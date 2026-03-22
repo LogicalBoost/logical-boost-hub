@@ -32,8 +32,8 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: https://nkeswemyzzkpsciwhlqc.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_bmY4kLd4w2h8ppxRZlNppA_cLASJXwA
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
