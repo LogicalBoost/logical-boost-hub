@@ -1,75 +1,95 @@
 'use client'
 
 import { useState } from 'react'
-
-const mockCompetitorAds = [
-  {
-    id: '1',
-    competitor_name: 'StormGuard Roofing',
-    competitor_website: 'https://stormguardroofing.com',
-    source: 'meta_ad_library',
-    ad_type: 'social',
-    content: 'Did your roof survive the storm? FREE inspection + we handle your insurance claim. Don\'t wait — damage gets worse every day. Call now: (555) 123-4567',
-    keywords: null,
-    notes: 'Heavy fear-based messaging. Similar free inspection offer. Running multiple variations.',
-    captured_at: '2026-03-15',
-  },
-  {
-    id: '2',
-    competitor_name: 'StormGuard Roofing',
-    competitor_website: 'https://stormguardroofing.com',
-    source: 'meta_ad_library',
-    ad_type: 'social',
-    content: 'JUST IN: Over 500 homes in your area reported storm damage this month. Is yours one of them? Get a FREE roof inspection before it\'s too late.',
-    keywords: null,
-    notes: 'Urgency-driven. Uses location targeting. Video ad format with drone footage of damaged roofs.',
-    captured_at: '2026-03-12',
-  },
-  {
-    id: '3',
-    competitor_name: 'DFW Roof Pros',
-    competitor_website: 'https://dfwroofpros.com',
-    source: 'google_ads',
-    ad_type: 'search',
-    content: 'Roof Repair DFW - $500 Off Any Repair | Licensed & Insured | Free Estimates. New Roof Starting at $5,999. Financing Available.',
-    keywords: ['roof repair dfw', 'roofing company dallas', 'storm damage roof repair'],
-    notes: 'Competing on price. Discount-heavy messaging. Weaker brand positioning.',
-    captured_at: '2026-03-18',
-  },
-  {
-    id: '4',
-    competitor_name: 'Apex Restoration',
-    competitor_website: 'https://apexrestoration.com',
-    source: 'meta_ad_library',
-    ad_type: 'social',
-    content: 'Your home deserves the best. Apex Restoration: Award-winning roofing, siding, and windows. Premium materials. Lifetime warranty. Schedule your consultation.',
-    keywords: null,
-    notes: 'Premium positioning. Less focused on storm damage, more on full home exterior. Beautiful creative assets.',
-    captured_at: '2026-03-10',
-  },
-  {
-    id: '5',
-    competitor_name: 'DFW Roof Pros',
-    competitor_website: 'https://dfwroofpros.com',
-    source: 'manual',
-    ad_type: 'landing_page',
-    content: 'Landing page at dfwroofpros.com/storm-damage — Features: comparison table vs competitors, customer video testimonials, live chat widget, "Price Match Guarantee" prominently displayed.',
-    keywords: ['storm damage repair', 'emergency roof repair'],
-    notes: 'Well-designed landing page. Price match guarantee could be an objection for our leads. Worth monitoring.',
-    captured_at: '2026-03-20',
-  },
-]
+import { useAppStore } from '@/lib/store'
+import { supabase } from '@/lib/supabase'
+import { showToast } from '@/lib/demo-toast'
 
 export default function CompetitorAdsPage() {
+  const { client, competitors, setCompetitors } = useAppStore()
   const [filterCompetitor, setFilterCompetitor] = useState('all')
   const [filterSource, setFilterSource] = useState('all')
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [saving, setSaving] = useState(false)
 
-  const competitors = [...new Set(mockCompetitorAds.map((a) => a.competitor_name))]
-  const filtered = mockCompetitorAds.filter((ad) => {
+  // Add form state
+  const [newCompetitorName, setNewCompetitorName] = useState('')
+  const [newCompetitorWebsite, setNewCompetitorWebsite] = useState('')
+  const [newSource, setNewSource] = useState('manual')
+  const [newAdType, setNewAdType] = useState('social')
+  const [newContent, setNewContent] = useState('')
+  const [newKeywords, setNewKeywords] = useState('')
+  const [newNotes, setNewNotes] = useState('')
+
+  if (!client) {
+    return (
+      <div className="empty-state">
+        <div className="empty-state-icon">&#128269;</div>
+        <div className="empty-state-text">No client selected</div>
+        <div className="empty-state-sub">Set up your client first in Business Overview.</div>
+      </div>
+    )
+  }
+
+  if (competitors.length === 0 && !showAddForm) {
+    return (
+      <div>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Competitor Ads</h1>
+            <p className="page-subtitle">Monitor competitor advertising across channels</p>
+          </div>
+          <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>+ Add Intel</button>
+        </div>
+        <div className="empty-state">
+          <div className="empty-state-icon">&#128269;</div>
+          <div className="empty-state-text">No competitor intel yet</div>
+          <div className="empty-state-sub">
+            Start tracking competitor ads by adding intel manually or through analysis.
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const competitorNames = [...new Set(competitors.map((a) => a.competitor_name))]
+  const filtered = competitors.filter((ad) => {
     if (filterCompetitor !== 'all' && ad.competitor_name !== filterCompetitor) return false
     if (filterSource !== 'all' && ad.source !== filterSource) return false
     return true
   })
+
+  async function handleAddIntel() {
+    if (!client || !newCompetitorName.trim() || !newContent.trim()) return
+    setSaving(true)
+    try {
+      const { data, error } = await supabase.from('competitor_intel').insert({
+        client_id: client.id,
+        competitor_name: newCompetitorName.trim(),
+        competitor_website: newCompetitorWebsite.trim() || null,
+        source: newSource,
+        ad_type: newAdType,
+        content: newContent.trim(),
+        keywords: newKeywords.trim() ? newKeywords.split(',').map((k) => k.trim()).filter(Boolean) : null,
+        notes: newNotes.trim() || null,
+      }).select().single()
+      if (error) throw error
+      setCompetitors([...competitors, data])
+      setShowAddForm(false)
+      setNewCompetitorName('')
+      setNewCompetitorWebsite('')
+      setNewSource('manual')
+      setNewAdType('social')
+      setNewContent('')
+      setNewKeywords('')
+      setNewNotes('')
+      showToast('Competitor intel added')
+    } catch (err) {
+      showToast(`Error: ${(err as Error).message}`)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div>
@@ -78,13 +98,70 @@ export default function CompetitorAdsPage() {
           <h1 className="page-title">Competitor Ads</h1>
           <p className="page-subtitle">Monitor competitor advertising across channels</p>
         </div>
-        <button className="btn btn-primary">+ Add Intel</button>
+        <button className="btn btn-primary" onClick={() => setShowAddForm(!showAddForm)}>
+          {showAddForm ? 'Cancel' : '+ Add Intel'}
+        </button>
       </div>
+
+      {showAddForm && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <div className="card-title">Add Competitor Intel</div>
+          <div style={{ marginTop: 16, display: 'grid', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-group">
+                <label className="form-label">Competitor Name *</label>
+                <input className="form-input" value={newCompetitorName} onChange={(e) => setNewCompetitorName(e.target.value)} placeholder="Company name" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Website</label>
+                <input className="form-input" value={newCompetitorWebsite} onChange={(e) => setNewCompetitorWebsite(e.target.value)} placeholder="https://..." />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-group">
+                <label className="form-label">Source</label>
+                <select className="form-input" value={newSource} onChange={(e) => setNewSource(e.target.value)}>
+                  <option value="manual">Manual</option>
+                  <option value="meta_ad_library">Meta Ad Library</option>
+                  <option value="google_ads">Google Ads</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Ad Type</label>
+                <select className="form-input" value={newAdType} onChange={(e) => setNewAdType(e.target.value)}>
+                  <option value="social">Social</option>
+                  <option value="search">Search</option>
+                  <option value="display">Display</option>
+                  <option value="video">Video</option>
+                  <option value="landing_page">Landing Page</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Ad Content / Copy *</label>
+              <textarea className="form-input form-textarea" rows={4} value={newContent} onChange={(e) => setNewContent(e.target.value)} placeholder="Paste the ad copy or describe the ad content..." />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Keywords (comma-separated)</label>
+              <input className="form-input" value={newKeywords} onChange={(e) => setNewKeywords(e.target.value)} placeholder="keyword 1, keyword 2, ..." />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Notes / Analysis</label>
+              <textarea className="form-input form-textarea" rows={3} value={newNotes} onChange={(e) => setNewNotes(e.target.value)} placeholder="Your observations about this ad..." />
+            </div>
+            <div>
+              <button className="btn btn-primary" onClick={handleAddIntel} disabled={saving || !newCompetitorName.trim() || !newContent.trim()}>
+                {saving ? 'Saving...' : 'Save Intel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
         <select className="form-input" style={{ maxWidth: 200 }} value={filterCompetitor} onChange={(e) => setFilterCompetitor(e.target.value)}>
           <option value="all">All Competitors</option>
-          {competitors.map((c) => <option key={c} value={c}>{c}</option>)}
+          {competitorNames.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
         <select className="form-input" style={{ maxWidth: 200 }} value={filterSource} onChange={(e) => setFilterSource(e.target.value)}>
           <option value="all">All Sources</option>
@@ -100,7 +177,7 @@ export default function CompetitorAdsPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
               <div>
                 <div className="card-title">{ad.competitor_name}</div>
-                <div className="card-meta">{ad.competitor_website}</div>
+                {ad.competitor_website && <div className="card-meta">{ad.competitor_website}</div>}
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <span className="tag">{ad.source.replace('_', ' ')}</span>
@@ -114,7 +191,7 @@ export default function CompetitorAdsPage() {
               <div style={{ marginBottom: 12 }}>
                 <span className="detail-label" style={{ marginBottom: 6, display: 'block' }}>Keywords</span>
                 <div className="tag-list">
-                  {ad.keywords.map((kw) => <span key={kw} className="tag">{kw}</span>)}
+                  {ad.keywords.map((kw: string) => <span key={kw} className="tag">{kw}</span>)}
                 </div>
               </div>
             )}
@@ -124,10 +201,15 @@ export default function CompetitorAdsPage() {
               </div>
             )}
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
-              Captured: {ad.captured_at}
+              Captured: {new Date(ad.captured_at).toLocaleDateString()}
             </div>
           </div>
         ))}
+        {filtered.length === 0 && competitors.length > 0 && (
+          <div className="empty-state">
+            <div className="empty-state-text">No results match your filters</div>
+          </div>
+        )}
       </div>
     </div>
   )

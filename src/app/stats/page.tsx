@@ -1,58 +1,104 @@
 'use client'
 
+import { useAppStore } from '@/lib/store'
+
 export default function StatsPage() {
+  const { client, avatars, offers, funnelInstances, copyComponents } = useAppStore()
+
+  if (!client) {
+    return (
+      <div className="empty-state">
+        <div className="empty-state-icon">&#9783;</div>
+        <div className="empty-state-text">No client selected</div>
+        <div className="empty-state-sub">Set up your client first in Business Overview.</div>
+      </div>
+    )
+  }
+
+  const approvedAvatars = avatars.filter((a) => a.status === 'approved')
+  const approvedOffers = offers.filter((o) => o.status === 'approved')
+  const activeFunnels = funnelInstances.filter((f) => f.status === 'active')
+  const totalCopy = copyComponents.filter((c) => c.status !== 'denied')
+
   return (
     <div>
       <div className="page-header">
         <div>
           <h1 className="page-title">Stats</h1>
-          <p className="page-subtitle">Campaign performance metrics and tracking</p>
+          <p className="page-subtitle">Campaign content overview for {client.name}</p>
         </div>
       </div>
 
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-label">Landing Page Visits</div>
-          <div className="stat-value">2,847</div>
-          <div className="stat-change positive">+12.3% vs last month</div>
+          <div className="stat-label">Avatars</div>
+          <div className="stat-value">{avatars.length}</div>
+          <div className="stat-change">
+            {approvedAvatars.length} approved
+          </div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Leads Generated</div>
-          <div className="stat-value">156</div>
-          <div className="stat-change positive">+8.2% vs last month</div>
+          <div className="stat-label">Offers</div>
+          <div className="stat-value">{offers.length}</div>
+          <div className="stat-change">
+            {approvedOffers.length} approved
+          </div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Calls</div>
-          <div className="stat-value">89</div>
-          <div className="stat-change positive">+15.6% vs last month</div>
+          <div className="stat-label">Funnels Generated</div>
+          <div className="stat-value">{funnelInstances.length}</div>
+          <div className="stat-change">
+            {activeFunnels.length} active
+          </div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Qualified Leads</div>
-          <div className="stat-value">42</div>
-          <div className="stat-change positive">+5.0% vs last month</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Cost Per Lead</div>
-          <div className="stat-value">$23.40</div>
-          <div className="stat-change positive">-$2.10 vs last month</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Conversion Rate</div>
-          <div className="stat-value">5.5%</div>
-          <div className="stat-change negative">-0.3% vs last month</div>
-        </div>
-      </div>
-
-      <div className="card" style={{ padding: 40, textAlign: 'center' as const }}>
-        <div className="empty-state">
-          <div className="empty-state-icon">&#9783;</div>
-          <div className="empty-state-text">Detailed Analytics Coming Soon</div>
-          <div className="empty-state-sub">
-            This page will integrate with GA4, CRM, call tracking, and ad platforms
-            to show real-time campaign performance data.
+          <div className="stat-label">Copy Components</div>
+          <div className="stat-value">{totalCopy.length}</div>
+          <div className="stat-change">
+            Across all funnels
           </div>
         </div>
       </div>
+
+      {funnelInstances.length > 0 ? (
+        <div className="card">
+          <div className="card-title">Generated Funnels</div>
+          <div style={{ marginTop: 16 }}>
+            {funnelInstances.map((fi) => {
+              const avatar = avatars.find((a) => a.id === fi.avatar_id)
+              const offer = offers.find((o) => o.id === fi.offer_id)
+              const components = copyComponents.filter(
+                (c) => c.funnel_instance_id === fi.id && c.status !== 'denied'
+              )
+              return (
+                <div key={fi.id} className="copy-item" style={{ padding: '16px 0' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                      {avatar?.name || 'Unknown Avatar'} + {offer?.name || 'Unknown Offer'}
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                      Angle: {fi.primary_angle} &bull; {components.length} copy items &bull; {fi.status}
+                    </div>
+                  </div>
+                  <span className={`badge ${fi.status === 'active' ? 'badge-approved' : 'badge-pending'}`}>
+                    {fi.status}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="card" style={{ padding: 40, textAlign: 'center' as const }}>
+          <div className="empty-state">
+            <div className="empty-state-icon">&#9783;</div>
+            <div className="empty-state-text">No funnels generated yet</div>
+            <div className="empty-state-sub">
+              Go to the Funnel page to generate your first campaign.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
