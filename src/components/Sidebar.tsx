@@ -16,7 +16,6 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname()
-  const basePath = '/logical-boost-hub'
 
   return (
     <aside className="sidebar">
@@ -27,12 +26,11 @@ export default function Sidebar() {
       </div>
       <nav className="sidebar-nav">
         {navItems.map((item) => {
-          const fullHref = `${basePath}${item.href}`
-          const isActive = pathname?.startsWith(fullHref.replace(/\/$/, '')) || false
+          const isActive = pathname?.startsWith(`/logical-boost-hub${item.href}`.replace(/\/$/, '')) || false
           return (
             <Link
               key={item.href}
-              href={fullHref}
+              href={item.href}
               className={`nav-item ${isActive ? 'active' : ''}`}
             >
               <span className="nav-icon">{item.icon}</span>
