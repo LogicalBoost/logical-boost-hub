@@ -1,37 +1,90 @@
 'use client'
 
 import { useState } from 'react'
-
-const mockClient = {
-  name: 'RoofCo Exteriors',
-  website: 'https://roofcoexteriors.com',
-  business_summary: 'RoofCo Exteriors is a full-service residential and commercial roofing company serving the greater Dallas-Fort Worth area. Founded in 2015, they specialize in storm damage repair, full roof replacements, and preventive maintenance. Their team of 45+ certified professionals has completed over 2,300 projects with a 4.9-star rating across 500+ Google reviews.',
-  services: 'Residential roof replacement, storm damage repair, roof inspections, gutter installation, commercial roofing, emergency tarping, insurance claim assistance',
-  differentiators: 'GAF Master Elite certified (top 3% of contractors nationwide), 24/7 emergency response team, full insurance claim management, lifetime workmanship warranty, drone-assisted inspections',
-  trust_signals: 'GAF Master Elite Certified, BBB A+ Rating, 2,300+ completed projects, 4.9 stars on Google (500+ reviews), Licensed and fully insured, 8+ years in business',
-  tone: 'Professional, reassuring, authoritative. Speak with confidence but empathy. The homeowner is stressed — acknowledge their situation and show expertise without being pushy.',
-  ad_copy_rules: {
-    tone_descriptors: ['professional', 'reassuring', 'authoritative', 'empathetic'],
-    banned_words: ['cheap', 'guarantee', 'best', '#1', 'act now'],
-    required_disclaimers: ['Licensed and insured', 'Results may vary'],
-    platform_rules: {
-      google: { headline_max_chars: 30, description_max_chars: 90 },
-      meta: { primary_text_max_chars: 125, headline_max_chars: 40 },
-      youtube: {},
-    },
-    brand_constraints: 'Never use all caps. Always include company name in first headline. No exclamation marks in Google Ads.',
-    compliance_notes: 'No income claims. No before/after photos without consent. All stats must be verifiable.',
-  },
-  ad_copy_notes: 'Focus on the free inspection offer as the primary hook. Emphasize the insurance claim assistance — this is our biggest differentiator. Avoid fear-mongering language; be factual about risks.',
-  competitors: [
-    { name: 'StormGuard Roofing', website: 'https://stormguardroofing.com', notes: 'Largest competitor. Heavy Meta ad spend. Similar free inspection offer.' },
-    { name: 'DFW Roof Pros', website: 'https://dfwroofpros.com', notes: 'Lower prices, aggressive discounting. Less established brand.' },
-    { name: 'Apex Restoration', website: 'https://apexrestoration.com', notes: 'Full restoration services. Higher price point. Premium positioning.' },
-  ],
-}
+import { MOCK_CLIENT } from '@/lib/mock-data'
+import { demoAction } from '@/lib/demo-toast'
+import type { Competitor } from '@/types/database'
 
 export default function BusinessOverviewPage() {
   const [editing, setEditing] = useState(false)
+
+  // Core fields
+  const [name, setName] = useState(MOCK_CLIENT.name)
+  const [website, setWebsite] = useState(MOCK_CLIENT.website)
+  const [businessSummary, setBusinessSummary] = useState(MOCK_CLIENT.business_summary ?? '')
+  const [services, setServices] = useState(MOCK_CLIENT.services ?? '')
+  const [differentiators, setDifferentiators] = useState(MOCK_CLIENT.differentiators ?? '')
+  const [trustSignals, setTrustSignals] = useState(MOCK_CLIENT.trust_signals ?? '')
+  const [tone, setTone] = useState(MOCK_CLIENT.tone ?? '')
+
+  // Ad copy rules
+  const [toneDescriptors, setToneDescriptors] = useState(
+    MOCK_CLIENT.ad_copy_rules?.tone_descriptors.join(', ') ?? ''
+  )
+  const [bannedWords, setBannedWords] = useState(
+    MOCK_CLIENT.ad_copy_rules?.banned_words.join(', ') ?? ''
+  )
+  const [requiredDisclaimers, setRequiredDisclaimers] = useState(
+    MOCK_CLIENT.ad_copy_rules?.required_disclaimers.join(', ') ?? ''
+  )
+  const [googleHeadlineMax, setGoogleHeadlineMax] = useState(
+    String(MOCK_CLIENT.ad_copy_rules?.platform_rules.google.headline_max_chars ?? 30)
+  )
+  const [googleDescMax, setGoogleDescMax] = useState(
+    String(MOCK_CLIENT.ad_copy_rules?.platform_rules.google.description_max_chars ?? 90)
+  )
+  const [metaPrimaryMax, setMetaPrimaryMax] = useState(
+    String(MOCK_CLIENT.ad_copy_rules?.platform_rules.meta.primary_text_max_chars ?? 125)
+  )
+  const [metaHeadlineMax, setMetaHeadlineMax] = useState(
+    String(MOCK_CLIENT.ad_copy_rules?.platform_rules.meta.headline_max_chars ?? 40)
+  )
+  const [brandConstraints, setBrandConstraints] = useState(
+    MOCK_CLIENT.ad_copy_rules?.brand_constraints ?? ''
+  )
+  const [complianceNotes, setComplianceNotes] = useState(
+    MOCK_CLIENT.ad_copy_rules?.compliance_notes ?? ''
+  )
+  const [adCopyNotes, setAdCopyNotes] = useState(MOCK_CLIENT.ad_copy_notes ?? '')
+
+  // Competitors
+  const [competitors, setCompetitors] = useState<Competitor[]>(
+    MOCK_CLIENT.competitors ?? []
+  )
+
+  // Call notes
+  const [callNotes, setCallNotes] = useState('')
+
+  // AI Analyze fields
+  const [analyzeUrl, setAnalyzeUrl] = useState('')
+  const [analyzeName, setAnalyzeName] = useState('')
+  const [analyzeNotes, setAnalyzeNotes] = useState('')
+
+  function handleToggleEdit() {
+    if (editing) {
+      demoAction('Save Business Data')
+    }
+    setEditing(!editing)
+  }
+
+  function handleAddCompetitor() {
+    setCompetitors([...competitors, { name: '', website: '', notes: '' }])
+  }
+
+  function updateCompetitor(index: number, field: keyof Competitor, value: string) {
+    const updated = competitors.map((c, i) =>
+      i === index ? { ...c, [field]: value } : c
+    )
+    setCompetitors(updated)
+  }
+
+  function removeCompetitor(index: number) {
+    setCompetitors(competitors.filter((_, i) => i !== index))
+  }
+
+  const toneList = toneDescriptors.split(',').map(s => s.trim()).filter(Boolean)
+  const bannedList = bannedWords.split(',').map(s => s.trim()).filter(Boolean)
+  const disclaimerList = requiredDisclaimers.split(',').map(s => s.trim()).filter(Boolean)
 
   return (
     <div>
@@ -40,12 +93,61 @@ export default function BusinessOverviewPage() {
           <h1 className="page-title">Business Overview</h1>
           <p className="page-subtitle">Foundation data that powers all AI generation</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setEditing(!editing)}>
-          {editing ? 'Save Changes' : 'Edit'}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-primary" onClick={handleToggleEdit}>
+            {editing ? 'Save Changes' : 'Edit'}
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gap: 16 }}>
+        {/* Analyze with AI */}
+        <div className="card">
+          <div className="card-title">Analyze with AI</div>
+          <div style={{ marginTop: 16, display: 'grid', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-group">
+                <label className="form-label">Business Website URL</label>
+                <input
+                  className="form-input"
+                  type="url"
+                  placeholder="https://example.com"
+                  value={analyzeUrl}
+                  onChange={(e) => setAnalyzeUrl(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Business Name</label>
+                <input
+                  className="form-input"
+                  type="text"
+                  placeholder="Company name"
+                  value={analyzeName}
+                  onChange={(e) => setAnalyzeName(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Call Notes / Raw Information</label>
+              <textarea
+                className="form-textarea"
+                rows={4}
+                placeholder="Paste call transcripts, notes, or any raw business information here..."
+                value={analyzeNotes}
+                onChange={(e) => setAnalyzeNotes(e.target.value)}
+              />
+            </div>
+            <div>
+              <button
+                className="btn btn-primary"
+                onClick={() => demoAction('Analyze Business with AI')}
+              >
+                Analyze Business
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Company Info */}
         <div className="card">
           <div className="card-title">Company Info</div>
@@ -53,28 +155,94 @@ export default function BusinessOverviewPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div className="detail-item">
                 <span className="detail-label">Business Name</span>
-                <span className="detail-value">{mockClient.name}</span>
+                {editing ? (
+                  <input
+                    className="form-input"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                ) : (
+                  <span className="detail-value">{name}</span>
+                )}
               </div>
               <div className="detail-item">
                 <span className="detail-label">Website</span>
-                <span className="detail-value">{mockClient.website}</span>
+                {editing ? (
+                  <input
+                    className="form-input"
+                    type="url"
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                  />
+                ) : (
+                  <span className="detail-value">{website}</span>
+                )}
               </div>
             </div>
             <div className="detail-item">
               <span className="detail-label">Business Summary</span>
-              <span className="detail-value">{mockClient.business_summary}</span>
+              {editing ? (
+                <textarea
+                  className="form-textarea"
+                  rows={4}
+                  value={businessSummary}
+                  onChange={(e) => setBusinessSummary(e.target.value)}
+                />
+              ) : (
+                <span className="detail-value">{businessSummary}</span>
+              )}
             </div>
             <div className="detail-item">
               <span className="detail-label">Services</span>
-              <span className="detail-value">{mockClient.services}</span>
+              {editing ? (
+                <textarea
+                  className="form-textarea"
+                  rows={3}
+                  value={services}
+                  onChange={(e) => setServices(e.target.value)}
+                />
+              ) : (
+                <span className="detail-value">{services}</span>
+              )}
             </div>
             <div className="detail-item">
               <span className="detail-label">Differentiators</span>
-              <span className="detail-value">{mockClient.differentiators}</span>
+              {editing ? (
+                <textarea
+                  className="form-textarea"
+                  rows={3}
+                  value={differentiators}
+                  onChange={(e) => setDifferentiators(e.target.value)}
+                />
+              ) : (
+                <span className="detail-value">{differentiators}</span>
+              )}
             </div>
             <div className="detail-item">
               <span className="detail-label">Trust Signals</span>
-              <span className="detail-value">{mockClient.trust_signals}</span>
+              {editing ? (
+                <textarea
+                  className="form-textarea"
+                  rows={3}
+                  value={trustSignals}
+                  onChange={(e) => setTrustSignals(e.target.value)}
+                />
+              ) : (
+                <span className="detail-value">{trustSignals}</span>
+              )}
+            </div>
+            <div className="detail-item">
+              <span className="detail-label">Tone</span>
+              {editing ? (
+                <textarea
+                  className="form-textarea"
+                  rows={2}
+                  value={tone}
+                  onChange={(e) => setTone(e.target.value)}
+                />
+              ) : (
+                <span className="detail-value">{tone}</span>
+              )}
             </div>
           </div>
         </div>
@@ -84,83 +252,227 @@ export default function BusinessOverviewPage() {
           <div className="card-title">Ad Copy Rules &amp; Guidelines</div>
           <div className="detail-grid" style={{ marginTop: 16 }}>
             <div className="detail-item">
-              <span className="detail-label">Tone</span>
-              <div className="tag-list">
-                {mockClient.ad_copy_rules.tone_descriptors.map((t) => (
-                  <span key={t} className="tag">{t}</span>
-                ))}
-              </div>
+              <span className="detail-label">Tone Descriptors</span>
+              {editing ? (
+                <input
+                  className="form-input"
+                  value={toneDescriptors}
+                  onChange={(e) => setToneDescriptors(e.target.value)}
+                  placeholder="Comma-separated values"
+                />
+              ) : (
+                <div className="tag-list">
+                  {toneList.map((t) => (
+                    <span key={t} className="tag">{t}</span>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="detail-item">
               <span className="detail-label">Banned Words</span>
-              <div className="tag-list">
-                {mockClient.ad_copy_rules.banned_words.map((w) => (
-                  <span key={w} className="tag" style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}>{w}</span>
-                ))}
-              </div>
+              {editing ? (
+                <input
+                  className="form-input"
+                  value={bannedWords}
+                  onChange={(e) => setBannedWords(e.target.value)}
+                  placeholder="Comma-separated values"
+                />
+              ) : (
+                <div className="tag-list">
+                  {bannedList.map((w) => (
+                    <span key={w} className="tag" style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}>{w}</span>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="detail-item">
               <span className="detail-label">Required Disclaimers</span>
-              <div className="tag-list">
-                {mockClient.ad_copy_rules.required_disclaimers.map((d) => (
-                  <span key={d} className="tag">{d}</span>
-                ))}
-              </div>
+              {editing ? (
+                <input
+                  className="form-input"
+                  value={requiredDisclaimers}
+                  onChange={(e) => setRequiredDisclaimers(e.target.value)}
+                  placeholder="Comma-separated values"
+                />
+              ) : (
+                <div className="tag-list">
+                  {disclaimerList.map((d) => (
+                    <span key={d} className="tag">{d}</span>
+                  ))}
+                </div>
+              )}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div className="detail-item">
                 <span className="detail-label">Google Ads Limits</span>
-                <span className="detail-value">
-                  Headlines: {mockClient.ad_copy_rules.platform_rules.google.headline_max_chars} chars |
-                  Descriptions: {mockClient.ad_copy_rules.platform_rules.google.description_max_chars} chars
-                </span>
+                {editing ? (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Headlines:</span>
+                    <input
+                      className="form-input"
+                      type="number"
+                      style={{ width: 70 }}
+                      value={googleHeadlineMax}
+                      onChange={(e) => setGoogleHeadlineMax(e.target.value)}
+                    />
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Desc:</span>
+                    <input
+                      className="form-input"
+                      type="number"
+                      style={{ width: 70 }}
+                      value={googleDescMax}
+                      onChange={(e) => setGoogleDescMax(e.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <span className="detail-value">
+                    Headlines: {googleHeadlineMax} chars | Descriptions: {googleDescMax} chars
+                  </span>
+                )}
               </div>
               <div className="detail-item">
                 <span className="detail-label">Meta Ads Limits</span>
-                <span className="detail-value">
-                  Primary text: {mockClient.ad_copy_rules.platform_rules.meta.primary_text_max_chars} chars |
-                  Headlines: {mockClient.ad_copy_rules.platform_rules.meta.headline_max_chars} chars
-                </span>
+                {editing ? (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Primary:</span>
+                    <input
+                      className="form-input"
+                      type="number"
+                      style={{ width: 70 }}
+                      value={metaPrimaryMax}
+                      onChange={(e) => setMetaPrimaryMax(e.target.value)}
+                    />
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Headlines:</span>
+                    <input
+                      className="form-input"
+                      type="number"
+                      style={{ width: 70 }}
+                      value={metaHeadlineMax}
+                      onChange={(e) => setMetaHeadlineMax(e.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <span className="detail-value">
+                    Primary text: {metaPrimaryMax} chars | Headlines: {metaHeadlineMax} chars
+                  </span>
+                )}
               </div>
             </div>
             <div className="detail-item">
               <span className="detail-label">Brand Constraints</span>
-              <span className="detail-value">{mockClient.ad_copy_rules.brand_constraints}</span>
+              {editing ? (
+                <textarea
+                  className="form-textarea"
+                  rows={2}
+                  value={brandConstraints}
+                  onChange={(e) => setBrandConstraints(e.target.value)}
+                />
+              ) : (
+                <span className="detail-value">{brandConstraints}</span>
+              )}
             </div>
             <div className="detail-item">
               <span className="detail-label">Compliance Notes</span>
-              <span className="detail-value">{mockClient.ad_copy_rules.compliance_notes}</span>
+              {editing ? (
+                <textarea
+                  className="form-textarea"
+                  rows={2}
+                  value={complianceNotes}
+                  onChange={(e) => setComplianceNotes(e.target.value)}
+                />
+              ) : (
+                <span className="detail-value">{complianceNotes}</span>
+              )}
             </div>
             <div className="detail-item">
               <span className="detail-label">Additional Copy Notes</span>
-              <span className="detail-value">{mockClient.ad_copy_notes}</span>
+              {editing ? (
+                <textarea
+                  className="form-textarea"
+                  rows={3}
+                  value={adCopyNotes}
+                  onChange={(e) => setAdCopyNotes(e.target.value)}
+                />
+              ) : (
+                <span className="detail-value">{adCopyNotes}</span>
+              )}
             </div>
           </div>
         </div>
 
         {/* Competitors */}
         <div className="card">
-          <div className="card-title">Competitors</div>
+          <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Competitors</span>
+            <button className="btn btn-secondary" onClick={handleAddCompetitor}>
+              Add Competitor
+            </button>
+          </div>
           <div style={{ marginTop: 16 }}>
-            {mockClient.competitors.map((c) => (
-              <div key={c.name} className="copy-item">
+            {competitors.map((c, index) => (
+              <div key={index} className="copy-item">
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{c.name}</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>{c.website}</div>
-                  <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{c.notes}</div>
+                  {editing ? (
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      <input
+                        className="form-input"
+                        placeholder="Competitor name"
+                        value={c.name}
+                        onChange={(e) => updateCompetitor(index, 'name', e.target.value)}
+                      />
+                      <input
+                        className="form-input"
+                        placeholder="Website URL"
+                        value={c.website}
+                        onChange={(e) => updateCompetitor(index, 'website', e.target.value)}
+                      />
+                      <textarea
+                        className="form-textarea"
+                        rows={2}
+                        placeholder="Notes about this competitor"
+                        value={c.notes}
+                        onChange={(e) => updateCompetitor(index, 'notes', e.target.value)}
+                      />
+                      <button
+                        className="btn btn-secondary"
+                        style={{ justifySelf: 'start', fontSize: 13 }}
+                        onClick={() => removeCompetitor(index)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ fontWeight: 600, marginBottom: 4 }}>{c.name}</div>
+                      <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>{c.website}</div>
+                      <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{c.notes}</div>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
+            {competitors.length === 0 && (
+              <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+                No competitors added yet. Click &quot;Add Competitor&quot; to get started.
+              </div>
+            )}
           </div>
         </div>
 
         {/* Call Notes */}
         <div className="card">
           <div className="card-title">Call Notes / Raw Inputs</div>
-          <div className="empty-state" style={{ padding: 32 }}>
-            <div className="empty-state-text">No call notes uploaded yet</div>
-            <div className="empty-state-sub">Upload call transcripts, documents, or paste notes here</div>
-            <button className="btn btn-secondary" style={{ marginTop: 16 }}>Upload Materials</button>
+          <div style={{ marginTop: 16 }}>
+            <div className="form-group">
+              <label className="form-label">Paste or type call notes, transcripts, or raw information</label>
+              <textarea
+                className="form-textarea"
+                rows={6}
+                placeholder="Upload call transcripts, documents, or paste notes here..."
+                value={callNotes}
+                onChange={(e) => setCallNotes(e.target.value)}
+              />
+            </div>
           </div>
         </div>
       </div>
