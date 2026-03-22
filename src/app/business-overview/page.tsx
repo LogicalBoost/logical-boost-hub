@@ -1,72 +1,165 @@
 'use client'
 
 import { useState } from 'react'
-import { MOCK_CLIENT } from '@/lib/mock-data'
-import { demoAction } from '@/lib/demo-toast'
+import { useAppStore } from '@/lib/store'
+import { analyzeBusiness } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
 import type { Competitor } from '@/types/database'
 
 export default function BusinessOverviewPage() {
+  const { client, loading, setClient, setLoading, setError, createClient, loadClientData } = useAppStore()
+
+  // New client setup form state
+  const [setupName, setSetupName] = useState('')
+  const [setupWebsite, setSetupWebsite] = useState('')
+  const [setupNotes, setSetupNotes] = useState('')
+  const [analyzeMessage, setAnalyzeMessage] = useState('')
+
+  // Editing state
   const [editing, setEditing] = useState(false)
 
-  // Core fields
-  const [name, setName] = useState(MOCK_CLIENT.name)
-  const [website, setWebsite] = useState(MOCK_CLIENT.website)
-  const [businessSummary, setBusinessSummary] = useState(MOCK_CLIENT.business_summary ?? '')
-  const [services, setServices] = useState(MOCK_CLIENT.services ?? '')
-  const [differentiators, setDifferentiators] = useState(MOCK_CLIENT.differentiators ?? '')
-  const [trustSignals, setTrustSignals] = useState(MOCK_CLIENT.trust_signals ?? '')
-  const [tone, setTone] = useState(MOCK_CLIENT.tone ?? '')
+  // Editable fields (initialized from client when toggling edit)
+  const [name, setName] = useState('')
+  const [website, setWebsite] = useState('')
+  const [businessSummary, setBusinessSummary] = useState('')
+  const [services, setServices] = useState('')
+  const [differentiators, setDifferentiators] = useState('')
+  const [trustSignals, setTrustSignals] = useState('')
+  const [tone, setTone] = useState('')
+  const [adCopyNotes, setAdCopyNotes] = useState('')
 
-  // Ad copy rules
-  const [toneDescriptors, setToneDescriptors] = useState(
-    MOCK_CLIENT.ad_copy_rules?.tone_descriptors.join(', ') ?? ''
-  )
-  const [bannedWords, setBannedWords] = useState(
-    MOCK_CLIENT.ad_copy_rules?.banned_words.join(', ') ?? ''
-  )
-  const [requiredDisclaimers, setRequiredDisclaimers] = useState(
-    MOCK_CLIENT.ad_copy_rules?.required_disclaimers.join(', ') ?? ''
-  )
-  const [googleHeadlineMax, setGoogleHeadlineMax] = useState(
-    String(MOCK_CLIENT.ad_copy_rules?.platform_rules.google.headline_max_chars ?? 30)
-  )
-  const [googleDescMax, setGoogleDescMax] = useState(
-    String(MOCK_CLIENT.ad_copy_rules?.platform_rules.google.description_max_chars ?? 90)
-  )
-  const [metaPrimaryMax, setMetaPrimaryMax] = useState(
-    String(MOCK_CLIENT.ad_copy_rules?.platform_rules.meta.primary_text_max_chars ?? 125)
-  )
-  const [metaHeadlineMax, setMetaHeadlineMax] = useState(
-    String(MOCK_CLIENT.ad_copy_rules?.platform_rules.meta.headline_max_chars ?? 40)
-  )
-  const [brandConstraints, setBrandConstraints] = useState(
-    MOCK_CLIENT.ad_copy_rules?.brand_constraints ?? ''
-  )
-  const [complianceNotes, setComplianceNotes] = useState(
-    MOCK_CLIENT.ad_copy_rules?.compliance_notes ?? ''
-  )
-  const [adCopyNotes, setAdCopyNotes] = useState(MOCK_CLIENT.ad_copy_notes ?? '')
+  // Ad copy rules editable fields
+  const [toneDescriptors, setToneDescriptors] = useState('')
+  const [bannedWords, setBannedWords] = useState('')
+  const [requiredDisclaimers, setRequiredDisclaimers] = useState('')
+  const [googleHeadlineMax, setGoogleHeadlineMax] = useState('30')
+  const [googleDescMax, setGoogleDescMax] = useState('90')
+  const [metaPrimaryMax, setMetaPrimaryMax] = useState('125')
+  const [metaHeadlineMax, setMetaHeadlineMax] = useState('40')
+  const [brandConstraints, setBrandConstraints] = useState('')
+  const [complianceNotes, setComplianceNotes] = useState('')
 
-  // Competitors
-  const [competitors, setCompetitors] = useState<Competitor[]>(
-    MOCK_CLIENT.competitors ?? []
-  )
+  // Competitors editable
+  const [competitors, setCompetitors] = useState<Competitor[]>([])
 
-  // Call notes
-  const [callNotes, setCallNotes] = useState('')
+  // Re-analyze state
+  const [reanalyzeNotes, setReanalyzeNotes] = useState('')
+  const [reanalyzing, setReanalyzing] = useState(false)
 
-  // AI Analyze fields
-  const [analyzeUrl, setAnalyzeUrl] = useState('')
-  const [analyzeName, setAnalyzeName] = useState('')
-  const [analyzeNotes, setAnalyzeNotes] = useState('')
+  // Saving state
+  const [saving, setSaving] = useState(false)
 
-  function handleToggleEdit() {
-    if (editing) {
-      demoAction('Save Business Data')
+  // --- New Client Setup ---
+  async function handleAnalyzeNewBusiness() {
+    if (!setupName.trim() || !setupWebsite.trim()) {
+      setError('Business name and website URL are required.')
+      return
     }
-    setEditing(!editing)
+    setLoading(true)
+    setAnalyzeMessage('Creating client record...')
+    setError(null)
+    try {
+      const newClient = await createClient(setupName.trim(), setupWebsite.trim())
+      if (!newClient) {
+        setLoading(false)
+        setAnalyzeMessage('')
+        return
+      }
+      setAnalyzeMessage('AI is analyzing your business...')
+      await analyzeBusiness(newClient.id, setupWebsite.trim(), setupNotes.trim())
+      await loadClientData(newClient.id)
+      setAnalyzeMessage('')
+      setSetupName('')
+      setSetupWebsite('')
+      setSetupNotes('')
+    } catch (err) {
+      setError((err as Error).message)
+      setAnalyzeMessage('')
+    } finally {
+      setLoading(false)
+    }
   }
 
+  // --- Edit toggle ---
+  function handleStartEdit() {
+    if (!client) return
+    setName(client.name)
+    setWebsite(client.website)
+    setBusinessSummary(client.business_summary ?? '')
+    setServices(client.services ?? '')
+    setDifferentiators(client.differentiators ?? '')
+    setTrustSignals(client.trust_signals ?? '')
+    setTone(client.tone ?? '')
+    setAdCopyNotes(client.ad_copy_notes ?? '')
+    setToneDescriptors(client.ad_copy_rules?.tone_descriptors.join(', ') ?? '')
+    setBannedWords(client.ad_copy_rules?.banned_words.join(', ') ?? '')
+    setRequiredDisclaimers(client.ad_copy_rules?.required_disclaimers.join(', ') ?? '')
+    setGoogleHeadlineMax(String(client.ad_copy_rules?.platform_rules.google.headline_max_chars ?? 30))
+    setGoogleDescMax(String(client.ad_copy_rules?.platform_rules.google.description_max_chars ?? 90))
+    setMetaPrimaryMax(String(client.ad_copy_rules?.platform_rules.meta.primary_text_max_chars ?? 125))
+    setMetaHeadlineMax(String(client.ad_copy_rules?.platform_rules.meta.headline_max_chars ?? 40))
+    setBrandConstraints(client.ad_copy_rules?.brand_constraints ?? '')
+    setComplianceNotes(client.ad_copy_rules?.compliance_notes ?? '')
+    setCompetitors(client.competitors ? [...client.competitors] : [])
+    setEditing(true)
+  }
+
+  async function handleSave() {
+    if (!client) return
+    setSaving(true)
+    setError(null)
+    try {
+      const updates: Record<string, unknown> = {
+        name: name.trim(),
+        website: website.trim(),
+        business_summary: businessSummary.trim() || null,
+        services: services.trim() || null,
+        differentiators: differentiators.trim() || null,
+        trust_signals: trustSignals.trim() || null,
+        tone: tone.trim() || null,
+        ad_copy_notes: adCopyNotes.trim() || null,
+        competitors: competitors.length > 0 ? competitors : null,
+        ad_copy_rules: {
+          tone_descriptors: toneDescriptors.split(',').map(s => s.trim()).filter(Boolean),
+          banned_words: bannedWords.split(',').map(s => s.trim()).filter(Boolean),
+          required_disclaimers: requiredDisclaimers.split(',').map(s => s.trim()).filter(Boolean),
+          platform_rules: {
+            google: {
+              headline_max_chars: parseInt(googleHeadlineMax) || 30,
+              description_max_chars: parseInt(googleDescMax) || 90,
+            },
+            meta: {
+              primary_text_max_chars: parseInt(metaPrimaryMax) || 125,
+              headline_max_chars: parseInt(metaHeadlineMax) || 40,
+            },
+            youtube: {},
+          },
+          brand_constraints: brandConstraints.trim(),
+          compliance_notes: complianceNotes.trim(),
+        },
+      }
+      const { error: updateError } = await supabase
+        .from('clients')
+        .update(updates)
+        .eq('id', client.id)
+      if (updateError) {
+        setError(updateError.message)
+      } else {
+        await loadClientData(client.id)
+        setEditing(false)
+      }
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function handleCancelEdit() {
+    setEditing(false)
+  }
+
+  // --- Competitors (edit mode) ---
   function handleAddCompetitor() {
     setCompetitors([...competitors, { name: '', website: '', notes: '' }])
   }
@@ -82,9 +175,95 @@ export default function BusinessOverviewPage() {
     setCompetitors(competitors.filter((_, i) => i !== index))
   }
 
-  const toneList = toneDescriptors.split(',').map(s => s.trim()).filter(Boolean)
-  const bannedList = bannedWords.split(',').map(s => s.trim()).filter(Boolean)
-  const disclaimerList = requiredDisclaimers.split(',').map(s => s.trim()).filter(Boolean)
+  // --- Re-analyze ---
+  async function handleReanalyze() {
+    if (!client) return
+    setReanalyzing(true)
+    setError(null)
+    try {
+      await analyzeBusiness(client.id, client.website, reanalyzeNotes.trim())
+      await loadClientData(client.id)
+      setReanalyzeNotes('')
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setReanalyzing(false)
+    }
+  }
+
+  // --- No client: show setup form ---
+  if (!client) {
+    return (
+      <div>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Business Overview</h1>
+            <p className="page-subtitle">Set up a new client to get started</p>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-title">New Client Setup</div>
+          <div style={{ marginTop: 16, display: 'grid', gap: 12 }}>
+            <div className="form-group">
+              <label className="form-label">Business Name *</label>
+              <input
+                className="form-input"
+                type="text"
+                placeholder="Enter business name"
+                value={setupName}
+                onChange={(e) => setSetupName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Business Website URL *</label>
+              <input
+                className="form-input"
+                type="url"
+                placeholder="https://example.com"
+                value={setupWebsite}
+                onChange={(e) => setSetupWebsite(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Call Notes / Raw Information</label>
+              <textarea
+                className="form-textarea"
+                rows={6}
+                placeholder="Paste call transcripts, notes, or any raw business information here..."
+                value={setupNotes}
+                onChange={(e) => setSetupNotes(e.target.value)}
+              />
+            </div>
+            {analyzeMessage && (
+              <div style={{ padding: 16, background: 'var(--surface-hover, #f0f4ff)', borderRadius: 8, textAlign: 'center' }}>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{analyzeMessage}</div>
+                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>Processing...</div>
+              </div>
+            )}
+            <div>
+              <button
+                className="btn btn-primary"
+                onClick={handleAnalyzeNewBusiness}
+                disabled={loading || !setupName.trim() || !setupWebsite.trim()}
+              >
+                {loading ? 'Processing...' : 'Analyze Business'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // --- Client exists: show data ---
+  const adRules = client.ad_copy_rules
+  const clientCompetitors = client.competitors ?? []
+
+  const toneList = adRules?.tone_descriptors ?? []
+  const bannedList = adRules?.banned_words ?? []
+  const disclaimerList = adRules?.required_disclaimers ?? []
 
   return (
     <div>
@@ -94,60 +273,24 @@ export default function BusinessOverviewPage() {
           <p className="page-subtitle">Foundation data that powers all AI generation</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-primary" onClick={handleToggleEdit}>
-            {editing ? 'Save Changes' : 'Edit'}
-          </button>
+          {editing ? (
+            <>
+              <button className="btn btn-secondary" onClick={handleCancelEdit} disabled={saving}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </>
+          ) : (
+            <button className="btn btn-primary" onClick={handleStartEdit}>
+              Edit
+            </button>
+          )}
         </div>
       </div>
 
       <div style={{ display: 'grid', gap: 16 }}>
-        {/* Analyze with AI */}
-        <div className="card">
-          <div className="card-title">Analyze with AI</div>
-          <div style={{ marginTop: 16, display: 'grid', gap: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div className="form-group">
-                <label className="form-label">Business Website URL</label>
-                <input
-                  className="form-input"
-                  type="url"
-                  placeholder="https://example.com"
-                  value={analyzeUrl}
-                  onChange={(e) => setAnalyzeUrl(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Business Name</label>
-                <input
-                  className="form-input"
-                  type="text"
-                  placeholder="Company name"
-                  value={analyzeName}
-                  onChange={(e) => setAnalyzeName(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Call Notes / Raw Information</label>
-              <textarea
-                className="form-textarea"
-                rows={4}
-                placeholder="Paste call transcripts, notes, or any raw business information here..."
-                value={analyzeNotes}
-                onChange={(e) => setAnalyzeNotes(e.target.value)}
-              />
-            </div>
-            <div>
-              <button
-                className="btn btn-primary"
-                onClick={() => demoAction('Analyze Business with AI')}
-              >
-                Analyze Business
-              </button>
-            </div>
-          </div>
-        </div>
-
         {/* Company Info */}
         <div className="card">
           <div className="card-title">Company Info</div>
@@ -162,7 +305,7 @@ export default function BusinessOverviewPage() {
                     onChange={(e) => setName(e.target.value)}
                   />
                 ) : (
-                  <span className="detail-value">{name}</span>
+                  <span className="detail-value">{client.name}</span>
                 )}
               </div>
               <div className="detail-item">
@@ -175,7 +318,7 @@ export default function BusinessOverviewPage() {
                     onChange={(e) => setWebsite(e.target.value)}
                   />
                 ) : (
-                  <span className="detail-value">{website}</span>
+                  <span className="detail-value">{client.website}</span>
                 )}
               </div>
             </div>
@@ -188,8 +331,13 @@ export default function BusinessOverviewPage() {
                   value={businessSummary}
                   onChange={(e) => setBusinessSummary(e.target.value)}
                 />
+              ) : client.business_summary ? (
+                <span className="detail-value">{client.business_summary}</span>
               ) : (
-                <span className="detail-value">{businessSummary}</span>
+                <div className="empty-state">
+                  <span className="empty-state-text">Not yet analyzed</span>
+                  <span className="empty-state-sub">Click Analyze Business below to generate</span>
+                </div>
               )}
             </div>
             <div className="detail-item">
@@ -201,8 +349,13 @@ export default function BusinessOverviewPage() {
                   value={services}
                   onChange={(e) => setServices(e.target.value)}
                 />
+              ) : client.services ? (
+                <span className="detail-value">{client.services}</span>
               ) : (
-                <span className="detail-value">{services}</span>
+                <div className="empty-state">
+                  <span className="empty-state-text">Not yet analyzed</span>
+                  <span className="empty-state-sub">Click Analyze Business below to generate</span>
+                </div>
               )}
             </div>
             <div className="detail-item">
@@ -214,8 +367,13 @@ export default function BusinessOverviewPage() {
                   value={differentiators}
                   onChange={(e) => setDifferentiators(e.target.value)}
                 />
+              ) : client.differentiators ? (
+                <span className="detail-value">{client.differentiators}</span>
               ) : (
-                <span className="detail-value">{differentiators}</span>
+                <div className="empty-state">
+                  <span className="empty-state-text">Not yet analyzed</span>
+                  <span className="empty-state-sub">Click Analyze Business below to generate</span>
+                </div>
               )}
             </div>
             <div className="detail-item">
@@ -227,8 +385,13 @@ export default function BusinessOverviewPage() {
                   value={trustSignals}
                   onChange={(e) => setTrustSignals(e.target.value)}
                 />
+              ) : client.trust_signals ? (
+                <span className="detail-value">{client.trust_signals}</span>
               ) : (
-                <span className="detail-value">{trustSignals}</span>
+                <div className="empty-state">
+                  <span className="empty-state-text">Not yet analyzed</span>
+                  <span className="empty-state-sub">Click Analyze Business below to generate</span>
+                </div>
               )}
             </div>
             <div className="detail-item">
@@ -240,180 +403,223 @@ export default function BusinessOverviewPage() {
                   value={tone}
                   onChange={(e) => setTone(e.target.value)}
                 />
+              ) : client.tone ? (
+                <span className="detail-value">{client.tone}</span>
               ) : (
-                <span className="detail-value">{tone}</span>
+                <div className="empty-state">
+                  <span className="empty-state-text">Not yet analyzed</span>
+                  <span className="empty-state-sub">Click Analyze Business below to generate</span>
+                </div>
               )}
             </div>
           </div>
         </div>
 
         {/* Ad Copy Rules */}
-        <div className="card">
-          <div className="card-title">Ad Copy Rules &amp; Guidelines</div>
-          <div className="detail-grid" style={{ marginTop: 16 }}>
-            <div className="detail-item">
-              <span className="detail-label">Tone Descriptors</span>
-              {editing ? (
-                <input
-                  className="form-input"
-                  value={toneDescriptors}
-                  onChange={(e) => setToneDescriptors(e.target.value)}
-                  placeholder="Comma-separated values"
-                />
-              ) : (
-                <div className="tag-list">
-                  {toneList.map((t) => (
-                    <span key={t} className="tag">{t}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Banned Words</span>
-              {editing ? (
-                <input
-                  className="form-input"
-                  value={bannedWords}
-                  onChange={(e) => setBannedWords(e.target.value)}
-                  placeholder="Comma-separated values"
-                />
-              ) : (
-                <div className="tag-list">
-                  {bannedList.map((w) => (
-                    <span key={w} className="tag" style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}>{w}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Required Disclaimers</span>
-              {editing ? (
-                <input
-                  className="form-input"
-                  value={requiredDisclaimers}
-                  onChange={(e) => setRequiredDisclaimers(e.target.value)}
-                  placeholder="Comma-separated values"
-                />
-              ) : (
-                <div className="tag-list">
-                  {disclaimerList.map((d) => (
-                    <span key={d} className="tag">{d}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        {(adRules || editing) && (
+          <div className="card">
+            <div className="card-title">Ad Copy Rules &amp; Guidelines</div>
+            <div className="detail-grid" style={{ marginTop: 16 }}>
               <div className="detail-item">
-                <span className="detail-label">Google Ads Limits</span>
+                <span className="detail-label">Tone Descriptors</span>
                 {editing ? (
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Headlines:</span>
-                    <input
-                      className="form-input"
-                      type="number"
-                      style={{ width: 70 }}
-                      value={googleHeadlineMax}
-                      onChange={(e) => setGoogleHeadlineMax(e.target.value)}
-                    />
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Desc:</span>
-                    <input
-                      className="form-input"
-                      type="number"
-                      style={{ width: 70 }}
-                      value={googleDescMax}
-                      onChange={(e) => setGoogleDescMax(e.target.value)}
-                    />
+                  <input
+                    className="form-input"
+                    value={toneDescriptors}
+                    onChange={(e) => setToneDescriptors(e.target.value)}
+                    placeholder="Comma-separated values"
+                  />
+                ) : toneList.length > 0 ? (
+                  <div className="tag-list">
+                    {toneList.map((t) => (
+                      <span key={t} className="tag">{t}</span>
+                    ))}
                   </div>
                 ) : (
-                  <span className="detail-value">
-                    Headlines: {googleHeadlineMax} chars | Descriptions: {googleDescMax} chars
-                  </span>
+                  <div className="empty-state">
+                    <span className="empty-state-text">No tone descriptors set</span>
+                  </div>
                 )}
               </div>
               <div className="detail-item">
-                <span className="detail-label">Meta Ads Limits</span>
+                <span className="detail-label">Banned Words</span>
                 {editing ? (
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Primary:</span>
-                    <input
-                      className="form-input"
-                      type="number"
-                      style={{ width: 70 }}
-                      value={metaPrimaryMax}
-                      onChange={(e) => setMetaPrimaryMax(e.target.value)}
-                    />
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Headlines:</span>
-                    <input
-                      className="form-input"
-                      type="number"
-                      style={{ width: 70 }}
-                      value={metaHeadlineMax}
-                      onChange={(e) => setMetaHeadlineMax(e.target.value)}
-                    />
+                  <input
+                    className="form-input"
+                    value={bannedWords}
+                    onChange={(e) => setBannedWords(e.target.value)}
+                    placeholder="Comma-separated values"
+                  />
+                ) : bannedList.length > 0 ? (
+                  <div className="tag-list">
+                    {bannedList.map((w) => (
+                      <span key={w} className="tag" style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}>{w}</span>
+                    ))}
                   </div>
                 ) : (
-                  <span className="detail-value">
-                    Primary text: {metaPrimaryMax} chars | Headlines: {metaHeadlineMax} chars
-                  </span>
+                  <div className="empty-state">
+                    <span className="empty-state-text">No banned words set</span>
+                  </div>
                 )}
               </div>
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Brand Constraints</span>
-              {editing ? (
-                <textarea
-                  className="form-textarea"
-                  rows={2}
-                  value={brandConstraints}
-                  onChange={(e) => setBrandConstraints(e.target.value)}
-                />
-              ) : (
-                <span className="detail-value">{brandConstraints}</span>
-              )}
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Compliance Notes</span>
-              {editing ? (
-                <textarea
-                  className="form-textarea"
-                  rows={2}
-                  value={complianceNotes}
-                  onChange={(e) => setComplianceNotes(e.target.value)}
-                />
-              ) : (
-                <span className="detail-value">{complianceNotes}</span>
-              )}
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Additional Copy Notes</span>
-              {editing ? (
-                <textarea
-                  className="form-textarea"
-                  rows={3}
-                  value={adCopyNotes}
-                  onChange={(e) => setAdCopyNotes(e.target.value)}
-                />
-              ) : (
-                <span className="detail-value">{adCopyNotes}</span>
-              )}
+              <div className="detail-item">
+                <span className="detail-label">Required Disclaimers</span>
+                {editing ? (
+                  <input
+                    className="form-input"
+                    value={requiredDisclaimers}
+                    onChange={(e) => setRequiredDisclaimers(e.target.value)}
+                    placeholder="Comma-separated values"
+                  />
+                ) : disclaimerList.length > 0 ? (
+                  <div className="tag-list">
+                    {disclaimerList.map((d) => (
+                      <span key={d} className="tag">{d}</span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state">
+                    <span className="empty-state-text">No disclaimers set</span>
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="detail-item">
+                  <span className="detail-label">Google Ads Limits</span>
+                  {editing ? (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Headlines:</span>
+                      <input
+                        className="form-input"
+                        type="number"
+                        style={{ width: 70 }}
+                        value={googleHeadlineMax}
+                        onChange={(e) => setGoogleHeadlineMax(e.target.value)}
+                      />
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Desc:</span>
+                      <input
+                        className="form-input"
+                        type="number"
+                        style={{ width: 70 }}
+                        value={googleDescMax}
+                        onChange={(e) => setGoogleDescMax(e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <span className="detail-value">
+                      Headlines: {adRules?.platform_rules.google.headline_max_chars ?? 30} chars | Descriptions: {adRules?.platform_rules.google.description_max_chars ?? 90} chars
+                    </span>
+                  )}
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Meta Ads Limits</span>
+                  {editing ? (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Primary:</span>
+                      <input
+                        className="form-input"
+                        type="number"
+                        style={{ width: 70 }}
+                        value={metaPrimaryMax}
+                        onChange={(e) => setMetaPrimaryMax(e.target.value)}
+                      />
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Headlines:</span>
+                      <input
+                        className="form-input"
+                        type="number"
+                        style={{ width: 70 }}
+                        value={metaHeadlineMax}
+                        onChange={(e) => setMetaHeadlineMax(e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <span className="detail-value">
+                      Primary text: {adRules?.platform_rules.meta.primary_text_max_chars ?? 125} chars | Headlines: {adRules?.platform_rules.meta.headline_max_chars ?? 40} chars
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Brand Constraints</span>
+                {editing ? (
+                  <textarea
+                    className="form-textarea"
+                    rows={2}
+                    value={brandConstraints}
+                    onChange={(e) => setBrandConstraints(e.target.value)}
+                  />
+                ) : adRules?.brand_constraints ? (
+                  <span className="detail-value">{adRules.brand_constraints}</span>
+                ) : (
+                  <div className="empty-state">
+                    <span className="empty-state-text">No brand constraints set</span>
+                  </div>
+                )}
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Compliance Notes</span>
+                {editing ? (
+                  <textarea
+                    className="form-textarea"
+                    rows={2}
+                    value={complianceNotes}
+                    onChange={(e) => setComplianceNotes(e.target.value)}
+                  />
+                ) : adRules?.compliance_notes ? (
+                  <span className="detail-value">{adRules.compliance_notes}</span>
+                ) : (
+                  <div className="empty-state">
+                    <span className="empty-state-text">No compliance notes set</span>
+                  </div>
+                )}
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Additional Copy Notes</span>
+                {editing ? (
+                  <textarea
+                    className="form-textarea"
+                    rows={3}
+                    value={adCopyNotes}
+                    onChange={(e) => setAdCopyNotes(e.target.value)}
+                  />
+                ) : client.ad_copy_notes ? (
+                  <span className="detail-value">{client.ad_copy_notes}</span>
+                ) : (
+                  <div className="empty-state">
+                    <span className="empty-state-text">No additional copy notes</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {!adRules && !editing && (
+          <div className="card">
+            <div className="card-title">Ad Copy Rules &amp; Guidelines</div>
+            <div className="empty-state" style={{ marginTop: 16, padding: 24, textAlign: 'center' }}>
+              <span className="empty-state-text">Not yet analyzed</span>
+              <span className="empty-state-sub">Click Analyze Business below to generate ad copy rules</span>
+            </div>
+          </div>
+        )}
 
         {/* Competitors */}
         <div className="card">
           <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>Competitors</span>
-            <button className="btn btn-secondary" onClick={handleAddCompetitor}>
-              Add Competitor
-            </button>
+            {editing && (
+              <button className="btn btn-secondary" onClick={handleAddCompetitor}>
+                Add Competitor
+              </button>
+            )}
           </div>
           <div style={{ marginTop: 16 }}>
-            {competitors.map((c, index) => (
-              <div key={index} className="copy-item">
-                <div style={{ flex: 1 }}>
-                  {editing ? (
-                    <div style={{ display: 'grid', gap: 8 }}>
+            {editing ? (
+              <>
+                {competitors.map((c, index) => (
+                  <div key={index} className="copy-item" style={{ marginBottom: 12 }}>
+                    <div style={{ flex: 1, display: 'grid', gap: 8 }}>
                       <input
                         className="form-input"
                         placeholder="Competitor name"
@@ -441,37 +647,61 @@ export default function BusinessOverviewPage() {
                         Remove
                       </button>
                     </div>
-                  ) : (
-                    <>
-                      <div style={{ fontWeight: 600, marginBottom: 4 }}>{c.name}</div>
-                      <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>{c.website}</div>
-                      <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{c.notes}</div>
-                    </>
-                  )}
+                  </div>
+                ))}
+                {competitors.length === 0 && (
+                  <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+                    No competitors added yet. Click &quot;Add Competitor&quot; to get started.
+                  </div>
+                )}
+              </>
+            ) : clientCompetitors.length > 0 ? (
+              clientCompetitors.map((c, index) => (
+                <div key={index} className="copy-item" style={{ marginBottom: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>{c.name}</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>{c.website}</div>
+                    <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{c.notes}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
-            {competitors.length === 0 && (
-              <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
-                No competitors added yet. Click &quot;Add Competitor&quot; to get started.
+              ))
+            ) : (
+              <div className="empty-state" style={{ padding: 24, textAlign: 'center' }}>
+                <span className="empty-state-text">No competitors found</span>
+                <span className="empty-state-sub">Not yet analyzed -- click Analyze Business below</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Call Notes */}
+        {/* Re-analyze Section */}
         <div className="card">
-          <div className="card-title">Call Notes / Raw Inputs</div>
-          <div style={{ marginTop: 16 }}>
+          <div className="card-title">Re-analyze Business</div>
+          <div style={{ marginTop: 16, display: 'grid', gap: 12 }}>
             <div className="form-group">
-              <label className="form-label">Paste or type call notes, transcripts, or raw information</label>
+              <label className="form-label">New Call Notes / Additional Information</label>
               <textarea
                 className="form-textarea"
                 rows={6}
-                placeholder="Upload call transcripts, documents, or paste notes here..."
-                value={callNotes}
-                onChange={(e) => setCallNotes(e.target.value)}
+                placeholder="Paste new call transcripts, notes, or any additional business information to re-run AI analysis..."
+                value={reanalyzeNotes}
+                onChange={(e) => setReanalyzeNotes(e.target.value)}
               />
+            </div>
+            {reanalyzing && (
+              <div style={{ padding: 16, background: 'var(--surface-hover, #f0f4ff)', borderRadius: 8, textAlign: 'center' }}>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>AI is analyzing your business...</div>
+                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>Processing...</div>
+              </div>
+            )}
+            <div>
+              <button
+                className="btn btn-primary"
+                onClick={handleReanalyze}
+                disabled={reanalyzing || !reanalyzeNotes.trim()}
+              >
+                {reanalyzing ? 'Processing...' : 'Re-analyze Business'}
+              </button>
             </div>
           </div>
         </div>

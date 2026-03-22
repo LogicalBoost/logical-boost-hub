@@ -1,0 +1,74 @@
+import { supabase } from './supabase'
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+
+async function callEdgeFunction(name: string, body: Record<string, unknown>) {
+  const { data: { session } } = await supabase.auth.getSession()
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session?.access_token || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error || `Edge function ${name} failed`)
+  }
+  return res.json()
+}
+
+// Workflow 1: Analyze a new business
+export async function analyzeBusiness(clientId: string, websiteUrl: string, callNotes: string) {
+  return callEdgeFunction('analyze-business', {
+    client_id: clientId,
+    website_url: websiteUrl,
+    call_notes: callNotes,
+  })
+}
+
+// Workflow 2: Generate intake questions
+export async function generateIntake(clientId: string) {
+  return callEdgeFunction('generate-intake', { client_id: clientId })
+}
+
+// Workflow 3: Refine system after intake
+export async function refineSystem(clientId: string, newCallNotes?: string, newMaterials?: string) {
+  return callEdgeFunction('refine-system', {
+    client_id: clientId,
+    new_call_notes: newCallNotes,
+    new_materials: newMaterials,
+  })
+}
+
+// Workflow 4: Generate funnel
+export async function generateFunnel(avatarId: string, offerId: string, primaryAngle: string, secondaryAngles: string[]) {
+  return callEdgeFunction('generate-funnel', {
+    avatar_id: avatarId,
+    offer_id: offerId,
+    primary_angle: primaryAngle,
+    secondary_angles: secondaryAngles,
+  })
+}
+
+// Workflow 5: Generate more items for a section
+export async function generateMore(funnelInstanceId: string, sectionType: string) {
+  return callEdgeFunction('generate-more', {
+    funnel_instance_id: funnelInstanceId,
+    section_type: sectionType,
+  })
+}
+
+// Prompt 0: Recommend angles
+export async function recommendAngles(avatarId: string, offerId: string) {
+  return callEdgeFunction('recommend-angles', {
+    avatar_id: avatarId,
+    offer_id: offerId,
+  })
+}
+
+// Prompt 8: Suggest offers
+export async function suggestOffers(clientId: string) {
+  return callEdgeFunction('suggest-offers', { client_id: clientId })
+}

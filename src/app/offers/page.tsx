@@ -1,29 +1,69 @@
 'use client'
 
 import { useState } from 'react'
-import { MOCK_OFFERS } from '@/lib/mock-data'
-import { demoAction, showToast } from '@/lib/demo-toast'
+import { useAppStore } from '@/lib/store'
+import { suggestOffers } from '@/lib/api'
+import { showToast } from '@/lib/demo-toast'
 import type { Offer } from '@/types/database'
 
 type StatusFilter = 'all' | 'approved' | 'denied'
 
 export default function OffersPage() {
-  const [offers, setOffers] = useState<Offer[]>(MOCK_OFFERS)
+  const { client, offers, updateOffer, refreshOffers, setLoading, loading } = useAppStore()
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [suggesting, setSuggesting] = useState(false)
 
   const filteredOffers = statusFilter === 'all'
     ? offers
     : offers.filter((o) => o.status === statusFilter)
 
   function handleDeny(offerId: string) {
-    setOffers((prev) =>
-      prev.map((o) => (o.id === offerId ? { ...o, status: 'denied' as const } : o))
-    )
+    updateOffer(offerId, { status: 'denied' })
     if (selectedOffer?.id === offerId) {
       setSelectedOffer((prev) => prev ? { ...prev, status: 'denied' as const } : null)
     }
     showToast('Offer denied')
+  }
+
+  function handleApprove(offerId: string) {
+    updateOffer(offerId, { status: 'approved' })
+    if (selectedOffer?.id === offerId) {
+      setSelectedOffer((prev) => prev ? { ...prev, status: 'approved' as const } : null)
+    }
+    showToast('Offer approved')
+  }
+
+  async function handleSuggestMore() {
+    if (!client) return
+    setSuggesting(true)
+    setLoading(true)
+    try {
+      await suggestOffers(client.id)
+      await refreshOffers(client.id)
+      showToast('New offers suggested successfully')
+    } catch (err) {
+      showToast(`Error: ${(err as Error).message}`)
+    } finally {
+      setSuggesting(false)
+      setLoading(false)
+    }
+  }
+
+  if (!client || offers.length === 0) {
+    return (
+      <div>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Offers</h1>
+            <p className="page-subtitle">Conversion propositions for campaigns</p>
+          </div>
+        </div>
+        <div className="empty-state">
+          No offers yet. Analyze your business first to get AI-generated offer suggestions.
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -33,7 +73,13 @@ export default function OffersPage() {
           <h1 className="page-title">Offers</h1>
           <p className="page-subtitle">Conversion propositions for campaigns</p>
         </div>
-        <button className="btn btn-primary" onClick={() => demoAction('Suggest Offers with AI')}>Suggest Offers</button>
+        <button
+          className="btn btn-primary"
+          onClick={handleSuggestMore}
+          disabled={suggesting || loading}
+        >
+          {suggesting ? 'Suggesting...' : 'Suggest More Offers'}
+        </button>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
@@ -59,8 +105,8 @@ export default function OffersPage() {
             <div className="card-body" style={{ marginTop: 8 }}>{offer.primary_cta}</div>
             <div className="card-actions">
               <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); setSelectedOffer(offer) }}>View Details</button>
-              <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); demoAction('Edit Offer') }}>Edit</button>
               <button className="btn btn-danger btn-sm" onClick={(e) => { e.stopPropagation(); handleDeny(offer.id) }}>Deny</button>
+              <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); handleApprove(offer.id) }}>Approve</button>
             </div>
           </div>
         ))}
@@ -128,8 +174,7 @@ export default function OffersPage() {
             </div>
             <div className="modal-footer">
               <button className="btn btn-danger" onClick={() => handleDeny(selectedOffer.id)}>Deny</button>
-              <button className="btn btn-secondary" onClick={() => demoAction('Edit Offer')}>Edit</button>
-              <button className="btn btn-primary" onClick={() => setSelectedOffer(null)}>Close</button>
+              <button className="btn btn-primary" onClick={() => handleApprove(selectedOffer.id)}>Approve</button>
             </div>
           </div>
         </div>

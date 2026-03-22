@@ -1,5 +1,6 @@
 import './globals.css'
 import AppShell from '@/components/AppShell'
+import { AppProvider } from '@/lib/store'
 
 export const metadata = {
   title: 'Logical Boost Hub',
@@ -14,7 +15,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <AppShell>{children}</AppShell>
+        <AppProvider>
+          <AppShell>{children}</AppShell>
+        </AppProvider>
       </body>
     </html>
   )
