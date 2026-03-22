@@ -1,6 +1,9 @@
+import './globals.css'
+import AppShell from '@/components/AppShell'
+
 export const metadata = {
-  title: 'logical-boost-hub',
-  description: '',
+  title: 'Logical Boost Hub',
+  description: 'Multi-tenant marketing platform',
 }
 
 export default function RootLayout({
@@ -10,7 +13,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AppShell>{children}</AppShell>
+      </body>
     </html>
   )
 }
