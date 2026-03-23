@@ -12,11 +12,14 @@ export default function DashboardPage() {
         <div className="empty-state-icon">🚀</div>
         <div className="empty-state-text">Welcome to Logical Boost Hub</div>
         <div className="empty-state-sub">
-          Get started by adding your first client&apos;s business information
+          Add your first client to begin building AI-powered campaign funnels.
         </div>
         <Link href="/business-overview/" className="btn btn-primary" style={{ marginTop: 24 }}>
-          Start Setup
+          + Add Your First Client
         </Link>
+        <div className="empty-state-sub" style={{ marginTop: 12, fontSize: 13 }}>
+          Or select an existing client from the dropdown above.
+        </div>
       </div>
     )
   }

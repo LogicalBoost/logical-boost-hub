@@ -17,6 +17,7 @@ interface AppState {
 }
 
 interface AppStore extends AppState {
+  allClients: Client[]
   setClient: (client: Client | null) => void
   setAvatars: (avatars: Avatar[]) => void
   setOffers: (offers: Offer[]) => void
@@ -26,7 +27,9 @@ interface AppStore extends AppState {
   setCompetitors: (competitors: CompetitorIntel[]) => void
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
+  loadAllClients: () => Promise<Client[]>
   loadClientData: (clientId: string) => Promise<void>
+  switchClient: (clientId: string) => Promise<void>
   createClient: (name: string, website: string) => Promise<Client | null>
   updateAvatar: (id: string, updates: Partial<Avatar>) => void
   updateOffer: (id: string, updates: Partial<Offer>) => void
@@ -40,6 +43,7 @@ interface AppStore extends AppState {
 const AppContext = createContext<AppStore | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const [allClients, setAllClients] = useState<Client[]>([])
   const [client, setClient] = useState<Client | null>(null)
   const [avatars, setAvatars] = useState<Avatar[]>([])
   const [offers, setOffers] = useState<Offer[]>([])
@@ -50,7 +54,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const loadAllClients = useCallback(async () => {
+    const { data } = await supabase.from('clients').select('*').order('created_at', { ascending: false })
+    setAllClients(data || [])
+    return data || []
+  }, [])
+
   const loadClientData = useCallback(async (clientId: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [
+        { data: clientData },
+        { data: avatarData },
+        { data: offerData },
+        { data: intakeData },
+        { data: funnelData },
+        { data: copyData },
+        { data: competitorData },
+      ] = await Promise.all([
+        supabase.from('clients').select('*').eq('id', clientId).single(),
+        supabase.from('avatars').select('*').eq('client_id', clientId).order('created_at'),
+        supabase.from('offers').select('*').eq('client_id', clientId).order('created_at'),
+        supabase.from('intake_questions').select('*').eq('client_id', clientId).order('sort_order'),
+        supabase.from('funnel_instances').select('*').eq('client_id', clientId).order('generated_at'),
+        supabase.from('copy_components').select('*').eq('client_id', clientId).order('created_at'),
+        supabase.from('competitor_intel').select('*').eq('client_id', clientId).order('captured_at'),
+      ])
+      if (clientData) setClient(clientData)
+      setAvatars(avatarData || [])
+      setOffers(offerData || [])
+      setIntakeQuestions(intakeData || [])
+      setFunnelInstances(funnelData || [])
+      setCopyComponents(copyData || [])
+      setCompetitors(competitorData || [])
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const switchClient = useCallback(async (clientId: string) => {
     setLoading(true)
     setError(null)
     try {
@@ -96,6 +141,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return null
     }
     setClient(data)
+    setAllClients(prev => [data as Client, ...prev])
     return data as Client
   }, [])
 
@@ -136,9 +182,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      client, avatars, offers, intakeQuestions, funnelInstances, copyComponents, competitors, loading, error,
+      allClients, client, avatars, offers, intakeQuestions, funnelInstances, copyComponents, competitors, loading, error,
       setClient, setAvatars, setOffers, setIntakeQuestions, setCopyComponents, setFunnelInstances, setCompetitors,
-      setLoading, setError, loadClientData, createClient: createNewClient,
+      setLoading, setError, loadAllClients, loadClientData, switchClient, createClient: createNewClient,
       updateAvatar, updateOffer, refreshAvatars, refreshOffers, refreshIntake,
       refreshCopyComponents, refreshFunnelInstances,
     }}>

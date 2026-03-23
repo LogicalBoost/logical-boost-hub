@@ -7,9 +7,10 @@ import { supabase } from '@/lib/supabase'
 import type { Competitor } from '@/types/database'
 
 export default function BusinessOverviewPage() {
-  const { client, loading, setClient, setLoading, setError, createClient, loadClientData } = useAppStore()
+  const { client, loading, setClient, setLoading, setError, createClient, loadClientData, loadAllClients } = useAppStore()
 
   // New client setup form state
+  const [showNewForm, setShowNewForm] = useState(false)
   const [setupName, setSetupName] = useState('')
   const [setupWebsite, setSetupWebsite] = useState('')
   const [setupNotes, setSetupNotes] = useState('')
@@ -68,10 +69,12 @@ export default function BusinessOverviewPage() {
       setAnalyzeMessage('AI is analyzing your business...')
       await analyzeBusiness(newClient.id, setupWebsite.trim(), setupNotes.trim())
       await loadClientData(newClient.id)
+      await loadAllClients()
       setAnalyzeMessage('')
       setSetupName('')
       setSetupWebsite('')
       setSetupNotes('')
+      setShowNewForm(false)
     } catch (err) {
       setError((err as Error).message)
       setAnalyzeMessage('')
@@ -191,15 +194,20 @@ export default function BusinessOverviewPage() {
     }
   }
 
-  // --- No client: show setup form ---
-  if (!client) {
+  // --- No client or adding new: show setup form ---
+  if (!client || showNewForm) {
     return (
       <div>
         <div className="page-header">
           <div>
-            <h1 className="page-title">Business Overview</h1>
-            <p className="page-subtitle">Set up a new client to get started</p>
+            <h1 className="page-title">{showNewForm ? 'Add New Client' : 'Business Overview'}</h1>
+            <p className="page-subtitle">{showNewForm ? 'Set up a new client for your agency' : 'Set up a new client to get started'}</p>
           </div>
+          {showNewForm && client && (
+            <button className="btn btn-secondary" onClick={() => setShowNewForm(false)}>
+              Cancel
+            </button>
+          )}
         </div>
         <div className="card">
           <div className="card-title">New Client Setup</div>
@@ -273,6 +281,9 @@ export default function BusinessOverviewPage() {
           <p className="page-subtitle">Foundation data that powers all AI generation</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-secondary" onClick={() => setShowNewForm(true)}>
+            + Add New Client
+          </button>
           {editing ? (
             <>
               <button className="btn btn-secondary" onClick={handleCancelEdit} disabled={saving}>

@@ -72,6 +72,16 @@ The `client_assignments` table maps team members to clients (many-to-many).
 
 **Current state**: Auth pages exist but the frontend does not yet enforce login or role-based routing. RLS is active on all tables, so queries will fail without an authenticated session.
 
+## Client Management
+
+The agency owner/client manager adds and manages clients through the platform:
+
+- **Header dropdown** — Lists all clients in the system. Select to switch, or choose "+ Add New Client"
+- **Business Overview** → "+ Add New Client" button opens the setup form even when viewing an existing client
+- **Dashboard** → Shows "Add Your First Client" when no client is selected
+- Clients are stored in the `clients` table and loaded on app init via `loadAllClients()`
+- Switching clients loads all related data (avatars, offers, funnels, intake, competitors)
+
 ## AI Workflow Pipeline
 
 The user flow for onboarding a new client:
