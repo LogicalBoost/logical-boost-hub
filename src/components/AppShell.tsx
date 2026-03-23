@@ -10,6 +10,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="main-area">
         <Header />
         <main className="content-area">
+          <div className="bg-watermark" aria-hidden="true" />
           {children}
         </main>
       </div>

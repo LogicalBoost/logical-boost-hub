@@ -97,17 +97,17 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // Check if funnel instance already exists
+    // Check if funnel instance already exists for this Avatar + Offer
     const { data: existing } = await supabase
       .from('funnel_instances')
       .select('id')
       .eq('avatar_id', avatar_id)
       .eq('offer_id', offer_id)
-      .eq('primary_angle', primary_angle)
+      .eq('status', 'active')
       .single()
 
     if (existing) {
-      return errorResponse('A funnel instance already exists for this combination. Use generate-more to add items.')
+      return errorResponse('A funnel instance already exists for this Avatar + Offer combination. Use generate-more to add items, or archive the existing one first.')
     }
 
     // Fetch all required data
@@ -178,33 +178,68 @@ Trust Signals: ${client.trust_signals}`
       maxTokens: 8192,
     })
 
-    const parsed = parseJsonResponse<{
-      copy_components: Array<{
-        type: string
-        text: string
-        character_count: number
-        platform: string
-        angle_ids: string[]
-      }>
-    }>(response)
+    const rawParsed = parseJsonResponse<Record<string, unknown>>(response)
+
+    // Unwrap if AI nests everything under a top-level key
+    const keys = Object.keys(rawParsed)
+    const unwrapped = (keys.length === 1 && typeof rawParsed[keys[0]] === 'object' && !Array.isArray(rawParsed[keys[0]]))
+      ? rawParsed[keys[0]] as Record<string, unknown>
+      : rawParsed
+
+    // Extract copy_components — AI may use different key names
+    let copyComponents = (unwrapped.copy_components || unwrapped.components || unwrapped.campaign_assets || []) as Array<Record<string, unknown>>
+
+    // If no array found, check if the response is structured by type (e.g. { headline: [...], cta: [...] })
+    if (!Array.isArray(copyComponents) || copyComponents.length === 0) {
+      copyComponents = []
+      const typeKeys = ['headline', 'subheadline', 'primary_text', 'google_headline', 'google_description',
+        'benefit', 'proof', 'urgency', 'fear_point', 'value_point', 'cta', 'video_hook', 'video_script',
+        'objection_handler', 'description', 'headlines', 'subheadlines', 'benefits', 'proofs', 'ctas',
+        'video_hooks', 'video_scripts', 'objection_handlers', 'descriptions', 'fear_points', 'value_points',
+        'urgency_elements', 'primary_texts', 'google_headlines', 'google_descriptions']
+      for (const tk of typeKeys) {
+        const items = unwrapped[tk]
+        if (Array.isArray(items)) {
+          // Normalize the type key (strip trailing 's', handle special cases)
+          const normalizedType = tk.replace(/s$/, '').replace('element', '')
+            .replace('primary_text', 'primary_text') // keep as-is
+          for (const item of items) {
+            if (typeof item === 'string') {
+              copyComponents.push({ type: normalizedType, text: item, platform: 'all' })
+            } else if (typeof item === 'object' && item !== null) {
+              copyComponents.push({ ...item as Record<string, unknown>, type: (item as Record<string, unknown>).type || normalizedType })
+            }
+          }
+        }
+      }
+    }
+
+    console.log(`Parsed ${copyComponents.length} copy components from AI response`)
 
     // Insert copy components
     let componentsCreated = 0
-    if (parsed.copy_components?.length) {
-      const records = parsed.copy_components.map(c => ({
-        client_id: client.id,
-        type: c.type,
-        text: c.text,
-        character_count: c.character_count || c.text.length,
-        avatar_ids: [avatar_id],
-        offer_ids: [offer_id],
-        angle_ids: c.angle_ids || [primary_angle],
-        platform: c.platform || 'all',
-        status: 'approved',
-        funnel_instance_id: funnelInstance.id,
-      }))
+    if (copyComponents.length > 0) {
+      const records = copyComponents.map(c => {
+        const text = String(c.text || '')
+        return {
+          client_id: client.id,
+          type: String(c.type || 'headline'),
+          text,
+          character_count: typeof c.character_count === 'number' ? c.character_count : text.length,
+          avatar_ids: [avatar_id],
+          offer_ids: [offer_id],
+          angle_ids: Array.isArray(c.angle_ids) ? c.angle_ids : [primary_angle],
+          platform: String(c.platform || 'all'),
+          status: 'approved',
+          funnel_instance_id: funnelInstance.id,
+        }
+      }).filter(r => r.text.length > 0)
       const { error: insertError } = await supabase.from('copy_components').insert(records)
-      if (!insertError) componentsCreated = records.length
+      if (insertError) {
+        console.error('Copy component insert error:', JSON.stringify(insertError))
+      } else {
+        componentsCreated = records.length
+      }
     }
 
     return jsonResponse({

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
 
 const navItems = [
   { href: '/dashboard/', label: 'Dashboard', icon: '◫' },
@@ -16,29 +17,63 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  // Close sidebar on route change
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
+
+  // Close on escape key
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMobileOpen(false)
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [])
 
   return (
-    <aside className="sidebar">
-      <div className="sidebar-logo">
-        <h1>
-          <span>Logical</span> Boost Hub
-        </h1>
-      </div>
-      <nav className="sidebar-nav">
-        {navItems.map((item) => {
-          const isActive = pathname?.startsWith(`/logical-boost-hub${item.href}`.replace(/\/$/, '')) || false
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`nav-item ${isActive ? 'active' : ''}`}
-            >
-              <span className="nav-icon">{item.icon}</span>
-              <span>{item.label}</span>
-            </Link>
-          )
-        })}
-      </nav>
-    </aside>
+    <>
+      {/* Mobile hamburger button */}
+      <button
+        className="mobile-menu-btn"
+        onClick={() => setMobileOpen(!mobileOpen)}
+        aria-label="Toggle menu"
+      >
+        <span className={`hamburger ${mobileOpen ? 'open' : ''}`}>
+          <span /><span /><span />
+        </span>
+      </button>
+
+      {/* Overlay for mobile */}
+      {mobileOpen && (
+        <div className="sidebar-overlay" onClick={() => setMobileOpen(false)} />
+      )}
+
+      <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
+        <div className="sidebar-logo">
+          <img src="/logical-boost-hub/images/icon.svg" alt="" width={28} height={28} style={{ flexShrink: 0 }} />
+          <h1>
+            logical<span>boost</span>
+          </h1>
+        </div>
+        <nav className="sidebar-nav">
+          {navItems.map((item) => {
+            const isActive = pathname?.startsWith(`/logical-boost-hub${item.href}`.replace(/\/$/, '')) || false
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`nav-item ${isActive ? 'active' : ''}`}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                <span className="nav-label">{item.label}</span>
+              </Link>
+            )
+          })}
+        </nav>
+      </aside>
+    </>
   )
 }

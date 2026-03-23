@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Gray line (behind) -->
+  <path d="M0 60 L40 30 L80 70 L120 40 L160 80 L200 50" stroke="#9CA3AF" stroke-width="32" stroke-linejoin="miter" fill="none"/>
+  <path d="M0 140 L40 170 L80 130 L120 160 L160 120 L200 150" stroke="#9CA3AF" stroke-width="32" stroke-linejoin="miter" fill="none"/>
+  <!-- Green line (front) -->
+  <path d="M60 0 L80 30 L60 60 L80 90 L60 120 L80 150 L60 180 L80 200" stroke="#10b981" stroke-width="32" stroke-linejoin="miter" fill="none"/>
+  <path d="M100 0 L120 30 L100 60 L120 90 L100 120 L120 150 L100 180 L120 200" stroke="#10b981" stroke-width="32" stroke-linejoin="miter" fill="none"/>
+</svg>

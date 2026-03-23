@@ -112,6 +112,7 @@ export default function FunnelPage() {
   const [angle, setAngle] = useState('')
   const [recommendedSlugs, setRecommendedSlugs] = useState<string[]>([])
   const [generatingSection, setGeneratingSection] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
 
   const approvedAvatars = avatars.filter((a) => a.status === 'approved')
   const approvedOffers = offers.filter((o) => o.status === 'approved')
@@ -152,12 +153,11 @@ export default function FunnelPage() {
     fetchRecommendations()
   }, [fetchRecommendations])
 
-  // Find matching funnel instance
+  // Find matching funnel instance (Avatar + Offer is the combination; angle is a generation parameter)
   const currentInstance = funnelInstances.find(
     (fi) =>
       fi.avatar_id === avatarId &&
       fi.offer_id === offerId &&
-      fi.primary_angle === angle &&
       fi.status === 'active'
   )
 
@@ -184,7 +184,7 @@ export default function FunnelPage() {
         <div className="page-header">
           <div>
             <h1 className="page-title">Funnel</h1>
-            <p className="page-subtitle">Complete campaign system for Avatar + Offer + Angle</p>
+            <p className="page-subtitle">Select Avatar + Offer, choose an Angle, then generate</p>
           </div>
         </div>
         <div className="empty-state" style={{ padding: 80 }}>
@@ -199,8 +199,8 @@ export default function FunnelPage() {
 
   async function handleGenerateCampaign() {
     if (!client) return
+    setGenerating(true)
     setLoading(true)
-    showToast('AI is generating your complete campaign...')
     try {
       await generateFunnel(avatarId, offerId, angle, [])
       await Promise.all([
@@ -211,6 +211,7 @@ export default function FunnelPage() {
     } catch (err) {
       showToast(`Error: ${(err as Error).message}`)
     } finally {
+      setGenerating(false)
       setLoading(false)
     }
   }
@@ -227,6 +228,20 @@ export default function FunnelPage() {
     } finally {
       setGeneratingSection(null)
     }
+  }
+
+  async function handleDeleteInstance() {
+    if (!currentInstance || !client) return
+    setLoading(true)
+    // Delete copy components first, then the instance
+    await supabase.from('copy_components').delete().eq('funnel_instance_id', currentInstance.id)
+    await supabase.from('funnel_instances').delete().eq('id', currentInstance.id)
+    await Promise.all([
+      refreshFunnelInstances(client.id),
+      refreshCopyComponents(client.id),
+    ])
+    setLoading(false)
+    showToast('Instance deleted. You can now regenerate.')
   }
 
   async function handleDeny(componentId: string) {
@@ -273,7 +288,7 @@ export default function FunnelPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Funnel</h1>
-          <p className="page-subtitle">Complete campaign system for Avatar + Offer + Angle</p>
+          <p className="page-subtitle">Select Avatar + Offer, choose an Angle, then generate</p>
         </div>
       </div>
 
@@ -374,23 +389,40 @@ export default function FunnelPage() {
           {instanceComponents.length === 0 && (
             <div className="empty-state" style={{ padding: 40 }}>
               <div className="empty-state-text">
-                Campaign generated but no copy components found. Try generating more content.
+                Campaign instance exists but no copy was generated.
               </div>
+              <div className="empty-state-sub">
+                This can happen if the AI response was truncated. Delete and regenerate.
+              </div>
+              <button
+                className="btn btn-danger"
+                style={{ marginTop: 16, marginRight: 8 }}
+                onClick={handleDeleteInstance}
+                disabled={loading}
+              >
+                Delete Instance
+              </button>
             </div>
           )}
         </>
+      ) : generating ? (
+        <div className="generating-overlay">
+          <div className="generating-spinner" />
+          <div className="generating-text">AI is generating your complete campaign...</div>
+          <div className="generating-sub">This may take 15–30 seconds. Headlines, social copy, benefits, video scripts, and more are being crafted for your Avatar + Offer + Angle combination.</div>
+        </div>
       ) : (
         <div className="empty-state" style={{ padding: 80 }}>
           <div className="empty-state-icon">&#9889;</div>
-          <div className="empty-state-text">No campaign generated for this combination</div>
-          <div className="empty-state-sub">Click below to generate the full campaign asset set</div>
+          <div className="empty-state-text">No campaign generated for this Avatar + Offer</div>
+          <div className="empty-state-sub">Select an angle, then click below to generate the full campaign asset set</div>
           <button
-            className="btn btn-primary"
+            className="btn btn-primary btn-lg"
             style={{ marginTop: 20 }}
             onClick={handleGenerateCampaign}
             disabled={loading}
           >
-            {loading ? 'AI is generating your complete campaign...' : 'Generate Campaign'}
+            Generate Campaign
           </button>
         </div>
       )}
