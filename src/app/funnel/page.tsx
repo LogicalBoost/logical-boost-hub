@@ -351,6 +351,30 @@ export default function FunnelPage() {
 
       {currentInstance ? (
         <>
+          {/* Show which angle this was generated with, and option to regenerate */}
+          <div className="card" style={{ marginBottom: 16, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
+              Generated with angle: <strong style={{ color: 'var(--accent)' }}>{getAngleLabel(currentInstance.primary_angle)}</strong>
+            </div>
+            {currentInstance.primary_angle !== angle && (
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={async () => {
+                  if (!client) return
+                  setLoading(true)
+                  // Archive old instance, then generate new one
+                  await supabase.from('funnel_instances').update({ status: 'archived' }).eq('id', currentInstance.id)
+                  await refreshFunnelInstances(client.id)
+                  setLoading(false)
+                  handleGenerateCampaign()
+                }}
+                disabled={loading || generating}
+              >
+                Regenerate with {getAngleLabel(angle)}
+              </button>
+            )}
+          </div>
+
           {sectionOrder.map((type) => {
             const items = groupedComponents[type]
             if (!items || items.length === 0) return null
