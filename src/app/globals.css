@@ -117,17 +117,10 @@ input, textarea, select {
   height: var(--header-height);
 }
 
-.sidebar-logo h1 {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  letter-spacing: -0.3px;
-  font-family: 'Roboto', sans-serif;
-}
-
-.sidebar-logo h1 span {
-  color: var(--accent);
-  font-weight: 900;
+.sidebar-logo-img {
+  height: 28px;
+  width: auto;
+  object-fit: contain;
 }
 
 .sidebar-nav {
@@ -254,7 +247,7 @@ input, textarea, select {
   height: 50vw;
   max-width: 600px;
   max-height: 600px;
-  background-image: url('/logical-boost-hub/images/icon.svg');
+  background-image: url('/logical-boost-hub/images/icon.png');
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
