@@ -97,17 +97,18 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // Check if funnel instance already exists for this Avatar + Offer
+    // Check if funnel instance already exists for this Avatar + Offer + Angle
     const { data: existing } = await supabase
       .from('funnel_instances')
       .select('id')
       .eq('avatar_id', avatar_id)
       .eq('offer_id', offer_id)
+      .eq('primary_angle', primary_angle)
       .eq('status', 'active')
       .single()
 
     if (existing) {
-      return errorResponse('A funnel instance already exists for this Avatar + Offer combination. Use generate-more to add items, or archive the existing one first.')
+      return errorResponse('A funnel instance already exists for this Avatar + Offer + Angle combination. Use generate-more to add items, or delete the existing one first.')
     }
 
     // Fetch all required data

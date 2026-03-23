@@ -153,13 +153,19 @@ export default function FunnelPage() {
     fetchRecommendations()
   }, [fetchRecommendations])
 
-  // Find matching funnel instance (Avatar + Offer is the combination; angle is a generation parameter)
-  const currentInstance = funnelInstances.find(
+  // Find ALL instances for this Avatar + Offer (active ones, any angle)
+  const matchingInstances = funnelInstances.filter(
     (fi) =>
       fi.avatar_id === avatarId &&
       fi.offer_id === offerId &&
       fi.status === 'active'
   )
+
+  // Auto-select instance matching the selected angle, or fall back to first available
+  const currentInstance =
+    matchingInstances.find((fi) => fi.primary_angle === angle) ||
+    matchingInstances[0] ||
+    null
 
   // Filter copy components for current funnel instance, excluding denied
   const instanceComponents = currentInstance
@@ -351,28 +357,32 @@ export default function FunnelPage() {
 
       {currentInstance ? (
         <>
-          {/* Show which angle this was generated with, and option to regenerate */}
-          <div className="card" style={{ marginBottom: 16, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-            <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
-              Generated with angle: <strong style={{ color: 'var(--accent)' }}>{getAngleLabel(currentInstance.primary_angle)}</strong>
+          {/* Angle tabs — show all generated angles for this Avatar+Offer */}
+          <div className="card" style={{ marginBottom: 16, padding: '12px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)', marginRight: 4 }}>Generated angles:</span>
+              {matchingInstances.map((inst) => (
+                <button
+                  key={inst.id}
+                  className={`btn btn-sm ${inst.id === currentInstance.id ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setAngle(inst.primary_angle)}
+                  style={{ fontSize: 12 }}
+                >
+                  {getAngleLabel(inst.primary_angle)}
+                </button>
+              ))}
+              {/* Show "Generate with [angle]" if the selected angle doesn't have an instance yet */}
+              {!matchingInstances.find((fi) => fi.primary_angle === angle) && (
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={handleGenerateCampaign}
+                  disabled={loading || generating}
+                  style={{ fontSize: 12 }}
+                >
+                  + Generate {getAngleLabel(angle)}
+                </button>
+              )}
             </div>
-            {currentInstance.primary_angle !== angle && (
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={async () => {
-                  if (!client) return
-                  setLoading(true)
-                  // Archive old instance, then generate new one
-                  await supabase.from('funnel_instances').update({ status: 'archived' }).eq('id', currentInstance.id)
-                  await refreshFunnelInstances(client.id)
-                  setLoading(false)
-                  handleGenerateCampaign()
-                }}
-                disabled={loading || generating}
-              >
-                Regenerate with {getAngleLabel(angle)}
-              </button>
-            )}
           </div>
 
           {sectionOrder.map((type) => {
@@ -446,7 +456,7 @@ export default function FunnelPage() {
             onClick={handleGenerateCampaign}
             disabled={loading}
           >
-            Generate Campaign
+            Generate with {getAngleLabel(angle)}
           </button>
         </div>
       )}
