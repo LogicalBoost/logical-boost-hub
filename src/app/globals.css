@@ -67,6 +67,22 @@ input, textarea, select {
   font-size: inherit;
 }
 
+select, select option {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+select option {
+  background: #0a0f0e;
+  color: #f0f5f3;
+  padding: 8px;
+}
+
+select optgroup {
+  background: #0a0f0e;
+  color: #94a3a0;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -193,7 +209,7 @@ input, textarea, select {
 }
 
 .client-switcher select {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-primary);
   border: 1px solid var(--border);
   color: var(--text-primary);
   padding: 8px 12px;
@@ -418,7 +434,7 @@ input, textarea, select {
 
 .form-input, .form-textarea {
   width: 100%;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-primary);
   border: 1px solid var(--border);
   color: var(--text-primary);
   padding: 10px 12px;
@@ -431,6 +447,10 @@ input, textarea, select {
   outline: none;
   border-color: var(--accent);
   background: rgba(16, 185, 129, 0.05);
+}
+
+select.form-input {
+  background: var(--bg-primary);
 }
 
 .form-textarea {
