@@ -57,76 +57,96 @@ Additional Notes from Team:
 ${team_notes || 'None provided'}`
 
     const response = await callClaude(SYSTEM_PROMPT, userMessage, {
-      model: 'claude-sonnet-4-6',
+      model: 'claude-haiku-4-5-20251001',
       maxTokens: 8192,
     })
 
-    const parsed = parseJsonResponse<{
-      business_summary: string
-      services: string
-      differentiators: string
-      trust_signals: string
-      tone: string
-      avatars: Array<Record<string, unknown>>
-      offers: Array<Record<string, unknown>>
-    }>(response)
+    const rawParsed = parseJsonResponse<Record<string, unknown>>(response)
+
+    // The AI may nest everything under a top-level key (e.g. "client_analysis")
+    // Unwrap it if needed
+    const keys = Object.keys(rawParsed)
+    const parsed = (keys.length === 1 && typeof rawParsed[keys[0]] === 'object' && !Array.isArray(rawParsed[keys[0]]))
+      ? rawParsed[keys[0]] as Record<string, unknown>
+      : rawParsed
+
+    // Extract fields, handling nested structures like "initial_avatars" or "avatars"
+    const businessSummary = parsed.business_summary as string || ''
+    const services = parsed.services as string || ''
+    const differentiators = parsed.differentiators as string || ''
+    const trustSignals = parsed.trust_signals as string || ''
+    const tone = parsed.tone as string || ''
+    const avatarsData = (parsed.avatars || parsed.initial_avatars || []) as Array<Record<string, unknown>>
+    const offersData = (parsed.offers || parsed.initial_offers || []) as Array<Record<string, unknown>>
 
     // Update client record
     await supabase.from('clients').update({
-      business_summary: parsed.business_summary,
-      services: parsed.services,
-      differentiators: parsed.differentiators,
-      trust_signals: parsed.trust_signals,
-      tone: parsed.tone,
+      business_summary: businessSummary,
+      services: typeof services === 'string' ? services : JSON.stringify(services),
+      differentiators: typeof differentiators === 'string' ? differentiators : JSON.stringify(differentiators),
+      trust_signals: typeof trustSignals === 'string' ? trustSignals : JSON.stringify(trustSignals),
+      tone: typeof tone === 'string' ? tone : JSON.stringify(tone),
       website: website_url,
       updated_at: new Date().toISOString(),
     }).eq('id', client_id)
 
     // Insert avatars
-    if (parsed.avatars?.length) {
-      const avatarRecords = parsed.avatars.map(a => ({
+    let avatarsCreated = 0
+    if (avatarsData?.length) {
+      const avatarRecords = avatarsData.map(a => ({
         client_id,
-        name: a.name,
-        avatar_type: a.avatar_type,
-        description: a.description,
-        pain_points: a.pain_points,
-        motivations: a.motivations,
-        objections: a.objections,
-        desired_outcome: a.desired_outcome,
-        trigger_events: a.trigger_events,
-        messaging_style: a.messaging_style,
-        preferred_platforms: a.preferred_platforms,
-        recommended_angles: a.recommended_angles,
+        name: String(a.name || 'Unnamed Avatar'),
+        avatar_type: a.avatar_type ? String(a.avatar_type) : null,
+        description: a.description ? String(a.description) : null,
+        pain_points: a.pain_points ? String(a.pain_points) : null,
+        motivations: a.motivations ? String(a.motivations) : null,
+        objections: a.objections ? String(a.objections) : null,
+        desired_outcome: a.desired_outcome ? String(a.desired_outcome) : null,
+        trigger_events: a.trigger_events ? String(a.trigger_events) : null,
+        messaging_style: a.messaging_style ? String(a.messaging_style) : null,
+        preferred_platforms: Array.isArray(a.preferred_platforms) ? a.preferred_platforms : null,
+        recommended_angles: Array.isArray(a.recommended_angles) ? a.recommended_angles : null,
         status: 'approved',
       }))
-      await supabase.from('avatars').insert(avatarRecords)
+      const { error: avatarError } = await supabase.from('avatars').insert(avatarRecords)
+      if (avatarError) {
+        console.error('Avatar insert error:', JSON.stringify(avatarError))
+      } else {
+        avatarsCreated = avatarRecords.length
+      }
     }
 
     // Insert offers
-    if (parsed.offers?.length) {
-      const offerRecords = parsed.offers.map(o => ({
+    let offersCreated = 0
+    if (offersData?.length) {
+      const offerRecords = offersData.map(o => ({
         client_id,
-        name: o.name,
-        offer_type: o.offer_type,
-        headline: o.headline,
-        subheadline: o.subheadline,
-        description: o.description,
-        primary_cta: o.primary_cta,
-        conversion_type: o.conversion_type,
-        benefits: o.benefits,
-        proof_elements: o.proof_elements,
-        urgency_elements: o.urgency_elements,
-        faq: o.faq,
-        landing_page_type: o.landing_page_type,
+        name: String(o.name || 'Unnamed Offer'),
+        offer_type: o.offer_type ? String(o.offer_type) : null,
+        headline: o.headline ? String(o.headline) : null,
+        subheadline: o.subheadline ? String(o.subheadline) : null,
+        description: o.description ? String(o.description) : null,
+        primary_cta: o.primary_cta ? String(o.primary_cta) : null,
+        conversion_type: o.conversion_type ? String(o.conversion_type) : null,
+        benefits: Array.isArray(o.benefits) ? o.benefits : null,
+        proof_elements: Array.isArray(o.proof_elements) ? o.proof_elements : null,
+        urgency_elements: Array.isArray(o.urgency_elements) ? o.urgency_elements : null,
+        faq: Array.isArray(o.faq) ? o.faq : null,
+        landing_page_type: o.landing_page_type ? String(o.landing_page_type) : null,
         status: 'approved',
       }))
-      await supabase.from('offers').insert(offerRecords)
+      const { error: offerError } = await supabase.from('offers').insert(offerRecords)
+      if (offerError) {
+        console.error('Offer insert error:', JSON.stringify(offerError))
+      } else {
+        offersCreated = offerRecords.length
+      }
     }
 
     return jsonResponse({
       success: true,
-      avatars_created: parsed.avatars?.length || 0,
-      offers_created: parsed.offers?.length || 0,
+      avatars_created: avatarsCreated,
+      offers_created: offersCreated,
     })
   } catch (err) {
     return errorResponse((err as Error).message, 500)

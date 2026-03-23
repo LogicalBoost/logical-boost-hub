@@ -174,7 +174,7 @@ Differentiators: ${client.differentiators}
 Trust Signals: ${client.trust_signals}`
 
     const response = await callClaude(systemPrompt, userMessage, {
-      model: 'claude-sonnet-4-6',
+      model: 'claude-haiku-4-5-20251001',
       maxTokens: 8192,
     })
 

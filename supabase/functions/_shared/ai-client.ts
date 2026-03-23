@@ -17,7 +17,7 @@ export async function callClaude(
     throw new Error('ANTHROPIC_API_KEY not configured')
   }
 
-  const model = options?.model || 'claude-sonnet-4-6'
+  const model = options?.model || 'claude-haiku-4-5-20251001'
   const maxTokens = options?.maxTokens || 4096
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -48,8 +48,29 @@ export async function callClaude(
 
 export function parseJsonResponse<T>(text: string): T {
   // Try to extract JSON from the response, handling markdown code blocks
-  const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) || text.match(/```\s*([\s\S]*?)```/)
-  const jsonStr = jsonMatch ? jsonMatch[1].trim() : text.trim()
+  // Handle both complete (```json...```) and truncated (```json... without closing) blocks
+  const jsonMatch = text.match(/```json\s*([\s\S]*?)```/)
+    || text.match(/```\s*([\s\S]*?)```/)
+    || text.match(/```json\s*([\s\S]*)/)
+    || text.match(/```\s*([\s\S]*)/)
+  let jsonStr = jsonMatch ? jsonMatch[1].trim() : text.trim()
+
+  // If the JSON is truncated (no closing brace), try to repair it
+  if (jsonStr && !jsonStr.endsWith('}')) {
+    // Find the last complete object/array by counting braces
+    let braceCount = 0
+    let lastValidPos = -1
+    for (let i = 0; i < jsonStr.length; i++) {
+      if (jsonStr[i] === '{') braceCount++
+      if (jsonStr[i] === '}') {
+        braceCount--
+        if (braceCount === 0) lastValidPos = i
+      }
+    }
+    if (lastValidPos > 0) {
+      jsonStr = jsonStr.substring(0, lastValidPos + 1)
+    }
+  }
 
   try {
     return JSON.parse(jsonStr) as T
