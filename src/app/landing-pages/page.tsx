@@ -1,7 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
+import { analyzeBrandKit } from '@/lib/api'
+import { showToast } from '@/lib/demo-toast'
+import type { BrandKit } from '@/types/database'
 
 type Stage = 'brand_kit' | 'competitive' | 'playbook' | 'concepts' | 'builder'
 
@@ -13,9 +16,37 @@ const STAGES: { key: Stage; label: string; icon: string; description: string }[]
   { key: 'builder', label: 'Page Builder', icon: '&#9889;', description: 'Build, preview, and deploy landing pages with AI-assisted editing' },
 ]
 
+function ColorSwatch({ color, label }: { color: string; label: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+      <div style={{
+        width: 28, height: 28, borderRadius: 4,
+        backgroundColor: color,
+        border: '1px solid var(--border)',
+        flexShrink: 0,
+      }} />
+      <div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{label}</div>
+        <div style={{ fontSize: 13, fontFamily: 'monospace' }}>{color}</div>
+      </div>
+    </div>
+  )
+}
+
 export default function LandingPagesPage() {
   const { client, canEdit } = useAppStore()
   const [activeStage, setActiveStage] = useState<Stage>('brand_kit')
+  const [analyzing, setAnalyzing] = useState(false)
+  const [brandKit, setBrandKit] = useState<BrandKit | null>(null)
+
+  // Load brand kit from client data if available
+  useEffect(() => {
+    if (client?.brand_kit) {
+      setBrandKit(client.brand_kit)
+    } else {
+      setBrandKit(null)
+    }
+  }, [client])
 
   if (!client) {
     return (
@@ -25,6 +56,24 @@ export default function LandingPagesPage() {
         <div className="empty-state-sub">Select or create a client first.</div>
       </div>
     )
+  }
+
+  async function handleAnalyzeBrandKit() {
+    if (!client) return
+    setAnalyzing(true)
+    try {
+      const result = await analyzeBrandKit(client.id)
+      if (result.brand_kit) {
+        setBrandKit(result.brand_kit)
+        showToast('Brand kit analysis complete!')
+      } else {
+        showToast('Analysis completed but no brand data returned')
+      }
+    } catch (err) {
+      showToast('Brand kit analysis failed: ' + (err as Error).message)
+    } finally {
+      setAnalyzing(false)
+    }
   }
 
   return (
@@ -69,40 +118,164 @@ export default function LandingPagesPage() {
               The brand kit captures your client&apos;s visual identity: colors, fonts, logo, button styles, and more.
               AI analyzes the client&apos;s website to extract these automatically, then the team reviews and adjusts.
             </p>
-            <div className="card-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-              <div className="card">
-                <div className="card-title">Colors</div>
-                <div className="card-body" style={{ color: 'var(--text-muted)' }}>
-                  No brand colors extracted yet
+
+            {analyzing && (
+              <div style={{
+                padding: 40, textAlign: 'center',
+                background: 'var(--bg-hover)', borderRadius: 8, marginBottom: 20,
+              }}>
+                <div style={{ fontSize: 24, marginBottom: 12 }}>&#9881;&#65039;</div>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>Analyzing {client.website || 'website'}...</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                  AI is visiting the website and extracting brand colors, fonts, and visual identity. This may take 15-30 seconds.
                 </div>
               </div>
-              <div className="card">
-                <div className="card-title">Typography</div>
-                <div className="card-body" style={{ color: 'var(--text-muted)' }}>
-                  No fonts detected yet
+            )}
+
+            {brandKit ? (
+              <div className="card-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                <div className="card">
+                  <div className="card-title">Colors</div>
+                  <div className="card-body">
+                    {brandKit.colors?.primary_color && <ColorSwatch color={brandKit.colors.primary_color} label="Primary" />}
+                    {brandKit.colors?.secondary_color && <ColorSwatch color={brandKit.colors.secondary_color} label="Secondary" />}
+                    {brandKit.colors?.accent_color && <ColorSwatch color={brandKit.colors.accent_color} label="Accent / CTA" />}
+                    {brandKit.colors?.background_color && <ColorSwatch color={brandKit.colors.background_color} label="Background" />}
+                    {brandKit.colors?.text_color && <ColorSwatch color={brandKit.colors.text_color} label="Text" />}
+                    {brandKit.colors?.additional_colors?.map((c, i) => (
+                      <ColorSwatch key={i} color={c} label={`Additional ${i + 1}`} />
+                    ))}
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="card-title">Typography</div>
+                  <div className="card-body">
+                    {brandKit.typography?.heading_font && (
+                      <div style={{ marginBottom: 8 }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Heading Font</div>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>{brandKit.typography.heading_font}</div>
+                      </div>
+                    )}
+                    {brandKit.typography?.body_font && (
+                      <div style={{ marginBottom: 8 }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Body Font</div>
+                        <div style={{ fontSize: 14 }}>{brandKit.typography.body_font}</div>
+                      </div>
+                    )}
+                    {brandKit.typography?.font_style_notes && (
+                      <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 8 }}>
+                        {brandKit.typography.font_style_notes}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="card-title">Button Style</div>
+                  <div className="card-body">
+                    {brandKit.button_style ? (
+                      <>
+                        <div style={{
+                          display: 'inline-block',
+                          padding: '8px 20px',
+                          borderRadius: brandKit.button_style.shape === 'pill' ? 50 : brandKit.button_style.shape === 'square' ? 0 : 6,
+                          backgroundColor: brandKit.button_style.color || 'var(--accent)',
+                          color: brandKit.button_style.text_color || '#fff',
+                          fontSize: 13, fontWeight: 600, marginBottom: 12,
+                        }}>
+                          Sample Button
+                        </div>
+                        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                          Shape: {brandKit.button_style.shape || 'rounded'}
+                          {brandKit.button_style.style_notes && ` · ${brandKit.button_style.style_notes}`}
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ color: 'var(--text-muted)' }}>No button style defined yet</div>
+                    )}
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="card-title">Visual Identity</div>
+                  <div className="card-body">
+                    {brandKit.visual_identity ? (
+                      <>
+                        {brandKit.visual_identity.overall_style && (
+                          <div style={{ marginBottom: 6 }}>
+                            <span className="tag">{brandKit.visual_identity.overall_style}</span>
+                            {brandKit.visual_identity.brand_mood && (
+                              <span className="tag" style={{ marginLeft: 4 }}>{brandKit.visual_identity.brand_mood}</span>
+                            )}
+                          </div>
+                        )}
+                        {brandKit.visual_identity.imagery_style && (
+                          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                            Imagery: {brandKit.visual_identity.imagery_style}
+                          </div>
+                        )}
+                        {brandKit.visual_identity.layout_pattern && (
+                          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                            Layout: {brandKit.visual_identity.layout_pattern}
+                          </div>
+                        )}
+                        {brandKit.visual_identity.whitespace && (
+                          <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                            Whitespace: {brandKit.visual_identity.whitespace}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div style={{ color: 'var(--text-muted)' }}>No visual identity data yet</div>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="card">
-                <div className="card-title">Logo</div>
-                <div className="card-body" style={{ color: 'var(--text-muted)' }}>
-                  No logo uploaded yet
+            ) : !analyzing ? (
+              <div className="card-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                <div className="card">
+                  <div className="card-title">Colors</div>
+                  <div className="card-body" style={{ color: 'var(--text-muted)' }}>
+                    No brand colors extracted yet
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="card-title">Typography</div>
+                  <div className="card-body" style={{ color: 'var(--text-muted)' }}>
+                    No fonts detected yet
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="card-title">Logo</div>
+                  <div className="card-body" style={{ color: 'var(--text-muted)' }}>
+                    No logo uploaded yet
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="card-title">Button Style</div>
+                  <div className="card-body" style={{ color: 'var(--text-muted)' }}>
+                    No button style defined yet
+                  </div>
                 </div>
               </div>
-              <div className="card">
-                <div className="card-title">Button Style</div>
-                <div className="card-body" style={{ color: 'var(--text-muted)' }}>
-                  No button style defined yet
-                </div>
-              </div>
-            </div>
+            ) : null}
+
             {canEdit && (
               <div style={{ marginTop: 20, display: 'flex', gap: 8 }}>
-                <button className="btn btn-primary" disabled>
-                  Analyze Website for Brand Kit
+                <button
+                  className="btn btn-primary"
+                  onClick={handleAnalyzeBrandKit}
+                  disabled={analyzing}
+                >
+                  {analyzing ? 'Analyzing...' : brandKit ? 'Re-analyze Website' : 'Analyze Website for Brand Kit'}
                 </button>
                 <button className="btn btn-secondary" disabled>
                   Upload Logo
                 </button>
+              </div>
+            )}
+
+            {client.website && (
+              <div style={{ marginTop: 12, fontSize: 13, color: 'var(--text-muted)' }}>
+                Website: {client.website}
               </div>
             )}
           </div>

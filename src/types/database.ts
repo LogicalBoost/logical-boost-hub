@@ -23,6 +23,7 @@ export interface Client {
   ad_copy_rules: AdCopyRules | null
   ad_copy_notes: string | null
   competitors: Competitor[] | null
+  brand_kit: BrandKit | null
   intake_status: 'pending' | 'completed'
   created_at: string
   updated_at: string
@@ -45,6 +46,40 @@ export interface Competitor {
   name: string
   website: string
   notes: string
+}
+
+export interface BrandKit {
+  colors?: {
+    primary_color?: string
+    secondary_color?: string
+    accent_color?: string
+    background_color?: string
+    text_color?: string
+    additional_colors?: string[]
+  }
+  typography?: {
+    heading_font?: string
+    body_font?: string
+    font_style_notes?: string
+  }
+  button_style?: {
+    shape?: string
+    color?: string
+    text_color?: string
+    style_notes?: string
+  }
+  visual_identity?: {
+    overall_style?: string
+    imagery_style?: string
+    layout_pattern?: string
+    whitespace?: string
+    brand_mood?: string
+  }
+  logo_notes?: {
+    description?: string
+    placement?: string
+    style?: string
+  }
 }
 
 export interface ClientAssignment {
@@ -229,8 +264,8 @@ export interface CompetitorIntel {
   client_id: string
   competitor_name: string
   competitor_website: string
-  source: 'meta_ad_library' | 'manual' | 'google_ads'
-  ad_type: 'social' | 'search' | 'display' | 'landing_page'
+  source: 'meta_ad_library' | 'manual' | 'google_ads' | 'ai_discovery'
+  ad_type: 'social' | 'search' | 'display' | 'landing_page' | 'overview'
   content: string | null
   screenshot_url: string | null
   keywords: string[] | null

@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { supabase } from './supabase'
 import type { Client, Avatar, Offer, IntakeQuestion, CopyComponent, FunnelInstance, CompetitorIntel, UserRole } from '@/types/database'
 
@@ -62,6 +62,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [userRole, setUserRole] = useState<UserRole>('admin')
   const canEdit = userRole === 'admin' || userRole === 'team_editor'
   const isClientRole = userRole === 'client'
+
+  // Persist selected client ID to localStorage so it survives page navigations
+  const STORAGE_KEY = 'lbh_selected_client_id'
+
+  const saveClientId = useCallback((id: string | null) => {
+    try {
+      if (id) {
+        localStorage.setItem(STORAGE_KEY, id)
+      } else {
+        localStorage.removeItem(STORAGE_KEY)
+      }
+    } catch { /* SSR or storage unavailable */ }
+  }, [])
+
+  const getSavedClientId = useCallback(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEY)
+    } catch {
+      return null
+    }
+  }, [])
 
   const loadAllClients = useCallback(async () => {
     const { data } = await supabase.from('clients').select('*').order('created_at', { ascending: false })
@@ -125,7 +146,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         supabase.from('copy_components').select('*').eq('client_id', clientId).order('created_at'),
         supabase.from('competitor_intel').select('*').eq('client_id', clientId).order('captured_at'),
       ])
-      if (clientData) setClient(clientData)
+      if (clientData) {
+        setClient(clientData)
+        saveClientId(clientData.id)
+      }
       setAvatars(avatarData || [])
       setOffers(offerData || [])
       setIntakeQuestions(intakeData || [])
@@ -137,7 +161,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [saveClientId])
 
   const createNewClient = useCallback(async (name: string, website: string) => {
     const { data, error: err } = await supabase
@@ -150,9 +174,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return null
     }
     setClient(data)
+    saveClientId(data.id)
     setAllClients(prev => [data as Client, ...prev])
     return data as Client
-  }, [])
+  }, [saveClientId])
 
   const updateAvatar = useCallback((id: string, updates: Partial<Avatar>) => {
     setAvatars(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a))

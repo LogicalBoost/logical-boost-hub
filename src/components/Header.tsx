@@ -1,16 +1,31 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/lib/store'
 
 export default function Header() {
   const { client, allClients, loadAllClients, switchClient } = useAppStore()
   const router = useRouter()
+  const restoredRef = useRef(false)
 
   useEffect(() => {
-    loadAllClients()
-  }, [loadAllClients])
+    loadAllClients().then((clients) => {
+      // Auto-restore last selected client from localStorage
+      if (!restoredRef.current && clients.length > 0) {
+        restoredRef.current = true
+        try {
+          const savedId = localStorage.getItem('lbh_selected_client_id')
+          if (savedId && clients.some(c => c.id === savedId)) {
+            switchClient(savedId)
+          } else if (clients.length === 1) {
+            // Only one client? Auto-select it
+            switchClient(clients[0].id)
+          }
+        } catch { /* storage unavailable */ }
+      }
+    })
+  }, [loadAllClients, switchClient])
 
   async function handleClientChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const value = e.target.value

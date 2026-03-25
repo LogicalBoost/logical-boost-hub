@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
+import { discoverCompetitors } from '@/lib/api'
 import { showToast } from '@/lib/demo-toast'
 
 type Tab = 'overview' | 'offers' | 'pages' | 'ad_copy' | 'video'
@@ -29,6 +30,13 @@ export default function CompetitiveIntelPage() {
   const [compContent, setCompContent] = useState('')
   const [compKeywords, setCompKeywords] = useState('')
   const [compNotes, setCompNotes] = useState('')
+  const [discovering, setDiscovering] = useState(false)
+  const [discoveryResult, setDiscoveryResult] = useState<{
+    market_overview?: string
+    competitors_added?: number
+    keyword_opportunities?: string[]
+    competitive_gaps?: string[]
+  } | null>(null)
 
   if (!client) {
     return (
@@ -76,6 +84,26 @@ export default function CompetitiveIntelPage() {
     if (client) await loadClientData(client.id)
   }
 
+  async function handleDiscoverCompetitors() {
+    if (!client) return
+    setDiscovering(true)
+    setDiscoveryResult(null)
+    try {
+      const result = await discoverCompetitors(client.id)
+      setDiscoveryResult(result)
+      if (result.competitors_added > 0) {
+        showToast(`Discovered ${result.competitors_added} competitors!`)
+        await loadClientData(client.id)
+      } else {
+        showToast('No new competitors found')
+      }
+    } catch (err) {
+      showToast('Discovery failed: ' + (err as Error).message)
+    } finally {
+      setDiscovering(false)
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -88,8 +116,15 @@ export default function CompetitiveIntelPage() {
           </div>
           {canEdit && (
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-primary" onClick={() => setShowAddForm(true)}>
-                + Add Intel
+              <button
+                className="btn btn-primary"
+                onClick={handleDiscoverCompetitors}
+                disabled={discovering}
+              >
+                {discovering ? 'Discovering...' : '&#129302; AI Discover Competitors'}
+              </button>
+              <button className="btn btn-secondary" onClick={() => setShowAddForm(true)}>
+                + Add Manually
               </button>
             </div>
           )}
@@ -108,6 +143,54 @@ export default function CompetitiveIntelPage() {
           </button>
         ))}
       </div>
+
+      {/* AI Discovery Loading State */}
+      {discovering && (
+        <div style={{
+          padding: 24, marginBottom: 24,
+          background: 'var(--bg-hover)', borderRadius: 8, textAlign: 'center',
+        }}>
+          <div style={{ fontSize: 24, marginBottom: 8 }}>&#129302;</div>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>AI is researching competitors...</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+            Analyzing {client.name}&apos;s market, industry, and services to identify competitors. This may take 15-30 seconds.
+          </div>
+        </div>
+      )}
+
+      {/* Discovery Results Summary */}
+      {discoveryResult && !discovering && (
+        <div style={{
+          padding: 16, marginBottom: 24,
+          background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border)',
+        }}>
+          {discoveryResult.market_overview && (
+            <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.6 }}>
+              {discoveryResult.market_overview}
+            </div>
+          )}
+          {discoveryResult.keyword_opportunities && discoveryResult.keyword_opportunities.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>Target Keywords:</div>
+              <div className="tag-list">
+                {discoveryResult.keyword_opportunities.map((kw, i) => (
+                  <span key={i} className="tag">{kw}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          {discoveryResult.competitive_gaps && discoveryResult.competitive_gaps.length > 0 && (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>Market Gaps:</div>
+              <div className="tag-list">
+                {discoveryResult.competitive_gaps.map((gap, i) => (
+                  <span key={i} className="tag" style={{ background: 'var(--accent-secondary)' }}>{gap}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tab Content */}
       {activeTab === 'overview' && (

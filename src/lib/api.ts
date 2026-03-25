@@ -89,3 +89,19 @@ export async function generateAvatars(
 export async function suggestOffers(clientId: string) {
   return callEdgeFunction('suggest-offers', { client_id: clientId })
 }
+
+// Workflow 9: Analyze brand kit from client website
+export async function analyzeBrandKit(clientId: string) {
+  return callEdgeFunction('analyze-brand-kit', { client_id: clientId })
+}
+
+// Workflow 10: AI-powered competitor discovery
+export async function discoverCompetitors(
+  clientId: string,
+  options?: { userPrompt?: string }
+) {
+  return callEdgeFunction('discover-competitors', {
+    client_id: clientId,
+    user_prompt: options?.userPrompt,
+  })
+}
