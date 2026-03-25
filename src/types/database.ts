@@ -104,6 +104,7 @@ export interface Avatar {
   messaging_style: string | null
   preferred_platforms: string[] | null
   recommended_angles: string[] | null
+  priority: number
   status: 'approved' | 'denied'
   created_at: string
   updated_at: string

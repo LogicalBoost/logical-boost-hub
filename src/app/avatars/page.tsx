@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import { generateAvatars } from '@/lib/api'
@@ -13,6 +13,7 @@ type StatusFilter = 'all' | 'approved' | 'denied'
 export default function AvatarsPage() {
   const { client, avatars, updateAvatar, refreshAvatars, canEdit } = useAppStore()
   const [filter, setFilter] = useState<StatusFilter>('all')
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [selectedAvatar, setSelectedAvatar] = useState<Avatar | null>(null)
   const [showPrompter, setShowPrompter] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -93,9 +94,15 @@ export default function AvatarsPage() {
     )
   }
 
-  const filtered = filter === 'all'
-    ? avatars
-    : avatars.filter((a) => a.status === filter)
+  // Extract unique avatar categories from avatar_type field
+  const categories = useMemo(() => {
+    const types = avatars.map(a => a.avatar_type || 'Uncategorized')
+    return Array.from(new Set(types)).sort()
+  }, [avatars])
+
+  const filtered = avatars
+    .filter(a => filter === 'all' || a.status === filter)
+    .filter(a => categoryFilter === 'all' || (a.avatar_type || 'Uncategorized') === categoryFilter)
 
   const approvedCount = avatars.filter(a => a.status === 'approved').length
 
@@ -159,7 +166,8 @@ export default function AvatarsPage() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+      {/* Status Filters */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
         {(['all', 'approved', 'denied'] as StatusFilter[]).map((s) => (
           <button
             key={s}
@@ -172,16 +180,62 @@ export default function AvatarsPage() {
         ))}
       </div>
 
+      {/* Category Filters */}
+      {categories.length > 1 && (
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '24px', flexWrap: 'wrap' }}>
+          <button
+            className={`btn btn-sm ${categoryFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setCategoryFilter('all')}
+            style={{ fontSize: 12 }}
+          >
+            All Types
+          </button>
+          {categories.map((cat) => {
+            const count = avatars.filter(a => (a.avatar_type || 'Uncategorized') === cat).length
+            return (
+              <button
+                key={cat}
+                className={`btn btn-sm ${categoryFilter === cat ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setCategoryFilter(cat)}
+                style={{ fontSize: 12 }}
+              >
+                {cat} ({count})
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       <div className="card-grid">
-        {filtered.map((avatar) => (
+        {filtered
+          .sort((a, b) => {
+            // Prioritized avatars first (priority > 0), then by priority number (1 highest)
+            if (a.priority && b.priority) return a.priority - b.priority
+            if (a.priority) return -1
+            if (b.priority) return 1
+            return 0
+          })
+          .map((avatar) => (
           <div
             key={avatar.id}
             className="card"
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: 'pointer', borderLeft: avatar.priority ? `3px solid var(--accent)` : undefined }}
             onClick={() => setSelectedAvatar(avatar)}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div className="card-title">{avatar.name}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {avatar.priority ? (
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    width: 22, height: 22, borderRadius: '50%',
+                    background: 'var(--accent)', color: '#fff',
+                    fontSize: 11, fontWeight: 700, flexShrink: 0,
+                  }}>
+                    {avatar.priority}
+                  </span>
+                ) : null}
+                <div className="card-title">{avatar.name}</div>
+              </div>
               <span
                 className={`badge ${
                   avatar.status === 'approved' ? 'badge-approved' : 'badge-denied'
@@ -339,30 +393,68 @@ export default function AvatarsPage() {
                 </div>
               </div>
             </div>
-            <div className="modal-footer">
+            <div className="modal-footer" style={{ flexDirection: 'column', gap: 12 }}>
+              {/* Priority Ranking */}
               {canEdit && (
-                <button
-                  className="btn btn-danger btn-sm"
-                  onClick={() => handleDelete(selectedAvatar.id)}
-                >
-                  Delete
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                  <span style={{ fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Priority:</span>
+                  {[1, 2, 3, 4, 5].map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => {
+                        const newPriority = selectedAvatar.priority === p ? 0 : p
+                        updateAvatar(selectedAvatar.id, { priority: newPriority })
+                        setSelectedAvatar({ ...selectedAvatar, priority: newPriority })
+                        showToast(newPriority ? `Priority set to #${newPriority}` : 'Priority removed')
+                      }}
+                      style={{
+                        width: 32, height: 32, borderRadius: '50%',
+                        border: selectedAvatar.priority === p ? '2px solid var(--accent)' : '1px solid var(--border)',
+                        background: selectedAvatar.priority === p ? 'var(--accent)' : 'transparent',
+                        color: selectedAvatar.priority === p ? '#fff' : 'var(--text-secondary)',
+                        fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                  {selectedAvatar.priority ? (
+                    <span style={{ fontSize: 12, color: 'var(--accent)', marginLeft: 4 }}>
+                      #{selectedAvatar.priority} priority
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 4 }}>
+                      Unranked
+                    </span>
+                  )}
+                </div>
               )}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => handleDeny(selectedAvatar.id)}
-                >
-                  Deny
-                </button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                 {canEdit && (
                   <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => handleApprove(selectedAvatar.id)}
+                    className="btn btn-danger btn-sm"
+                    onClick={() => handleDelete(selectedAvatar.id)}
                   >
-                    Approve
+                    Delete
                   </button>
                 )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => handleDeny(selectedAvatar.id)}
+                  >
+                    Deny
+                  </button>
+                  {canEdit && (
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => handleApprove(selectedAvatar.id)}
+                    >
+                      Approve
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
