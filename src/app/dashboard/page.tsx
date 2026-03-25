@@ -16,24 +16,6 @@ interface SetupStep {
 export default function DashboardPage() {
   const { client, avatars, offers, funnelInstances, copyComponents, intakeQuestions, competitors } = useAppStore()
 
-  if (!client) {
-    return (
-      <div className="empty-state">
-        <div className="empty-state-icon">&#128640;</div>
-        <div className="empty-state-text">Welcome to Logical Boost Hub</div>
-        <div className="empty-state-sub">
-          Add your first client to begin building AI-powered campaign funnels.
-        </div>
-        <Link href="/business-overview/" className="btn btn-primary" style={{ marginTop: 24 }}>
-          + Add Your First Client
-        </Link>
-        <div className="empty-state-sub" style={{ marginTop: 12, fontSize: 13 }}>
-          Or select an existing client from the dropdown above.
-        </div>
-      </div>
-    )
-  }
-
   const activeFunnels = funnelInstances.filter((fi) => fi.status === 'active').length
   const approvedAvatars = avatars.filter(a => a.status === 'approved').length
   const approvedOffers = offers.filter(o => o.status === 'approved').length
@@ -45,7 +27,7 @@ export default function DashboardPage() {
       label: '1. Set Up Business Profile',
       description: 'Enter your client\'s name, website, and call notes. AI will analyze the business.',
       href: '/business-overview/',
-      isComplete: !!(client.business_summary && client.business_summary.trim().length > 0),
+      isComplete: !!(client?.business_summary && client.business_summary.trim().length > 0),
       icon: '&#128188;',
       order: 1,
     },
@@ -93,7 +75,7 @@ export default function DashboardPage() {
       label: '7. Build Landing Pages',
       description: 'Create landing pages using brand kit, competitive insights, and AI concepts.',
       href: '/landing-pages/',
-      isComplete: false, // Not yet built
+      isComplete: false,
       icon: '&#128196;',
       order: 7,
     },
@@ -102,8 +84,6 @@ export default function DashboardPage() {
   const completedSteps = setupSteps.filter(s => s.isComplete).length
   const totalSteps = setupSteps.length
   const progressPercent = Math.round((completedSteps / totalSteps) * 100)
-
-  // Find the next incomplete step
   const nextStep = setupSteps.find(s => !s.isComplete)
 
   // Build activity feed from recent items
@@ -151,6 +131,24 @@ export default function DashboardPage() {
     if (hours < 24) return `${hours}h ago`
     const days = Math.floor(hours / 24)
     return `${days}d ago`
+  }
+
+  if (!client) {
+    return (
+      <div className="empty-state">
+        <div className="empty-state-icon">&#128640;</div>
+        <div className="empty-state-text">Welcome to Logical Boost Hub</div>
+        <div className="empty-state-sub">
+          Add your first client to begin building AI-powered campaign funnels.
+        </div>
+        <Link href="/business-overview/" className="btn btn-primary" style={{ marginTop: 24 }}>
+          + Add Your First Client
+        </Link>
+        <div className="empty-state-sub" style={{ marginTop: 12, fontSize: 13 }}>
+          Or select an existing client from the dropdown above.
+        </div>
+      </div>
+    )
   }
 
   return (

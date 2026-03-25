@@ -43,6 +43,7 @@ interface AppStore extends AppState {
   refreshIntake: (clientId: string) => Promise<void>
   refreshCopyComponents: (clientId: string) => Promise<void>
   refreshFunnelInstances: (clientId: string) => Promise<void>
+  setUserRole: (role: UserRole) => void
 }
 
 const AppContext = createContext<AppStore | null>(null)
@@ -58,7 +59,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [competitors, setCompetitors] = useState<CompetitorIntel[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Default to 'admin' until auth is wired up; will be set from users table on login
   const [userRole, setUserRole] = useState<UserRole>('admin')
   const canEdit = userRole === 'admin' || userRole === 'team_editor'
   const isClientRole = userRole === 'client'
@@ -221,7 +221,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setClient, setAvatars, setOffers, setIntakeQuestions, setCopyComponents, setFunnelInstances, setCompetitors,
       setLoading, setError, loadAllClients, loadClientData, switchClient, createClient: createNewClient,
       updateAvatar, updateOffer, refreshAvatars, refreshOffers, refreshIntake,
-      refreshCopyComponents, refreshFunnelInstances,
+      refreshCopyComponents, refreshFunnelInstances, setUserRole,
     }}>
       {children}
     </AppContext.Provider>

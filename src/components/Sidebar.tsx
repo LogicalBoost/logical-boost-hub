@@ -14,6 +14,7 @@ const navItems = [
   { href: '/competitive-intel/', label: 'Competitive Intel', icon: '◮' },
   { href: '/landing-pages/', label: 'Landing Pages', icon: '◰' },
   { href: '/stats/', label: 'Stats', icon: '◩' },
+  { href: '/settings/', label: 'Settings', icon: '◷' },
 ]
 
 export default function Sidebar() {

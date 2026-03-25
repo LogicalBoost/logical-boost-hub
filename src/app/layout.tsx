@@ -1,6 +1,7 @@
 import './globals.css'
 import AppShell from '@/components/AppShell'
 import { AppProvider } from '@/lib/store'
+import { AuthProvider } from '@/components/AuthProvider'
 
 export const metadata = {
   title: 'Logical Boost Hub',
@@ -16,7 +17,9 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <AppProvider>
-          <AppShell>{children}</AppShell>
+          <AuthProvider>
+            <AppShell>{children}</AppShell>
+          </AuthProvider>
         </AppProvider>
       </body>
     </html>
