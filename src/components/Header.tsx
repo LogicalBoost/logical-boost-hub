@@ -53,6 +53,19 @@ export default function Header() {
   return (
     <header className="header">
       <div className="client-switcher">
+        {/* Show client logo thumbnail if available */}
+        {client?.logo_url && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={client.logo_url}
+            alt=""
+            style={{
+              width: 28, height: 28, objectFit: 'contain',
+              borderRadius: 4, background: 'rgba(255,255,255,0.1)',
+              flexShrink: 0,
+            }}
+          />
+        )}
         <label>Client:</label>
         <select
           value={client?.id || ''}

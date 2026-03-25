@@ -35,7 +35,7 @@ function ColorSwatch({ color, label }: { color: string; label: string }) {
 }
 
 export default function LandingPagesPage() {
-  const { client, canEdit } = useAppStore()
+  const { client, canEdit, refreshClient } = useAppStore()
   const [activeStage, setActiveStage] = useState<Stage>('brand_kit')
   const [analyzing, setAnalyzing] = useState(false)
   const [brandKit, setBrandKit] = useState<BrandKit | null>(null)
@@ -55,7 +55,9 @@ export default function LandingPagesPage() {
   const handleLogoUploaded = useCallback((url: string) => {
     setLogoUrl(url)
     setShowLogoUpload(false)
-  }, [])
+    // Refresh client in store so logo persists across navigation
+    if (client?.id) refreshClient(client.id)
+  }, [client?.id, refreshClient])
 
   if (!client) {
     return (
@@ -72,13 +74,18 @@ export default function LandingPagesPage() {
     setAnalyzing(true)
     try {
       const result = await analyzeBrandKit(client.id)
+      console.log('[Brand Kit] Analysis result:', result)
       if (result.brand_kit) {
         setBrandKit(result.brand_kit)
+        // Refresh client in store so brand kit persists across navigation
+        await refreshClient(client.id)
         showToast('Brand kit analysis complete!')
       } else {
-        showToast('Analysis completed but no brand data returned')
+        console.warn('[Brand Kit] No brand_kit in response:', result)
+        showToast('Analysis completed but no brand data returned. Check console for details.')
       }
     } catch (err) {
+      console.error('[Brand Kit] Analysis failed:', err)
       showToast('Brand kit analysis failed: ' + (err as Error).message)
     } finally {
       setAnalyzing(false)

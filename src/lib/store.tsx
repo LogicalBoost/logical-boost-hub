@@ -43,6 +43,8 @@ interface AppStore extends AppState {
   refreshIntake: (clientId: string) => Promise<void>
   refreshCopyComponents: (clientId: string) => Promise<void>
   refreshFunnelInstances: (clientId: string) => Promise<void>
+  /** Refresh just the client record from DB (e.g. after logo upload or brand kit analysis) */
+  refreshClient: (clientId: string) => Promise<void>
   setUserRole: (role: UserRole) => void
 }
 
@@ -214,6 +216,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setFunnelInstances(data || [])
   }, [])
 
+  const refreshClient = useCallback(async (clientId: string) => {
+    const { data } = await supabase.from('clients').select('*').eq('id', clientId).single()
+    if (data) {
+      setClient(data)
+      // Also update allClients list so header dropdown stays in sync
+      setAllClients(prev => prev.map(c => c.id === clientId ? data : c))
+    }
+  }, [])
+
   return (
     <AppContext.Provider value={{
       allClients, client, avatars, offers, intakeQuestions, funnelInstances, copyComponents, competitors, loading, error,
@@ -221,7 +232,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setClient, setAvatars, setOffers, setIntakeQuestions, setCopyComponents, setFunnelInstances, setCompetitors,
       setLoading, setError, loadAllClients, loadClientData, switchClient, createClient: createNewClient,
       updateAvatar, updateOffer, refreshAvatars, refreshOffers, refreshIntake,
-      refreshCopyComponents, refreshFunnelInstances, setUserRole,
+      refreshCopyComponents, refreshFunnelInstances, refreshClient, setUserRole,
     }}>
       {children}
     </AppContext.Provider>

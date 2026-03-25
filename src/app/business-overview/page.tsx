@@ -6,9 +6,10 @@ import { analyzeBusiness } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import type { Competitor } from '@/types/database'
 import TagInput from '@/components/TagInput'
+import LogoUpload from '@/components/LogoUpload'
 
 export default function BusinessOverviewPage() {
-  const { client, loading, setClient, setLoading, setError, createClient, loadClientData, loadAllClients, canEdit } = useAppStore()
+  const { client, loading, setClient, setLoading, setError, createClient, loadClientData, loadAllClients, canEdit, refreshClient } = useAppStore()
 
   // New client setup form state
   const [showNewForm, setShowNewForm] = useState(false)
@@ -335,6 +336,22 @@ export default function BusinessOverviewPage() {
                   <span className="detail-value">{client.website}</span>
                 )}
               </div>
+            </div>
+            {/* Client Logo */}
+            <div className="detail-item">
+              <span className="detail-label">Logo</span>
+              {canEdit ? (
+                <LogoUpload
+                  clientId={client.id}
+                  currentLogoUrl={client.logo_url || null}
+                  onUploadComplete={() => refreshClient(client.id)}
+                />
+              ) : client.logo_url ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={client.logo_url} alt={`${client.name} logo`} style={{ maxHeight: 80, objectFit: 'contain' }} />
+              ) : (
+                <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>No logo uploaded yet</span>
+              )}
             </div>
             <div className="detail-item">
               <span className="detail-label">Business Summary</span>
