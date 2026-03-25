@@ -81,7 +81,7 @@ EXISTING OFFERS:
 ${offerContext || 'None'}`
 
     const response = await callClaude(SYSTEM_PROMPT, userMessage, {
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-sonnet-4-20250514',
       maxTokens: 4096,
     })
 

@@ -121,7 +121,7 @@ ${existingList || 'None yet. This is the first batch.'}
 Generate exactly ${generateCount} new, unique avatars.${userDirection}`
 
     const response = await callClaude(systemPrompt, userMessage, {
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-4-20250514',
       maxTokens: 8192,
     })
 
