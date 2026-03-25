@@ -95,6 +95,11 @@ export async function analyzeBrandKit(clientId: string) {
   return callEdgeFunction('analyze-brand-kit', { client_id: clientId })
 }
 
+// Workflow 11: Analyze competitor landing pages
+export async function analyzeCompetitorPages(clientId: string) {
+  return callEdgeFunction('analyze-competitor-pages', { client_id: clientId })
+}
+
 // Workflow 10: AI-powered competitor discovery
 export async function discoverCompetitors(
   clientId: string,

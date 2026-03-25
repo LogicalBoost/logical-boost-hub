@@ -56,6 +56,7 @@ export default function Sidebar() {
       <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-logo">
           <img src="/logical-boost-hub/images/logow.png" alt="LogicalBoost" className="sidebar-logo-img" />
+          <span className="beta-badge">BETA</span>
         </div>
         <nav className="sidebar-nav">
           {navItems.map((item) => {

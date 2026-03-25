@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
-import { discoverCompetitors } from '@/lib/api'
+import { discoverCompetitors, analyzeCompetitorPages } from '@/lib/api'
 import { showToast } from '@/lib/demo-toast'
 
 type Tab = 'overview' | 'offers' | 'pages' | 'ad_copy' | 'video'
@@ -31,6 +31,10 @@ export default function CompetitiveIntelPage() {
   const [compKeywords, setCompKeywords] = useState('')
   const [compNotes, setCompNotes] = useState('')
   const [discovering, setDiscovering] = useState(false)
+  const [analyzingPages, setAnalyzingPages] = useState(false)
+  const [pageAnalyses, setPageAnalyses] = useState<Array<Record<string, unknown>>>([])
+  const [patternSummary, setPatternSummary] = useState('')
+  const [opportunities, setOpportunities] = useState<string[]>([])
   const [discoveryResult, setDiscoveryResult] = useState<{
     market_overview?: string
     competitors_added?: number
@@ -101,6 +105,25 @@ export default function CompetitiveIntelPage() {
       showToast('Discovery failed: ' + (err as Error).message)
     } finally {
       setDiscovering(false)
+    }
+  }
+
+  async function handleAnalyzePages() {
+    if (!client) return
+    setAnalyzingPages(true)
+    try {
+      const result = await analyzeCompetitorPages(client.id)
+      if (result.analyses) {
+        setPageAnalyses(result.analyses)
+        setPatternSummary(result.pattern_summary || '')
+        setOpportunities(result.opportunities || [])
+        showToast(`Analyzed ${result.analyses_added} competitor pages!`)
+        await loadClientData(client.id)
+      }
+    } catch (err) {
+      showToast('Page analysis failed: ' + (err as Error).message)
+    } finally {
+      setAnalyzingPages(false)
     }
   }
 
@@ -290,27 +313,222 @@ export default function CompetitiveIntelPage() {
 
       {activeTab === 'pages' && (
         <div>
-          <div className="funnel-section-card">
-            <div className="funnel-section-header">
-              <h3>Above-Fold &amp; Landing Pages</h3>
+          {/* Analyze button */}
+          {canEdit && uniqueCompetitors.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <button
+                className="btn btn-primary"
+                onClick={handleAnalyzePages}
+                disabled={analyzingPages}
+              >
+                {analyzingPages ? 'Analyzing competitor pages...' : '\u{1F50D} AI Analyze Competitor Pages'}
+              </button>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 12 }}>
+                Visits competitor websites and extracts above-fold patterns, CTAs, page structure
+              </span>
             </div>
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-              {competitors.filter(c => c.ad_type === 'landing_page').length > 0 ? (
-                <div>
-                  {competitors.filter(c => c.ad_type === 'landing_page').map((c, i) => (
-                    <div key={c.id || i} style={{ textAlign: 'left', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
-                      <div style={{ fontWeight: 600, marginBottom: 4 }}>{c.competitor_name}</div>
-                      <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>{c.competitor_website}</div>
-                      {c.content && <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{c.content}</div>}
-                      {c.notes && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>{c.notes}</div>}
-                    </div>
-                  ))}
+          )}
+
+          {/* Loading state */}
+          {analyzingPages && (
+            <div style={{
+              padding: 24, marginBottom: 20,
+              background: 'var(--bg-hover)', borderRadius: 8, textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>{'\u{1F50D}'}</div>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Analyzing competitor landing pages...</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                AI is visiting {uniqueCompetitors.length} competitor websites and analyzing their above-fold content, page structure, offers, and conversion tactics. This may take 30-60 seconds.
+              </div>
+            </div>
+          )}
+
+          {/* Pattern Summary */}
+          {patternSummary && (
+            <div style={{
+              padding: 16, marginBottom: 20,
+              background: 'var(--bg-card)', borderRadius: 8, border: '1px solid var(--border)',
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Pattern Summary</div>
+              <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{patternSummary}</div>
+              {opportunities.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>Opportunities:</div>
+                  <div className="tag-list">
+                    {opportunities.map((opp, i) => (
+                      <span key={i} className="tag" style={{ background: 'var(--accent-secondary)' }}>{opp}</span>
+                    ))}
+                  </div>
                 </div>
-              ) : (
-                'No competitor landing pages tracked yet. Add landing page intel to analyze above-fold patterns.'
               )}
             </div>
-          </div>
+          )}
+
+          {/* AI Page Analyses */}
+          {pageAnalyses.length > 0 ? (
+            <div className="card-grid" style={{ gridTemplateColumns: '1fr' }}>
+              {pageAnalyses.map((analysis, i) => {
+                const aboveFold = analysis.above_fold as Record<string, unknown> | undefined
+                const pageStructure = analysis.page_structure as Record<string, unknown> | undefined
+                const offerAnalysis = analysis.offer_analysis as Record<string, unknown> | undefined
+                const tactics = analysis.conversion_tactics as Record<string, unknown> | undefined
+                const notes = analysis.strategic_notes as Record<string, unknown> | undefined
+                return (
+                  <div key={i} className="funnel-section-card">
+                    <div className="funnel-section-header">
+                      <h3>{String(analysis.competitor_name || 'Competitor')}</h3>
+                      {analysis.website ? (
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{String(analysis.website)}</span>
+                      ) : null}
+                    </div>
+                    <div style={{ padding: 16 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                        {/* Above Fold */}
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', marginBottom: 8 }}>ABOVE THE FOLD</div>
+                          {aboveFold?.headline ? <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>{String(aboveFold.headline)}</div> : null}
+                          {aboveFold?.subheadline ? <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>{String(aboveFold.subheadline)}</div> : null}
+                          {aboveFold?.cta_text ? (
+                            <div style={{ marginBottom: 6 }}>
+                              <span className="tag" style={{ background: 'var(--accent)' }}>CTA: {String(aboveFold.cta_text)}</span>
+                            </div>
+                          ) : null}
+                          <div className="tag-list" style={{ marginTop: 4 }}>
+                            {aboveFold?.hero_type ? <span className="tag">{String(aboveFold.hero_type)}</span> : null}
+                            {aboveFold?.urgency ? <span className="tag" style={{ background: '#ef4444' }}>{String(aboveFold.urgency)}</span> : null}
+                          </div>
+                        </div>
+
+                        {/* Page Structure */}
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', marginBottom: 8 }}>PAGE STRUCTURE</div>
+                          {pageStructure?.sections && Array.isArray(pageStructure.sections) ? (
+                            <div className="tag-list" style={{ marginBottom: 8 }}>
+                              {(pageStructure.sections as string[]).map((s, si) => (
+                                <span key={si} className="tag" style={{ fontSize: 11 }}>{s}</span>
+                              ))}
+                            </div>
+                          ) : null}
+                          {pageStructure?.estimated_length ? (
+                            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Length: {String(pageStructure.estimated_length)}</div>
+                          ) : null}
+                          {pageStructure?.navigation_style ? (
+                            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Nav: {String(pageStructure.navigation_style)}</div>
+                          ) : null}
+                        </div>
+
+                        {/* Offer Analysis */}
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', marginBottom: 8 }}>OFFER</div>
+                          {offerAnalysis?.primary_offer ? <div style={{ fontSize: 13, marginBottom: 4 }}>{String(offerAnalysis.primary_offer)}</div> : null}
+                          <div className="tag-list">
+                            {offerAnalysis?.offer_type ? <span className="tag">{String(offerAnalysis.offer_type)}</span> : null}
+                            {offerAnalysis?.pricing_visible ? <span className="tag">Pricing Visible</span> : null}
+                            {offerAnalysis?.guarantee ? <span className="tag">{String(offerAnalysis.guarantee)}</span> : null}
+                          </div>
+                        </div>
+
+                        {/* Conversion Tactics */}
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', marginBottom: 8 }}>CONVERSION TACTICS</div>
+                          {tactics?.social_proof_types && Array.isArray(tactics.social_proof_types) ? (
+                            <div className="tag-list" style={{ marginBottom: 6 }}>
+                              {(tactics.social_proof_types as string[]).map((t, ti) => (
+                                <span key={ti} className="tag" style={{ fontSize: 11 }}>{t}</span>
+                              ))}
+                            </div>
+                          ) : null}
+                          {tactics?.form_fields ? (
+                            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Form fields: {String(tactics.form_fields)}</div>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* Strategic Notes */}
+                      {notes && (
+                        <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                            {Array.isArray(notes.strengths) ? (
+                              <div>
+                                <div style={{ fontSize: 11, fontWeight: 600, color: '#22c55e', marginBottom: 4 }}>STRENGTHS</div>
+                                {(notes.strengths as string[]).map((s, si) => (
+                                  <div key={si} style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 2 }}>{s}</div>
+                                ))}
+                              </div>
+                            ) : null}
+                            {Array.isArray(notes.weaknesses) ? (
+                              <div>
+                                <div style={{ fontSize: 11, fontWeight: 600, color: '#ef4444', marginBottom: 4 }}>WEAKNESSES</div>
+                                {(notes.weaknesses as string[]).map((w, wi) => (
+                                  <div key={wi} style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 2 }}>{w}</div>
+                                ))}
+                              </div>
+                            ) : null}
+                            {notes.unique_approach ? (
+                              <div>
+                                <div style={{ fontSize: 11, fontWeight: 600, color: '#3b82f6', marginBottom: 4 }}>UNIQUE APPROACH</div>
+                                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{String(notes.unique_approach)}</div>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : !analyzingPages ? (
+            <div className="funnel-section-card">
+              <div className="funnel-section-header">
+                <h3>Above-Fold &amp; Landing Pages</h3>
+              </div>
+              <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+                {/* Show stored landing page analyses from competitor_intel */}
+                {competitors.filter(c => c.ad_type === 'landing_page').length > 0 ? (
+                  <div>
+                    {competitors.filter(c => c.ad_type === 'landing_page').map((c, idx) => {
+                      let parsed: Record<string, unknown> | null = null
+                      try { if (c.content) parsed = JSON.parse(c.content) } catch { /* not json */ }
+                      return (
+                        <div key={c.id || idx} style={{ textAlign: 'left', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+                          <div style={{ fontWeight: 600, marginBottom: 4 }}>{c.competitor_name}</div>
+                          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>{c.competitor_website}</div>
+                          {parsed ? (
+                            <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                              {(parsed.above_fold as Record<string, unknown>)?.headline ? (
+                                <div>Headline: {String((parsed.above_fold as Record<string, unknown>).headline)}</div>
+                              ) : null}
+                              {(parsed.above_fold as Record<string, unknown>)?.cta_text ? (
+                                <span className="tag" style={{ marginTop: 4 }}>CTA: {String((parsed.above_fold as Record<string, unknown>).cta_text)}</span>
+                              ) : null}
+                            </div>
+                          ) : c.content ? (
+                            <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{c.content}</div>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                    {canEdit && (
+                      <button className="btn btn-secondary" style={{ marginTop: 16 }} onClick={handleAnalyzePages} disabled={analyzingPages}>
+                        Re-analyze Pages
+                      </button>
+                    )}
+                  </div>
+                ) : uniqueCompetitors.length > 0 ? (
+                  <div>
+                    <div style={{ marginBottom: 12 }}>
+                      {uniqueCompetitors.length} competitors discovered. Click the button above to analyze their landing pages.
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    No competitors found yet. Use &quot;AI Discover Competitors&quot; first, then analyze their pages.
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
 
