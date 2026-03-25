@@ -6,13 +6,14 @@ import { useState, useEffect } from 'react'
 
 const navItems = [
   { href: '/dashboard/', label: 'Dashboard', icon: '◫' },
-  { href: '/stats/', label: 'Stats', icon: '◩' },
-  { href: '/funnel/', label: 'Funnel', icon: '◬' },
   { href: '/business-overview/', label: 'Business Overview', icon: '◨' },
   { href: '/intake/', label: 'Intake', icon: '◧' },
   { href: '/avatars/', label: 'Avatars', icon: '◪' },
   { href: '/offers/', label: 'Offers', icon: '◭' },
-  { href: '/competitor-ads/', label: 'Competitor Ads', icon: '◮' },
+  { href: '/funnel/', label: 'Funnel', icon: '◬' },
+  { href: '/competitive-intel/', label: 'Competitive Intel', icon: '◮' },
+  { href: '/landing-pages/', label: 'Landing Pages', icon: '◰' },
+  { href: '/stats/', label: 'Stats', icon: '◩' },
 ]
 
 export default function Sidebar() {
