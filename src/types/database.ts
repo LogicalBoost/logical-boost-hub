@@ -111,9 +111,15 @@ export type CopyComponentType =
   | 'value_point'
   | 'cta'
   | 'video_hook'
+  | 'short_script'
+  | 'long_script'
   | 'video_script'
   | 'objection_handler'
   | 'description'
+  | 'hero_headline'
+  | 'hero_subheadline'
+  | 'hero_cta'
+  | 'urgency_bar'
 
 export interface CopyComponent {
   id: string
@@ -137,8 +143,6 @@ export interface FunnelInstance {
   client_id: string
   avatar_id: string
   offer_id: string
-  primary_angle: string
-  secondary_angles: string[]
   generated_at: string
   status: 'active' | 'archived'
 }
@@ -174,9 +178,30 @@ export interface LandingPage {
   cta: string
   sections: LandingPageSection[]
   preview_image_url: string | null
+  deployed_url: string | null
+  deploy_status: 'draft' | 'deployed' | 'stale'
   status: 'approved' | 'denied'
   created_at: string
   updated_at: string
+}
+
+// Angle badge color map for UI
+export const ANGLE_COLORS: Record<string, string> = {
+  problem: '#ef4444',
+  outcome: '#22c55e',
+  fear: '#f97316',
+  opportunity: '#3b82f6',
+  curiosity: '#a855f7',
+  proof: '#14b8a6',
+  authority: '#6366f1',
+  mechanism: '#ec4899',
+  speed: '#eab308',
+  cost: '#06b6d4',
+  comparison: '#f43f5e',
+  identity: '#8b5cf6',
+  mistake: '#d946ef',
+  hidden_truth: '#0ea5e9',
+  before_after: '#84cc16',
 }
 
 export type LandingPageSection =

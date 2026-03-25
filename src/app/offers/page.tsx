@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useAppStore } from '@/lib/store'
+import { supabase } from '@/lib/supabase'
 import { suggestOffers } from '@/lib/api'
 import { showToast } from '@/lib/demo-toast'
 import type { Offer } from '@/types/database'
@@ -32,6 +33,15 @@ export default function OffersPage() {
       setSelectedOffer((prev) => prev ? { ...prev, status: 'approved' as const } : null)
     }
     showToast('Offer approved')
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('Delete this offer? This cannot be undone.')) return
+    if (!client) return
+    await supabase.from('offers').delete().eq('id', id)
+    setSelectedOffer(null)
+    await refreshOffers(client.id)
+    showToast('Offer deleted')
   }
 
   async function handleSuggestMore() {
@@ -173,8 +183,11 @@ export default function OffersPage() {
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-danger" onClick={() => handleDeny(selectedOffer.id)}>Deny</button>
-              <button className="btn btn-primary" onClick={() => handleApprove(selectedOffer.id)}>Approve</button>
+              <button className="btn btn-danger btn-sm" onClick={() => handleDelete(selectedOffer.id)}>Delete</button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-secondary" onClick={() => handleDeny(selectedOffer.id)}>Deny</button>
+                <button className="btn btn-primary" onClick={() => handleApprove(selectedOffer.id)}>Approve</button>
+              </div>
             </div>
           </div>
         </div>

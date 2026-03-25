@@ -77,7 +77,7 @@ export default function StatsPage() {
                       {avatar?.name || 'Unknown Avatar'} + {offer?.name || 'Unknown Offer'}
                     </div>
                     <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                      Angle: {fi.primary_angle} &bull; {components.length} copy items &bull; {fi.status}
+                      {components.length} copy items &bull; {fi.status}
                     </div>
                   </div>
                   <span className={`badge ${fi.status === 'active' ? 'badge-approved' : 'badge-pending'}`}>

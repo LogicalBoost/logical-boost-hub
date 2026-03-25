@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(node -e \"const s = require\\(''C:/Users/Admin/FOR_DEVELOPMENT/logical-boost-hub/.claude/settings.json''\\); console.log\\(''Valid JSON. Permissions:'', s.permissions.allow.length, ''rules''\\); s.permissions.allow.forEach\\(r => console.log\\('' '', r\\)\\)\")",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(where gh:*)",
+      "Bash(cp \"C:\\\\Users\\\\Admin\\\\FOR_DEVELOPMENT\\\\logical-boost-hub\\\\logical_boost_hub_spec.md\" \"C:\\\\Users\\\\Admin\\\\FOR_DEVELOPMENT\\\\logical-boost-hub\\\\.claude\\\\worktrees\\\\stupefied-bell\\\\logical_boost_hub_spec.md\")",
+      "Bash(cp \"C:\\\\Users\\\\Admin\\\\FOR_DEVELOPMENT\\\\logical-boost-hub\\\\logical_boost_hub_ai_prompts.md\" \"C:\\\\Users\\\\Admin\\\\FOR_DEVELOPMENT\\\\logical-boost-hub\\\\.claude\\\\worktrees\\\\stupefied-bell\\\\logical_boost_hub_ai_prompts.md\")",
+      "Bash(/c/Users/Admin/AppData/Roaming/npm/gh)",
+      "Bash(curl -s -H 'Accept: application/vnd.github+json' https://api.github.com/repos/LogicalBoost/logical-boost-hub/actions/runs?per_page=5)",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); runs=data.get\\(''''workflow_runs'''',[]\\); [print\\(f''''{r[id]} | {r[status]} | {r[conclusion]} | {r[head_sha][:7]} | {r[created_at]}''''\\) for r in runs[:5]]\")",
+      "Bash(curl -s https://api.github.com/repos/LogicalBoost/logical-boost-hub/actions/runs?per_page=3)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(npx supabase:*)",
+      "Bash(source .env.local)",
+      "Bash(curl -s -X POST \"https://nkeswemyzzkpsciwhlqc.supabase.co/functions/v1/analyze-business\" -H \"Content-Type: application/json\" -H \"Authorization: Bearer $NEXT_PUBLIC_SUPABASE_ANON_KEY\" -d \"{\"\"client_id\"\": \"\"7a24fa85-de3b-4140-80f1-6feb088157cc\"\", \"\"website_url\"\": \"\"https://upstart.com\"\", \"\"call_notes\"\": \"\"Test business\"\"}\")",
+      "Bash(curl -s -X POST \"https://nkeswemyzzkpsciwhlqc.supabase.co/functions/v1/analyze-business\" -H \"Content-Type: application/json\" -H \"Authorization: Bearer $NEXT_PUBLIC_SUPABASE_ANON_KEY\" -d \"{\"\"client_id\"\": \"\"7a24fa85-de3b-4140-80f1-6feb088157cc\"\", \"\"website_url\"\": \"\"https://upstart.com\"\", \"\"call_notes\"\": \"\"Business coaching and consulting firm\"\"}\")",
+      "Bash(curl -s -X POST \"https://nkeswemyzzkpsciwhlqc.supabase.co/functions/v1/analyze-business\" -H \"Content-Type: application/json\" -H \"Authorization: Bearer $NEXT_PUBLIC_SUPABASE_ANON_KEY\" -d \"{\"\"client_id\"\": \"\"7a24fa85-de3b-4140-80f1-6feb088157cc\"\", \"\"website_url\"\": \"\"https://upstart.com\"\", \"\"call_notes\"\": \"\"Business coaching firm focused on startups\"\"}\")",
+      "Bash(npx next:*)",
+      "Bash(curl -L -o public/images/logow.png \"https://logicalboost.com/assets/brand/logow.png\")",
+      "Bash(curl -sL -o public/images/icon.png \"https://logicalboost.com/assets/brand/icon.png\" -w \"%{http_code}\")",
+      "Bash(gh run:*)",
+      "Bash(find C:UsersAdminFOR_DEVELOPMENTlogical-boost-hub.claudeworktreesstupefied-bellout -name *.css)",
+      "Bash(xargs basename:*)"
+    ]
+  }
+}

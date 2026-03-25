@@ -1,15 +1,16 @@
 'use client'
 
 import Link from 'next/link'
+import { useMemo } from 'react'
 import { useAppStore } from '@/lib/store'
 
 export default function DashboardPage() {
-  const { client, avatars, offers, intakeQuestions, funnelInstances } = useAppStore()
+  const { client, avatars, offers, funnelInstances, copyComponents } = useAppStore()
 
   if (!client) {
     return (
       <div className="empty-state">
-        <div className="empty-state-icon">🚀</div>
+        <div className="empty-state-icon">&#128640;</div>
         <div className="empty-state-text">Welcome to Logical Boost Hub</div>
         <div className="empty-state-sub">
           Add your first client to begin building AI-powered campaign funnels.
@@ -24,160 +25,150 @@ export default function DashboardPage() {
     )
   }
 
-  const gettingStartedSteps = [
-    {
-      number: 1,
-      title: 'Add Business Info',
-      href: '/business-overview/',
-      isComplete: !!client.business_summary,
-    },
-    {
-      number: 2,
-      title: 'Complete Intake',
-      href: '/intake/',
-      isComplete: client.intake_status === 'completed',
-    },
-    {
-      number: 3,
-      title: 'Review Avatars',
-      href: '/avatars/',
-      isComplete: avatars.length > 0,
-    },
-    {
-      number: 4,
-      title: 'Review Offers',
-      href: '/offers/',
-      isComplete: offers.length > 0,
-    },
-    {
-      number: 5,
-      title: 'Generate Funnels',
-      href: '/funnel/',
-      isComplete: funnelInstances.length > 0,
-    },
-  ]
+  const activeFunnels = funnelInstances.filter((fi) => fi.status === 'active').length
 
-  const completedSteps = gettingStartedSteps.filter((s) => s.isComplete).length
+  // Build activity feed from recent items
+  const activityFeed = useMemo(() => {
+    const items: { text: string; time: string; icon: string }[] = []
+
+    // Recent copy components
+    const recentCopy = [...copyComponents]
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .slice(0, 5)
+
+    for (const cc of recentCopy) {
+      const avatar = avatars.find((a) => (cc.avatar_ids || []).includes(a.id))
+      items.push({
+        text: `New ${cc.type.replace(/_/g, ' ')} added${avatar ? ` for ${avatar.name} funnel` : ''}`,
+        time: cc.created_at,
+        icon: '&#128221;',
+      })
+    }
+
+    // Recent avatars
+    for (const a of avatars.slice(-3).reverse()) {
+      items.push({
+        text: `Avatar "${a.name}" ${a.status === 'approved' ? 'approved' : 'created'}`,
+        time: a.created_at,
+        icon: '&#128100;',
+      })
+    }
+
+    // Recent offers
+    for (const o of offers.slice(-3).reverse()) {
+      items.push({
+        text: `Offer "${o.name}" ${o.status === 'approved' ? 'approved' : 'created'}`,
+        time: o.created_at,
+        icon: '&#127873;',
+      })
+    }
+
+    // Sort by time descending, take top 10
+    items.sort((a, b) => b.time.localeCompare(a.time))
+    return items.slice(0, 10)
+  }, [copyComponents, avatars, offers])
+
+  function timeAgo(dateStr: string) {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 60) return `${mins}m ago`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    return `${days}d ago`
+  }
 
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Dashboard</h1>
-      </div>
-
-      <div className="welcome-card">
-        <h2>Welcome back, {client.name}</h2>
-        <p>
-          Your marketing hub is ready. View your campaign funnels, manage avatars and offers,
-          and track performance all in one place.
-        </p>
-      </div>
-
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-label">Avatars</div>
-          <div className="stat-value">{avatars.length}</div>
-          <div className="stat-change">
-            {avatars.length === 0 ? 'None yet' : `${avatars.length} defined`}
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Offers</div>
-          <div className="stat-value">{offers.length}</div>
-          <div className="stat-change">
-            {offers.length === 0 ? 'None yet' : `${offers.length} active`}
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Funnels</div>
-          <div className="stat-value">{funnelInstances.length}</div>
-          <div className="stat-change">
-            {funnelInstances.length === 0 ? 'Not started' : `${funnelInstances.length} generated`}
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Setup Progress</div>
-          <div className="stat-value">{completedSteps}/{gettingStartedSteps.length}</div>
-          <div className="stat-change">
-            {completedSteps === gettingStartedSteps.length
-              ? 'Complete'
-              : `${gettingStartedSteps.length - completedSteps} remaining`}
-          </div>
+        <div>
+          <h1 className="page-title">Welcome back, {client.name}</h1>
+          <p className="page-subtitle">Your marketing hub overview</p>
         </div>
       </div>
 
-      <h3 style={{ marginBottom: 16, fontSize: 18, fontWeight: 600 }}>Getting Started</h3>
-      <div className="card">
-        <div className="card-body">
-          {gettingStartedSteps.map((step) => (
-            <Link
-              key={step.number}
-              href={step.href}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 0',
-                borderBottom: '1px solid #eee',
-                textDecoration: 'none',
-                color: 'inherit',
-              }}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span
+      {/* Stat Cards */}
+      <div className="funnel-stats-bar" style={{ marginBottom: 24 }}>
+        <div className="funnel-stat">
+          <div className="funnel-stat-value">0</div>
+          <div className="funnel-stat-label">Total Leads</div>
+        </div>
+        <div className="funnel-stat">
+          <div className="funnel-stat-value">--</div>
+          <div className="funnel-stat-label">Cost Per Lead</div>
+        </div>
+        <div className="funnel-stat">
+          <div className="funnel-stat-value">{activeFunnels}</div>
+          <div className="funnel-stat-label">Active Funnels</div>
+        </div>
+        <div className="funnel-stat">
+          <div className="funnel-stat-value">0</div>
+          <div className="funnel-stat-label">Landing Pages Live</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        {/* Activity Feed */}
+        <div className="funnel-section-card" style={{ gridColumn: activityFeed.length > 0 ? '1' : '1 / -1' }}>
+          <div className="funnel-section-header">
+            <h3>Recent Activity</h3>
+          </div>
+          <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+            {activityFeed.length > 0 ? (
+              activityFeed.map((item, i) => (
+                <div
+                  key={i}
                   style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    background: step.isComplete ? '#22c55e' : '#e5e7eb',
-                    color: step.isComplete ? '#fff' : '#6b7280',
+                    gap: 12,
+                    padding: '10px 20px',
+                    borderBottom: '1px solid var(--border)',
+                    fontSize: 13,
                   }}
                 >
-                  {step.isComplete ? '\u2713' : step.number}
-                </span>
-                <span style={{ fontWeight: 500 }}>
-                  Step {step.number}: {step.title}
-                </span>
-              </span>
-              <span className={step.isComplete ? 'badge badge-approved' : 'badge badge-pending'}>
-                {step.isComplete ? 'Completed' : 'Pending'}
-              </span>
-            </Link>
-          ))}
+                  <span dangerouslySetInnerHTML={{ __html: item.icon }} />
+                  <span style={{ flex: 1, color: 'var(--text-primary)' }}>{item.text}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>
+                    {timeAgo(item.time)}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+                No activity yet. Start by analyzing your business.
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
-      <h3 style={{ marginTop: 32, marginBottom: 16, fontSize: 18, fontWeight: 600 }}>Quick Links</h3>
-      <div className="card-grid">
-        <Link href="/funnel/" className="card" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <div className="card-title">Funnel Builder</div>
-          <div className="card-body">
-            Select an avatar, offer, and angle to view or generate your complete campaign system.
-          </div>
-        </Link>
-        <Link href="/avatars/" className="card" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <div className="card-title">Avatars</div>
-          <div className="card-body">
-            View and manage your target audience profiles. {avatars.length} active avatars defined.
-          </div>
-        </Link>
-        <Link href="/offers/" className="card" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <div className="card-title">Offers</div>
-          <div className="card-body">
-            Manage your conversion offers. {offers.length} offers ready for campaigns.
-          </div>
-        </Link>
-        <Link href="/business-overview/" className="card" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <div className="card-title">Business Overview</div>
-          <div className="card-body">
-            Review and update your company profile, ad copy rules, and brand guidelines.
-          </div>
-        </Link>
+        {/* Quick Links */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <Link href="/funnel/" className="funnel-section-card" style={{ textDecoration: 'none', color: 'inherit', padding: '20px', display: 'block' }}>
+            <h3 style={{ fontSize: 15, marginBottom: 4, color: 'var(--accent)' }}>&#9889; Funnel Builder</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+              {activeFunnels > 0 ? `${activeFunnels} active funnels with ${copyComponents.length} copy components` : 'Generate your first campaign'}
+            </p>
+          </Link>
+          <Link href="/avatars/" className="funnel-section-card" style={{ textDecoration: 'none', color: 'inherit', padding: '20px', display: 'block' }}>
+            <h3 style={{ fontSize: 15, marginBottom: 4, color: 'var(--accent)' }}>&#128100; Avatars</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+              {avatars.length} audience profiles defined
+            </p>
+          </Link>
+          <Link href="/offers/" className="funnel-section-card" style={{ textDecoration: 'none', color: 'inherit', padding: '20px', display: 'block' }}>
+            <h3 style={{ fontSize: 15, marginBottom: 4, color: 'var(--accent)' }}>&#127873; Offers</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+              {offers.length} conversion offers ready
+            </p>
+          </Link>
+          <Link href="/business-overview/" className="funnel-section-card" style={{ textDecoration: 'none', color: 'inherit', padding: '20px', display: 'block' }}>
+            <h3 style={{ fontSize: 15, marginBottom: 4, color: 'var(--accent)' }}>&#128188; Business Overview</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+              Company profile, ad rules, and guidelines
+            </p>
+          </Link>
+        </div>
       </div>
     </div>
   )

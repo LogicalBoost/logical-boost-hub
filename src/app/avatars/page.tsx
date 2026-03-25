@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import type { Avatar } from '@/types/database'
+import { getAngleLabel, ANGLE_COLORS } from '@/types/database'
 import { showToast } from '@/lib/demo-toast'
 
 type StatusFilter = 'all' | 'approved' | 'denied'
@@ -112,6 +113,15 @@ export default function AvatarsPage() {
     }
   }
 
+  async function handleDelete(id: string) {
+    if (!confirm('Delete this avatar? This cannot be undone.')) return
+    if (!client) return
+    await supabase.from('avatars').delete().eq('id', id)
+    setSelectedAvatar(null)
+    await refreshAvatars(client.id)
+    showToast('Avatar deleted')
+  }
+
   return (
     <>
       <div className="page-header">
@@ -160,9 +170,14 @@ export default function AvatarsPage() {
               )}
               {avatar.recommended_angles && avatar.recommended_angles.length > 0 && (
                 <div className="tag-list">
-                  {avatar.recommended_angles.map((angle) => (
-                    <span key={angle} className="tag">{angle}</span>
-                  ))}
+                  {avatar.recommended_angles.map((angle) => {
+                    const color = ANGLE_COLORS[angle] || '#6b7280'
+                    return (
+                      <span key={angle} className="angle-badge" style={{ backgroundColor: `${color}22`, color, borderColor: `${color}44` }}>
+                        {getAngleLabel(angle)}
+                      </span>
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -353,16 +368,24 @@ export default function AvatarsPage() {
             <div className="modal-footer">
               <button
                 className="btn btn-danger btn-sm"
-                onClick={() => handleDeny(selectedAvatar.id)}
+                onClick={() => handleDelete(selectedAvatar.id)}
               >
-                Deny
+                Delete
               </button>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => handleApprove(selectedAvatar.id)}
-              >
-                Approve
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => handleDeny(selectedAvatar.id)}
+                >
+                  Deny
+                </button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => handleApprove(selectedAvatar.id)}
+                >
+                  Approve
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -42,21 +42,26 @@ export async function refineSystem(clientId: string, newCallNotes?: string, newM
   })
 }
 
-// Workflow 4: Generate funnel
-export async function generateFunnel(avatarId: string, offerId: string, primaryAngle: string, secondaryAngles: string[]) {
+// Workflow 4: Generate funnel (multi-angle — AI generates across all recommended angles)
+export async function generateFunnel(avatarId: string, offerId: string) {
   return callEdgeFunction('generate-funnel', {
     avatar_id: avatarId,
     offer_id: offerId,
-    primary_angle: primaryAngle,
-    secondary_angles: secondaryAngles,
   })
 }
 
 // Workflow 5: Generate more items for a section
-export async function generateMore(funnelInstanceId: string, sectionType: string) {
+export async function generateMore(
+  funnelInstanceId: string,
+  sectionType: string,
+  options?: { userPrompt?: string; quantity?: number; angleFilter?: string }
+) {
   return callEdgeFunction('generate-more', {
     funnel_instance_id: funnelInstanceId,
     section_type: sectionType,
+    user_prompt: options?.userPrompt,
+    quantity: options?.quantity,
+    angle_filter: options?.angleFilter,
   })
 }
 
