@@ -7,7 +7,7 @@ import { showToast } from '@/lib/demo-toast'
 import { supabase } from '@/lib/supabase'
 
 export default function IntakePage() {
-  const { client, intakeQuestions, refreshIntake, loadClientData, setLoading, loading } = useAppStore()
+  const { client, intakeQuestions, refreshIntake, loadClientData, setLoading, loading, canEdit } = useAppStore()
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [loadingMessage, setLoadingMessage] = useState('')
 
@@ -35,9 +35,13 @@ export default function IntakePage() {
     setLoading(true)
     setLoadingMessage('AI is generating targeted questions...')
     try {
-      await generateIntake(client.id)
+      const result = await generateIntake(client.id)
       await refreshIntake(client.id)
-      showToast('Intake questions generated')
+      if (result.questions_created > 0) {
+        showToast(`${result.questions_created} intake questions generated`)
+      } else {
+        showToast('No questions were generated. Try again.')
+      }
     } catch (err) {
       showToast(`Error: ${(err as Error).message}`)
     } finally {
@@ -121,14 +125,16 @@ export default function IntakePage() {
           <div className="empty-state-sub">
             Generate targeted questions based on your client profile.
           </div>
-          <button
-            className="btn btn-primary"
-            onClick={handleGenerateIntake}
-            disabled={loading}
-            style={{ marginTop: 16 }}
-          >
-            {loading ? loadingMessage || 'Generating...' : 'Generate Intake Questions'}
-          </button>
+          {canEdit && (
+            <button
+              className="btn btn-primary"
+              onClick={handleGenerateIntake}
+              disabled={loading}
+              style={{ marginTop: 16 }}
+            >
+              {loading ? loadingMessage || 'Generating...' : 'Generate Intake Questions'}
+            </button>
+          )}
         </div>
       </div>
     )
@@ -206,20 +212,24 @@ export default function IntakePage() {
       ))}
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 24 }}>
-        <button
-          className="btn btn-secondary"
-          onClick={handleGenerateIntake}
-          disabled={loading}
-        >
-          Regenerate Questions
-        </button>
-        <button
-          className="btn btn-primary"
-          onClick={handleSaveAndRefine}
-          disabled={loading}
-        >
-          {loading && loadingMessage ? loadingMessage : 'Save & Refine System'}
-        </button>
+        {canEdit && (
+          <button
+            className="btn btn-secondary"
+            onClick={handleGenerateIntake}
+            disabled={loading}
+          >
+            Regenerate Questions
+          </button>
+        )}
+        {canEdit && (
+          <button
+            className="btn btn-primary"
+            onClick={handleSaveAndRefine}
+            disabled={loading}
+          >
+            {loading && loadingMessage ? loadingMessage : 'Save & Refine System'}
+          </button>
+        )}
       </div>
     </div>
   )

@@ -32,7 +32,9 @@ SELECTION RULES:
 - If trust is low → add "proof" or "authority"
 - If targeting a specific segment → always include "identity"
 
-Recommend exactly 3–5 angles. For each, explain in one sentence WHY this angle works for this specific avatar + offer combo. Rank them from strongest to weakest.
+Recommend exactly 3-5 angles. For each, explain in one sentence WHY this angle works for this specific avatar + offer combo. Rank them from strongest to weakest.
+
+NEVER use em dashes (—) in any generated text. Use commas, periods, colons, or separate sentences instead.
 
 Respond ONLY with valid JSON. No markdown, no explanation outside the JSON.`
 

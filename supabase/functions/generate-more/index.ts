@@ -87,8 +87,14 @@ Brand Constraints: ${String(rules.brand_constraints || 'None')}
 Compliance Notes: ${String(rules.compliance_notes || 'None')}
 ${FTC_COMPLIANCE}
 
+FORMATTING RULES (HARD CONSTRAINTS):
+- NEVER use em dashes (—) in any copy. Use commas, periods, colons, or separate sentences instead.
+
+SECTION-SPECIFIC RULES:
+- If section_type is "benefit" or "value_point": Write SHORT, punchy bullet points (5-10 words max). Think banner copy and landing page bullet lists. No full sentences. Examples: "24/7 Emergency Response", "Licensed & Insured Technicians", "Same-Day Service Available".
+
 RULES:
-- Read every existing item below. Your new items must be DIFFERENT — different angles, different phrasing, different emotional triggers.
+- Read every existing item below. Your new items must be DIFFERENT: different angles, different phrasing, different emotional triggers.
 - Stay aligned with the Avatar + Offer combination.
 - Maintain the same quality bar as existing items. No filler.
 - Respect all character limits for the target platform.

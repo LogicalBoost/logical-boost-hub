@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import { supabase } from './supabase'
-import type { Client, Avatar, Offer, IntakeQuestion, CopyComponent, FunnelInstance, CompetitorIntel } from '@/types/database'
+import type { Client, Avatar, Offer, IntakeQuestion, CopyComponent, FunnelInstance, CompetitorIntel, UserRole } from '@/types/database'
 
 interface AppState {
   client: Client | null
@@ -14,10 +14,15 @@ interface AppState {
   competitors: CompetitorIntel[]
   loading: boolean
   error: string | null
+  userRole: UserRole
 }
 
 interface AppStore extends AppState {
   allClients: Client[]
+  /** True if user can create/edit/generate content (admin, team_editor) */
+  canEdit: boolean
+  /** True if user is a client with limited access */
+  isClientRole: boolean
   setClient: (client: Client | null) => void
   setAvatars: (avatars: Avatar[]) => void
   setOffers: (offers: Offer[]) => void
@@ -53,6 +58,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [competitors, setCompetitors] = useState<CompetitorIntel[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Default to 'admin' until auth is wired up; will be set from users table on login
+  const [userRole, setUserRole] = useState<UserRole>('admin')
+  const canEdit = userRole === 'admin' || userRole === 'team_editor'
+  const isClientRole = userRole === 'client'
 
   const loadAllClients = useCallback(async () => {
     const { data } = await supabase.from('clients').select('*').order('created_at', { ascending: false })
@@ -183,6 +192,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider value={{
       allClients, client, avatars, offers, intakeQuestions, funnelInstances, copyComponents, competitors, loading, error,
+      userRole, canEdit, isClientRole,
       setClient, setAvatars, setOffers, setIntakeQuestions, setCopyComponents, setFunnelInstances, setCompetitors,
       setLoading, setError, loadAllClients, loadClientData, switchClient, createClient: createNewClient,
       updateAvatar, updateOffer, refreshAvatars, refreshOffers, refreshIntake,

@@ -206,6 +206,7 @@ export default function FunnelPage() {
     refreshFunnelInstances,
     setLoading,
     loading,
+    canEdit,
   } = useAppStore()
 
   const [avatarId, setAvatarId] = useState('')
@@ -505,13 +506,15 @@ export default function FunnelPage() {
 
             {/* Filter Bar */}
             <div className="funnel-filter-bar">
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => openPrompter(activeTabDef.types[0])}
-                disabled={!!generatingSection}
-              >
-                Generate More +30
-              </button>
+              {canEdit && (
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => openPrompter(activeTabDef.types[0])}
+                  disabled={!!generatingSection}
+                >
+                  Generate More +30
+                </button>
+              )}
               <select
                 className="form-input form-input-sm"
                 value={angleFilter}
@@ -578,22 +581,24 @@ export default function FunnelPage() {
               )}
             </div>
 
-            {/* Tab Footer */}
-            <div className="funnel-tab-footer">
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => handleGenerateMore(activeTabDef.types[0])}
-                disabled={!!generatingSection}
-              >
-                {generatingSection === activeTabDef.types[0] ? 'Generating...' : 'Generate More'}
-              </button>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => openPrompter(activeTabDef.types[0])}
-              >
-                Prompt AI
-              </button>
-            </div>
+            {/* Tab Footer (team only) */}
+            {canEdit && (
+              <div className="funnel-tab-footer">
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => handleGenerateMore(activeTabDef.types[0])}
+                  disabled={!!generatingSection}
+                >
+                  {generatingSection === activeTabDef.types[0] ? 'Generating...' : 'Generate More'}
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => openPrompter(activeTabDef.types[0])}
+                >
+                  Prompt AI
+                </button>
+              </div>
+            )}
           </div>
 
           {/* ── Banner Ad Mockups ──────────────────────────────────── */}
@@ -661,9 +666,11 @@ export default function FunnelPage() {
           {instanceComponents.length === 0 && (
             <div className="empty-state" style={{ padding: 40 }}>
               <div className="empty-state-text">Instance exists but no copy was generated.</div>
-              <button className="btn btn-danger" style={{ marginTop: 16 }} onClick={handleDeleteInstance} disabled={loading}>
-                Delete Instance
-              </button>
+              {canEdit && (
+                <button className="btn btn-danger" style={{ marginTop: 16 }} onClick={handleDeleteInstance} disabled={loading}>
+                  Delete Instance
+                </button>
+              )}
             </div>
           )}
         </>
@@ -681,16 +688,20 @@ export default function FunnelPage() {
           <div className="empty-state-icon">&#9889;</div>
           <div className="empty-state-text">No campaign generated for this Avatar + Offer</div>
           <div className="empty-state-sub">
-            AI will generate ~130-180 copy components across multiple angles in one shot
+            {canEdit
+              ? 'AI will generate ~130-180 copy components across multiple angles in one shot'
+              : 'No campaign has been generated for this combination yet.'}
           </div>
-          <button
-            className="btn btn-primary btn-lg"
-            style={{ marginTop: 20 }}
-            onClick={handleGenerate}
-            disabled={loading}
-          >
-            Generate Campaign
-          </button>
+          {canEdit && (
+            <button
+              className="btn btn-primary btn-lg"
+              style={{ marginTop: 20 }}
+              onClick={handleGenerate}
+              disabled={loading}
+            >
+              Generate Campaign
+            </button>
+          )}
         </div>
       )}
 

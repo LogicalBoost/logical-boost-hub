@@ -16,6 +16,7 @@ RULES:
 - If the new information adds depth, merge it in.
 - If existing copy_components might be affected, flag those components for review. Do NOT rewrite them.
 - If the new information suggests a new avatar or offer, suggest it as a NEW addition.
+- NEVER use em dashes (—) in any generated text. Use commas, periods, colons, or separate sentences instead.
 
 Respond ONLY with valid JSON. No markdown, no explanation outside the JSON.`
 

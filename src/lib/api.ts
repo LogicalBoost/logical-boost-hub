@@ -73,6 +73,18 @@ export async function recommendAngles(avatarId: string, offerId: string) {
   })
 }
 
+// Generate avatars via AI prompter
+export async function generateAvatars(
+  clientId: string,
+  options?: { quantity?: number; userPrompt?: string }
+) {
+  return callEdgeFunction('generate-avatars', {
+    client_id: clientId,
+    quantity: options?.quantity,
+    user_prompt: options?.userPrompt,
+  })
+}
+
 // Prompt 8: Suggest offers
 export async function suggestOffers(clientId: string) {
   return callEdgeFunction('suggest-offers', { client_id: clientId })

@@ -10,7 +10,7 @@ import type { Offer } from '@/types/database'
 type StatusFilter = 'all' | 'approved' | 'denied'
 
 export default function OffersPage() {
-  const { client, offers, updateOffer, refreshOffers, setLoading, loading } = useAppStore()
+  const { client, offers, updateOffer, refreshOffers, setLoading, loading, canEdit } = useAppStore()
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [suggesting, setSuggesting] = useState(false)
@@ -83,13 +83,15 @@ export default function OffersPage() {
           <h1 className="page-title">Offers</h1>
           <p className="page-subtitle">Conversion propositions for campaigns</p>
         </div>
-        <button
-          className="btn btn-primary"
-          onClick={handleSuggestMore}
-          disabled={suggesting || loading}
-        >
-          {suggesting ? 'Suggesting...' : 'Suggest More Offers'}
-        </button>
+        {canEdit && (
+          <button
+            className="btn btn-primary"
+            onClick={handleSuggestMore}
+            disabled={suggesting || loading}
+          >
+            {suggesting ? 'Suggesting...' : 'Suggest More Offers'}
+          </button>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
@@ -183,10 +185,14 @@ export default function OffersPage() {
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-danger btn-sm" onClick={() => handleDelete(selectedOffer.id)}>Delete</button>
+              {canEdit && (
+                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(selectedOffer.id)}>Delete</button>
+              )}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn btn-secondary" onClick={() => handleDeny(selectedOffer.id)}>Deny</button>
-                <button className="btn btn-primary" onClick={() => handleApprove(selectedOffer.id)}>Approve</button>
+                {canEdit && (
+                  <button className="btn btn-primary" onClick={() => handleApprove(selectedOffer.id)}>Approve</button>
+                )}
               </div>
             </div>
           </div>

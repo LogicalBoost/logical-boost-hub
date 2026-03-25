@@ -18,8 +18,13 @@ RULES:
 - Group questions into sections: "Your Best Customers", "What Makes People Buy", "Hesitations & Objections", "Timing & Urgency", "Competition", "Trust & Proof".
 - Maximum 12 questions. Minimum 8.
 - Each question should have a "section" label and a "sort_order" number.
+- NEVER use em dashes (—) in any generated text. Use commas, periods, colons, or separate sentences instead.
 
-Respond ONLY with valid JSON. No markdown, no explanation outside the JSON.`
+RESPONSE FORMAT:
+Respond ONLY with valid JSON matching this exact structure:
+{ "intake_questions": [{ "section": "Your Best Customers", "question": "The question text", "sort_order": 1 }] }
+
+No markdown, no explanation outside the JSON.`
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -73,23 +78,58 @@ COMPETITOR INFO:
 ${client.competitors ? JSON.stringify(client.competitors) : 'None yet'}`
 
     const response = await callClaude(SYSTEM_PROMPT, userMessage)
-    const parsed = parseJsonResponse<{ intake_questions: Array<{ section: string; question: string; sort_order: number }> }>(response)
+    const parsed = parseJsonResponse<Record<string, unknown>>(response)
+
+    // Extract questions array — AI may use different key names
+    let questions: Array<{ section: string; question: string; sort_order: number }> = []
+
+    if (Array.isArray(parsed.intake_questions)) {
+      questions = parsed.intake_questions as typeof questions
+    } else if (Array.isArray(parsed.questions)) {
+      questions = parsed.questions as typeof questions
+    } else if (Array.isArray(parsed)) {
+      questions = parsed as unknown as typeof questions
+    } else {
+      // Check if there's any array value in the response
+      for (const key of Object.keys(parsed)) {
+        if (Array.isArray(parsed[key]) && (parsed[key] as Array<Record<string, unknown>>).length > 0) {
+          const firstItem = (parsed[key] as Array<Record<string, unknown>>)[0]
+          if (firstItem && typeof firstItem === 'object' && 'question' in firstItem) {
+            questions = parsed[key] as typeof questions
+            break
+          }
+        }
+      }
+    }
+
+    console.log(`Parsed ${questions.length} intake questions from AI response`)
+
+    if (questions.length === 0) {
+      return errorResponse('AI did not return any questions. Please try again.')
+    }
+
+    // Delete any existing intake questions for this client before inserting new ones
+    await supabase.from('intake_questions').delete().eq('client_id', client_id)
 
     // Insert questions into database
-    if (parsed.intake_questions?.length) {
-      const records = parsed.intake_questions.map(q => ({
-        client_id,
-        section: q.section,
-        question: q.question,
-        sort_order: q.sort_order,
-      }))
-      await supabase.from('intake_questions').insert(records)
-      await supabase.from('clients').update({ intake_status: 'pending' }).eq('id', client_id)
+    const records = questions.map((q, i) => ({
+      client_id,
+      section: q.section || 'General',
+      question: q.question,
+      sort_order: typeof q.sort_order === 'number' ? q.sort_order : i + 1,
+    })).filter(r => r.question && r.question.length > 0)
+
+    const { error: insertError } = await supabase.from('intake_questions').insert(records)
+    if (insertError) {
+      console.error('Intake question insert error:', JSON.stringify(insertError))
+      return errorResponse(`Failed to save questions: ${insertError.message}`)
     }
+
+    await supabase.from('clients').update({ intake_status: 'pending' }).eq('id', client_id)
 
     return jsonResponse({
       success: true,
-      questions_created: parsed.intake_questions?.length || 0,
+      questions_created: records.length,
     })
   } catch (err) {
     return errorResponse((err as Error).message, 500)

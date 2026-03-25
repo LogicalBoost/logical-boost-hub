@@ -5,9 +5,10 @@ import { useAppStore } from '@/lib/store'
 import { analyzeBusiness } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import type { Competitor } from '@/types/database'
+import TagInput from '@/components/TagInput'
 
 export default function BusinessOverviewPage() {
-  const { client, loading, setClient, setLoading, setError, createClient, loadClientData, loadAllClients } = useAppStore()
+  const { client, loading, setClient, setLoading, setError, createClient, loadClientData, loadAllClients, canEdit } = useAppStore()
 
   // New client setup form state
   const [showNewForm, setShowNewForm] = useState(false)
@@ -29,10 +30,10 @@ export default function BusinessOverviewPage() {
   const [tone, setTone] = useState('')
   const [adCopyNotes, setAdCopyNotes] = useState('')
 
-  // Ad copy rules editable fields
-  const [toneDescriptors, setToneDescriptors] = useState('')
-  const [bannedWords, setBannedWords] = useState('')
-  const [requiredDisclaimers, setRequiredDisclaimers] = useState('')
+  // Ad copy rules editable fields (arrays for tag inputs)
+  const [toneDescriptors, setToneDescriptors] = useState<string[]>([])
+  const [bannedWords, setBannedWords] = useState<string[]>([])
+  const [requiredDisclaimers, setRequiredDisclaimers] = useState<string[]>([])
   const [googleHeadlineMax, setGoogleHeadlineMax] = useState('30')
   const [googleDescMax, setGoogleDescMax] = useState('90')
   const [metaPrimaryMax, setMetaPrimaryMax] = useState('125')
@@ -94,9 +95,9 @@ export default function BusinessOverviewPage() {
     setTrustSignals(client.trust_signals ?? '')
     setTone(client.tone ?? '')
     setAdCopyNotes(client.ad_copy_notes ?? '')
-    setToneDescriptors(client.ad_copy_rules?.tone_descriptors.join(', ') ?? '')
-    setBannedWords(client.ad_copy_rules?.banned_words.join(', ') ?? '')
-    setRequiredDisclaimers(client.ad_copy_rules?.required_disclaimers.join(', ') ?? '')
+    setToneDescriptors(client.ad_copy_rules?.tone_descriptors ?? [])
+    setBannedWords(client.ad_copy_rules?.banned_words ?? [])
+    setRequiredDisclaimers(client.ad_copy_rules?.required_disclaimers ?? [])
     setGoogleHeadlineMax(String(client.ad_copy_rules?.platform_rules.google.headline_max_chars ?? 30))
     setGoogleDescMax(String(client.ad_copy_rules?.platform_rules.google.description_max_chars ?? 90))
     setMetaPrimaryMax(String(client.ad_copy_rules?.platform_rules.meta.primary_text_max_chars ?? 125))
@@ -123,9 +124,9 @@ export default function BusinessOverviewPage() {
         ad_copy_notes: adCopyNotes.trim() || null,
         competitors: competitors.length > 0 ? competitors : null,
         ad_copy_rules: {
-          tone_descriptors: toneDescriptors.split(',').map(s => s.trim()).filter(Boolean),
-          banned_words: bannedWords.split(',').map(s => s.trim()).filter(Boolean),
-          required_disclaimers: requiredDisclaimers.split(',').map(s => s.trim()).filter(Boolean),
+          tone_descriptors: toneDescriptors,
+          banned_words: bannedWords,
+          required_disclaimers: requiredDisclaimers,
           platform_rules: {
             google: {
               headline_max_chars: parseInt(googleHeadlineMax) || 30,
@@ -281,10 +282,12 @@ export default function BusinessOverviewPage() {
           <p className="page-subtitle">Foundation data that powers all AI generation</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={() => setShowNewForm(true)}>
-            + Add New Client
-          </button>
-          {editing ? (
+          {canEdit && (
+            <button className="btn btn-secondary" onClick={() => setShowNewForm(true)}>
+              + Add New Client
+            </button>
+          )}
+          {canEdit && (editing ? (
             <>
               <button className="btn btn-secondary" onClick={handleCancelEdit} disabled={saving}>
                 Cancel
@@ -297,7 +300,7 @@ export default function BusinessOverviewPage() {
             <button className="btn btn-primary" onClick={handleStartEdit}>
               Edit
             </button>
-          )}
+          ))}
         </div>
       </div>
 
@@ -434,11 +437,10 @@ export default function BusinessOverviewPage() {
               <div className="detail-item">
                 <span className="detail-label">Tone Descriptors</span>
                 {editing ? (
-                  <input
-                    className="form-input"
-                    value={toneDescriptors}
-                    onChange={(e) => setToneDescriptors(e.target.value)}
-                    placeholder="Comma-separated values"
+                  <TagInput
+                    tags={toneDescriptors}
+                    onChange={setToneDescriptors}
+                    placeholder="Type a tone descriptor and press Enter"
                   />
                 ) : toneList.length > 0 ? (
                   <div className="tag-list">
@@ -455,11 +457,11 @@ export default function BusinessOverviewPage() {
               <div className="detail-item">
                 <span className="detail-label">Banned Words</span>
                 {editing ? (
-                  <input
-                    className="form-input"
-                    value={bannedWords}
-                    onChange={(e) => setBannedWords(e.target.value)}
-                    placeholder="Comma-separated values"
+                  <TagInput
+                    tags={bannedWords}
+                    onChange={setBannedWords}
+                    placeholder="Type a banned word and press Enter"
+                    tagColor="var(--danger)"
                   />
                 ) : bannedList.length > 0 ? (
                   <div className="tag-list">
@@ -476,16 +478,42 @@ export default function BusinessOverviewPage() {
               <div className="detail-item">
                 <span className="detail-label">Required Disclaimers</span>
                 {editing ? (
-                  <input
-                    className="form-input"
-                    value={requiredDisclaimers}
-                    onChange={(e) => setRequiredDisclaimers(e.target.value)}
-                    placeholder="Comma-separated values"
-                  />
+                  <div className="disclaimer-list">
+                    {requiredDisclaimers.map((d, i) => (
+                      <div key={i} className="disclaimer-item">
+                        <textarea
+                          className="form-textarea"
+                          rows={2}
+                          value={d}
+                          onChange={(e) => {
+                            const updated = [...requiredDisclaimers]
+                            updated[i] = e.target.value
+                            setRequiredDisclaimers(updated)
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-sm"
+                          onClick={() => setRequiredDisclaimers(requiredDisclaimers.filter((_, idx) => idx !== i))}
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm disclaimer-add-btn"
+                      onClick={() => setRequiredDisclaimers([...requiredDisclaimers, ''])}
+                    >
+                      + Add Disclaimer
+                    </button>
+                  </div>
                 ) : disclaimerList.length > 0 ? (
-                  <div className="tag-list">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {disclaimerList.map((d) => (
-                      <span key={d} className="tag">{d}</span>
+                      <div key={d} style={{ fontSize: 14, color: 'var(--text-primary)', padding: '6px 10px', background: 'var(--warning-muted)', borderRadius: 6, border: '1px solid rgba(245, 158, 11, 0.25)' }}>
+                        {d}
+                      </div>
                     ))}
                   </div>
                 ) : (
@@ -494,59 +522,81 @@ export default function BusinessOverviewPage() {
                   </div>
                 )}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div className="detail-item">
-                  <span className="detail-label">Google Ads Limits</span>
+              <div className="platform-rules-grid">
+                <div className="platform-rule-card">
+                  <div className="platform-rule-title">Google Ads Limits</div>
                   {editing ? (
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Headlines:</span>
-                      <input
-                        className="form-input"
-                        type="number"
-                        style={{ width: 70 }}
-                        value={googleHeadlineMax}
-                        onChange={(e) => setGoogleHeadlineMax(e.target.value)}
-                      />
-                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Desc:</span>
-                      <input
-                        className="form-input"
-                        type="number"
-                        style={{ width: 70 }}
-                        value={googleDescMax}
-                        onChange={(e) => setGoogleDescMax(e.target.value)}
-                      />
-                    </div>
+                    <>
+                      <div className="platform-rule-row">
+                        <span className="platform-rule-label">Headlines</span>
+                        <input
+                          className="form-input platform-rule-input"
+                          type="number"
+                          value={googleHeadlineMax}
+                          onChange={(e) => setGoogleHeadlineMax(e.target.value)}
+                        />
+                        <span className="platform-rule-suffix">chars</span>
+                      </div>
+                      <div className="platform-rule-row">
+                        <span className="platform-rule-label">Descriptions</span>
+                        <input
+                          className="form-input platform-rule-input"
+                          type="number"
+                          value={googleDescMax}
+                          onChange={(e) => setGoogleDescMax(e.target.value)}
+                        />
+                        <span className="platform-rule-suffix">chars</span>
+                      </div>
+                    </>
                   ) : (
-                    <span className="detail-value">
-                      Headlines: {adRules?.platform_rules.google.headline_max_chars ?? 30} chars | Descriptions: {adRules?.platform_rules.google.description_max_chars ?? 90} chars
-                    </span>
+                    <>
+                      <div className="platform-rule-row">
+                        <span className="platform-rule-label">Headlines</span>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>{adRules?.platform_rules.google.headline_max_chars ?? 30} chars</span>
+                      </div>
+                      <div className="platform-rule-row">
+                        <span className="platform-rule-label">Descriptions</span>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>{adRules?.platform_rules.google.description_max_chars ?? 90} chars</span>
+                      </div>
+                    </>
                   )}
                 </div>
-                <div className="detail-item">
-                  <span className="detail-label">Meta Ads Limits</span>
+                <div className="platform-rule-card">
+                  <div className="platform-rule-title">Meta Ads Limits</div>
                   {editing ? (
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Primary:</span>
-                      <input
-                        className="form-input"
-                        type="number"
-                        style={{ width: 70 }}
-                        value={metaPrimaryMax}
-                        onChange={(e) => setMetaPrimaryMax(e.target.value)}
-                      />
-                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Headlines:</span>
-                      <input
-                        className="form-input"
-                        type="number"
-                        style={{ width: 70 }}
-                        value={metaHeadlineMax}
-                        onChange={(e) => setMetaHeadlineMax(e.target.value)}
-                      />
-                    </div>
+                    <>
+                      <div className="platform-rule-row">
+                        <span className="platform-rule-label">Primary text</span>
+                        <input
+                          className="form-input platform-rule-input"
+                          type="number"
+                          value={metaPrimaryMax}
+                          onChange={(e) => setMetaPrimaryMax(e.target.value)}
+                        />
+                        <span className="platform-rule-suffix">chars</span>
+                      </div>
+                      <div className="platform-rule-row">
+                        <span className="platform-rule-label">Headlines</span>
+                        <input
+                          className="form-input platform-rule-input"
+                          type="number"
+                          value={metaHeadlineMax}
+                          onChange={(e) => setMetaHeadlineMax(e.target.value)}
+                        />
+                        <span className="platform-rule-suffix">chars</span>
+                      </div>
+                    </>
                   ) : (
-                    <span className="detail-value">
-                      Primary text: {adRules?.platform_rules.meta.primary_text_max_chars ?? 125} chars | Headlines: {adRules?.platform_rules.meta.headline_max_chars ?? 40} chars
-                    </span>
+                    <>
+                      <div className="platform-rule-row">
+                        <span className="platform-rule-label">Primary text</span>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>{adRules?.platform_rules.meta.primary_text_max_chars ?? 125} chars</span>
+                      </div>
+                      <div className="platform-rule-row">
+                        <span className="platform-rule-label">Headlines</span>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>{adRules?.platform_rules.meta.headline_max_chars ?? 40} chars</span>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -685,37 +735,39 @@ export default function BusinessOverviewPage() {
           </div>
         </div>
 
-        {/* Re-analyze Section */}
-        <div className="card">
-          <div className="card-title">Re-analyze Business</div>
-          <div style={{ marginTop: 16, display: 'grid', gap: 12 }}>
-            <div className="form-group">
-              <label className="form-label">New Call Notes / Additional Information</label>
-              <textarea
-                className="form-textarea"
-                rows={6}
-                placeholder="Paste new call transcripts, notes, or any additional business information to re-run AI analysis..."
-                value={reanalyzeNotes}
-                onChange={(e) => setReanalyzeNotes(e.target.value)}
-              />
-            </div>
-            {reanalyzing && (
-              <div style={{ padding: 16, background: 'var(--surface-hover, #f0f4ff)', borderRadius: 8, textAlign: 'center' }}>
-                <div style={{ fontSize: 14, fontWeight: 500 }}>AI is analyzing your business...</div>
-                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>Processing...</div>
+        {/* Re-analyze Section (team only) */}
+        {canEdit && (
+          <div className="card">
+            <div className="card-title">Re-analyze Business</div>
+            <div style={{ marginTop: 16, display: 'grid', gap: 12 }}>
+              <div className="form-group">
+                <label className="form-label">New Call Notes / Additional Information</label>
+                <textarea
+                  className="form-textarea"
+                  rows={6}
+                  placeholder="Paste new call transcripts, notes, or any additional business information to re-run AI analysis..."
+                  value={reanalyzeNotes}
+                  onChange={(e) => setReanalyzeNotes(e.target.value)}
+                />
               </div>
-            )}
-            <div>
-              <button
-                className="btn btn-primary"
-                onClick={handleReanalyze}
-                disabled={reanalyzing || !reanalyzeNotes.trim()}
-              >
-                {reanalyzing ? 'Processing...' : 'Re-analyze Business'}
-              </button>
+              {reanalyzing && (
+                <div style={{ padding: 16, background: 'var(--surface-hover, #f0f4ff)', borderRadius: 8, textAlign: 'center' }}>
+                  <div style={{ fontSize: 14, fontWeight: 500 }}>AI is analyzing your business...</div>
+                  <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>Processing...</div>
+                </div>
+              )}
+              <div>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleReanalyze}
+                  disabled={reanalyzing || !reanalyzeNotes.trim()}
+                >
+                  {reanalyzing ? 'Processing...' : 'Re-analyze Business'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

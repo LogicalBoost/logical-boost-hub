@@ -25,6 +25,10 @@ You must produce:
 
 7. INITIAL OFFERS — Suggest 2–4 conversion offers with ALL fields: name, offer_type, headline, subheadline, description, primary_cta, conversion_type, benefits, proof_elements, urgency_elements, faq, landing_page_type.
 
+FORMATTING RULES:
+- NEVER use em dashes (—) in any generated text. Use commas, periods, colons, or separate sentences instead.
+- Benefits must be SHORT bullet points (5-10 words each), suitable for banners and landing pages.
+
 Be thorough. Be specific. No generic filler.
 Respond ONLY with valid JSON. No markdown, no explanation outside the JSON.`
 

@@ -68,10 +68,13 @@ Compliance Notes: ${rules.compliance_notes || 'None specified'}
 Additional Notes: ${adCopyNotes || 'None'}
 ${FTC_COMPLIANCE}
 
+FORMATTING RULES (HARD CONSTRAINTS):
+- NEVER use em dashes (—) in any copy. Use commas, periods, colons, or separate sentences instead.
+
 QUALITY STANDARDS:
 - Every headline must be specific to this avatar and offer. No generic copy.
-- Benefits must be concrete and measurable where possible.
-- Proof statements must reference REAL trust signals from the business data — never invent claims.
+- Benefits must be SHORT, punchy bullet points (5-10 words max). Think banner copy and landing page bullet lists. No full sentences. Examples: "24/7 Emergency Response", "Licensed & Insured Technicians", "Same-Day Service Available". NOT long explanatory paragraphs.
+- Proof statements must reference REAL trust signals from the business data. Never invent claims.
 - CTAs must be action-oriented and specific to the offer's conversion type.
 - Video hooks must create pattern interrupts within the first 3 seconds.
 - Social copy must read naturally, not like an ad.
@@ -83,7 +86,7 @@ GENERATION QUANTITIES (generate ALL of these):
 - google_description: 8-12 (strict 90 char max)
 - primary_text: 8-12 (Meta, 125ch recommended)
 - subheadline: 5-8
-- benefit: 10-15
+- benefit: 10-15 (SHORT bullet points, 5-10 words each, for banners and landing page bullet lists)
 - proof: 6-10 (based on REAL data only)
 - urgency: 4-6
 - fear_point: 4-6

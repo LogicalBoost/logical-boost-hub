@@ -14,6 +14,8 @@ RULES:
 - Include at least one offer that creates urgency (seasonal, limited, deadline-driven).
 - Consider what competitors are offering and suggest something that differentiates.
 - Every offer must be realistic and deliverable by this specific business.
+- NEVER use em dashes (—) in any generated text. Use commas, periods, colons, or separate sentences instead.
+- Benefits must be SHORT bullet points (5-10 words each), suitable for banners and landing pages.
 
 Respond ONLY with valid JSON array of offer objects matching the offers schema.`
 
