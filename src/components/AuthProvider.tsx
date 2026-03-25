@@ -55,11 +55,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // User exists in auth but not in users table yet.
       // This happens on first signup. We'll auto-create a profile.
       // Default to admin for the first user, team_editor for subsequent.
-      const { count } = await supabase
-        .from('users')
-        .select('*', { count: 'exact', head: true })
+      // Use RPC function to bypass RLS and get accurate total user count.
+      const { data: userCount } = await supabase.rpc('get_user_count')
 
-      const role: UserRole = (count === 0) ? 'admin' : 'team_editor'
+      const role: UserRole = (userCount === 0) ? 'admin' : 'team_editor'
 
       const authUser = (await supabase.auth.getUser()).data.user
       const { data: newProfile } = await supabase
