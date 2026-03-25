@@ -4,8 +4,17 @@ import Link from 'next/link'
 import { useMemo } from 'react'
 import { useAppStore } from '@/lib/store'
 
+interface SetupStep {
+  label: string
+  description: string
+  href: string
+  isComplete: boolean
+  icon: string
+  order: number
+}
+
 export default function DashboardPage() {
-  const { client, avatars, offers, funnelInstances, copyComponents } = useAppStore()
+  const { client, avatars, offers, funnelInstances, copyComponents, intakeQuestions, competitors } = useAppStore()
 
   if (!client) {
     return (
@@ -26,12 +35,81 @@ export default function DashboardPage() {
   }
 
   const activeFunnels = funnelInstances.filter((fi) => fi.status === 'active').length
+  const approvedAvatars = avatars.filter(a => a.status === 'approved').length
+  const approvedOffers = offers.filter(o => o.status === 'approved').length
+  const answeredIntake = intakeQuestions.filter(q => (q.answer ?? '').trim().length > 0).length
+
+  // Setup steps checklist
+  const setupSteps: SetupStep[] = useMemo(() => [
+    {
+      label: '1. Set Up Business Profile',
+      description: 'Enter your client\'s name, website, and call notes. AI will analyze the business.',
+      href: '/business-overview/',
+      isComplete: !!(client.business_summary && client.business_summary.trim().length > 0),
+      icon: '&#128188;',
+      order: 1,
+    },
+    {
+      label: '2. Complete Intake Questions',
+      description: 'Answer AI-generated questions to fill knowledge gaps about the client.',
+      href: '/intake/',
+      isComplete: intakeQuestions.length > 0 && answeredIntake >= intakeQuestions.length * 0.5,
+      icon: '&#128221;',
+      order: 2,
+    },
+    {
+      label: '3. Review & Approve Avatars',
+      description: 'Generate audience profiles with AI, then approve the best ones.',
+      href: '/avatars/',
+      isComplete: approvedAvatars >= 3,
+      icon: '&#128100;',
+      order: 3,
+    },
+    {
+      label: '4. Review & Approve Offers',
+      description: 'Approve or refine AI-generated conversion offers for your campaigns.',
+      href: '/offers/',
+      isComplete: approvedOffers >= 1,
+      icon: '&#127873;',
+      order: 4,
+    },
+    {
+      label: '5. Add Competitive Intelligence',
+      description: 'Track competitor ads, landing pages, and offers to inform your strategy.',
+      href: '/competitive-intel/',
+      isComplete: competitors.length >= 1,
+      icon: '&#128269;',
+      order: 5,
+    },
+    {
+      label: '6. Build Campaign Funnels',
+      description: 'Select avatar + offer + angle, then generate full campaign copy with AI.',
+      href: '/funnel/',
+      isComplete: activeFunnels >= 1,
+      icon: '&#9889;',
+      order: 6,
+    },
+    {
+      label: '7. Build Landing Pages',
+      description: 'Create landing pages using brand kit, competitive insights, and AI concepts.',
+      href: '/landing-pages/',
+      isComplete: false, // Not yet built
+      icon: '&#128196;',
+      order: 7,
+    },
+  ], [client, intakeQuestions, answeredIntake, approvedAvatars, approvedOffers, competitors, activeFunnels])
+
+  const completedSteps = setupSteps.filter(s => s.isComplete).length
+  const totalSteps = setupSteps.length
+  const progressPercent = Math.round((completedSteps / totalSteps) * 100)
+
+  // Find the next incomplete step
+  const nextStep = setupSteps.find(s => !s.isComplete)
 
   // Build activity feed from recent items
   const activityFeed = useMemo(() => {
     const items: { text: string; time: string; icon: string }[] = []
 
-    // Recent copy components
     const recentCopy = [...copyComponents]
       .sort((a, b) => b.created_at.localeCompare(a.created_at))
       .slice(0, 5)
@@ -45,7 +123,6 @@ export default function DashboardPage() {
       })
     }
 
-    // Recent avatars
     for (const a of avatars.slice(-3).reverse()) {
       items.push({
         text: `Avatar "${a.name}" ${a.status === 'approved' ? 'approved' : 'created'}`,
@@ -54,7 +131,6 @@ export default function DashboardPage() {
       })
     }
 
-    // Recent offers
     for (const o of offers.slice(-3).reverse()) {
       items.push({
         text: `Offer "${o.name}" ${o.status === 'approved' ? 'approved' : 'created'}`,
@@ -63,7 +139,6 @@ export default function DashboardPage() {
       })
     }
 
-    // Sort by time descending, take top 10
     items.sort((a, b) => b.time.localeCompare(a.time))
     return items.slice(0, 10)
   }, [copyComponents, avatars, offers])
@@ -90,20 +165,122 @@ export default function DashboardPage() {
       {/* Stat Cards */}
       <div className="funnel-stats-bar" style={{ marginBottom: 24 }}>
         <div className="funnel-stat">
-          <div className="funnel-stat-value">0</div>
-          <div className="funnel-stat-label">Total Leads</div>
+          <div className="funnel-stat-value">{approvedAvatars}</div>
+          <div className="funnel-stat-label">Approved Avatars</div>
         </div>
         <div className="funnel-stat">
-          <div className="funnel-stat-value">--</div>
-          <div className="funnel-stat-label">Cost Per Lead</div>
+          <div className="funnel-stat-value">{approvedOffers}</div>
+          <div className="funnel-stat-label">Approved Offers</div>
         </div>
         <div className="funnel-stat">
           <div className="funnel-stat-value">{activeFunnels}</div>
           <div className="funnel-stat-label">Active Funnels</div>
         </div>
         <div className="funnel-stat">
-          <div className="funnel-stat-value">0</div>
-          <div className="funnel-stat-label">Landing Pages Live</div>
+          <div className="funnel-stat-value">{competitors.length}</div>
+          <div className="funnel-stat-label">Competitors Tracked</div>
+        </div>
+      </div>
+
+      {/* Setup Steps Checklist */}
+      <div className="funnel-section-card" style={{ marginBottom: 24 }}>
+        <div className="funnel-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3>Setup Progress</h3>
+          <span style={{ fontSize: 14, color: completedSteps === totalSteps ? '#22c55e' : 'var(--text-muted)' }}>
+            {completedSteps}/{totalSteps} complete
+          </span>
+        </div>
+
+        {/* Progress bar */}
+        <div style={{ padding: '0 20px 16px' }}>
+          <div style={{ width: '100%', height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)' }}>
+            <div
+              style={{
+                width: `${progressPercent}%`,
+                height: '100%',
+                borderRadius: 3,
+                background: progressPercent === 100 ? '#22c55e' : '#6366f1',
+                transition: 'width 0.3s ease',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Steps list */}
+        <div>
+          {setupSteps.map((step) => {
+            const isNext = nextStep?.order === step.order
+            return (
+              <Link
+                key={step.order}
+                href={step.href}
+                className="setup-step-row"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                  padding: '14px 20px',
+                  borderTop: '1px solid var(--border)',
+                  textDecoration: 'none',
+                  color: 'inherit',
+                  background: isNext ? 'rgba(99, 102, 241, 0.06)' : 'transparent',
+                  transition: 'background 0.15s',
+                }}
+              >
+                {/* Checkbox */}
+                <div style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  border: step.isComplete ? '2px solid #22c55e' : '2px solid var(--border)',
+                  background: step.isComplete ? '#22c55e' : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  fontSize: 13,
+                  color: '#fff',
+                  fontWeight: 700,
+                }}>
+                  {step.isComplete ? '\u2713' : ''}
+                </div>
+
+                {/* Icon */}
+                <span
+                  style={{ fontSize: 18, flexShrink: 0 }}
+                  dangerouslySetInnerHTML={{ __html: step.icon }}
+                />
+
+                {/* Label + Description */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: step.isComplete ? 'var(--text-muted)' : 'var(--text-primary)',
+                    textDecoration: step.isComplete ? 'line-through' : 'none',
+                    marginBottom: 2,
+                  }}>
+                    {step.label}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                    {step.description}
+                  </div>
+                </div>
+
+                {/* Next indicator */}
+                {isNext && (
+                  <span className="badge badge-pending" style={{ flexShrink: 0, fontSize: 11 }}>
+                    Next Step
+                  </span>
+                )}
+                {step.isComplete && (
+                  <span className="badge badge-approved" style={{ flexShrink: 0, fontSize: 11 }}>
+                    Done
+                  </span>
+                )}
+              </Link>
+            )
+          })}
         </div>
       </div>
 
@@ -136,7 +313,7 @@ export default function DashboardPage() {
               ))
             ) : (
               <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-                No activity yet. Start by analyzing your business.
+                No activity yet. Start by setting up the business profile.
               </div>
             )}
           </div>
@@ -153,19 +330,19 @@ export default function DashboardPage() {
           <Link href="/avatars/" className="funnel-section-card" style={{ textDecoration: 'none', color: 'inherit', padding: '20px', display: 'block' }}>
             <h3 style={{ fontSize: 15, marginBottom: 4, color: 'var(--accent)' }}>&#128100; Avatars</h3>
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
-              {avatars.length} audience profiles defined
+              {avatars.length} audience profiles ({approvedAvatars} approved)
             </p>
           </Link>
           <Link href="/offers/" className="funnel-section-card" style={{ textDecoration: 'none', color: 'inherit', padding: '20px', display: 'block' }}>
             <h3 style={{ fontSize: 15, marginBottom: 4, color: 'var(--accent)' }}>&#127873; Offers</h3>
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
-              {offers.length} conversion offers ready
+              {offers.length} offers ({approvedOffers} approved)
             </p>
           </Link>
-          <Link href="/business-overview/" className="funnel-section-card" style={{ textDecoration: 'none', color: 'inherit', padding: '20px', display: 'block' }}>
-            <h3 style={{ fontSize: 15, marginBottom: 4, color: 'var(--accent)' }}>&#128188; Business Overview</h3>
+          <Link href="/competitive-intel/" className="funnel-section-card" style={{ textDecoration: 'none', color: 'inherit', padding: '20px', display: 'block' }}>
+            <h3 style={{ fontSize: 15, marginBottom: 4, color: 'var(--accent)' }}>&#128269; Competitive Intel</h3>
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
-              Company profile, ad rules, and guidelines
+              {competitors.length > 0 ? `${competitors.length} competitor entries tracked` : 'Start tracking competitors'}
             </p>
           </Link>
         </div>

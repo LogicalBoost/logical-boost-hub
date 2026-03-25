@@ -24,7 +24,11 @@
       "Bash(curl -sL -o public/images/icon.png \"https://logicalboost.com/assets/brand/icon.png\" -w \"%{http_code}\")",
       "Bash(gh run:*)",
       "Bash(find C:UsersAdminFOR_DEVELOPMENTlogical-boost-hub.claudeworktreesstupefied-bellout -name *.css)",
-      "Bash(xargs basename:*)"
+      "Bash(xargs basename:*)",
+      "Bash(curl -s \"https://nkeswemyzzkpsciwhlqc.supabase.co/functions/v1/generate-avatars\" -H \"Content-Type: application/json\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rZXN3ZW15enprcHNjaXdobHFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI1OTg4NjAsImV4cCI6MjA1ODE3NDg2MH0.LMCRAzh-8X3mwxS3fOBbNoCbGhBBo72FKkFJfCSUqqk\" -d '{\"\"client_id\"\":\"\"test\"\"}')",
+      "Bash(curl -s \"https://nkeswemyzzkpsciwhlqc.supabase.co/rest/v1/clients?select=id,name&limit=3\" -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rZXN3ZW15enprcHNjaXdobHFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI1OTg4NjAsImV4cCI6MjA1ODE3NDg2MH0.LMCRAzh-8X3mwxS3fOBbNoCbGhBBo72FKkFJfCSUqqk\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rZXN3ZW15enprcHNjaXdobHFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI1OTg4NjAsImV4cCI6MjA1ODE3NDg2MH0.LMCRAzh-8X3mwxS3fOBbNoCbGhBBo72FKkFJfCSUqqk\")",
+      "Bash(curl -s \"https://nkeswemyzzkpsciwhlqc.supabase.co/rest/v1/clients?select=id,name&limit=3\" -H \"apikey: sb_publishable_bmY4kLd4w2h8ppxRZlNppA_cLASJXwA\" -H \"Authorization: Bearer sb_publishable_bmY4kLd4w2h8ppxRZlNppA_cLASJXwA\")",
+      "Bash(curl -s \"https://nkeswemyzzkpsciwhlqc.supabase.co/functions/v1/generate-avatars\" -H \"Content-Type: application/json\" -H \"Authorization: Bearer sb_publishable_bmY4kLd4w2h8ppxRZlNppA_cLASJXwA\" -d '{\"\"client_id\"\":\"\"7a24fa85-de3b-4140-80f1-6feb088157cc\"\",\"\"quantity\"\":2}')"
     ]
   }
 }

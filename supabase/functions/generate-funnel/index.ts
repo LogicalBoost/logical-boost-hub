@@ -227,7 +227,7 @@ Trust Signals: ${client.trust_signals}
 Generate the complete campaign asset library now. Remember: distribute content across ALL recommended angles (${recommendedAngles.join(', ')}) and tag each component with its angle_ids.`
 
     const response = await callClaude(systemPrompt, userMessage, {
-      model: 'claude-sonnet-4-5-20241022',
+      model: 'claude-3-5-sonnet-20241022',
       maxTokens: 16384,
     })
 

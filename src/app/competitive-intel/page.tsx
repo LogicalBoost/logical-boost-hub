@@ -16,7 +16,7 @@ const TABS: { key: Tab; label: string }[] = [
 ]
 
 export default function CompetitiveIntelPage() {
-  const { client, competitors, canEdit } = useAppStore()
+  const { client, competitors, canEdit, loadClientData } = useAppStore()
   const [activeTab, setActiveTab] = useState<Tab>('overview')
   const [showAddForm, setShowAddForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -72,8 +72,8 @@ export default function CompetitiveIntelPage() {
     setCompKeywords('')
     setCompNotes('')
     setShowAddForm(false)
-    // Refresh via store — for now just reload
-    window.location.reload()
+    // Refresh competitor data via store
+    if (client) await loadClientData(client.id)
   }
 
   return (

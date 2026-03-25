@@ -17,7 +17,7 @@ export async function callClaude(
     throw new Error('ANTHROPIC_API_KEY not configured')
   }
 
-  const model = options?.model || 'claude-haiku-4-5-20251001'
+  const model = options?.model || 'claude-3-5-haiku-20241022'
   const maxTokens = options?.maxTokens || 4096
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
