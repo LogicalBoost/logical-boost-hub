@@ -121,7 +121,7 @@ export default function CompetitiveIntelPage() {
                 onClick={handleDiscoverCompetitors}
                 disabled={discovering}
               >
-                {discovering ? 'Discovering...' : '&#129302; AI Discover Competitors'}
+                {discovering ? 'Discovering...' : '\u{1F916} AI Discover Competitors'}
               </button>
               <button className="btn btn-secondary" onClick={() => setShowAddForm(true)}>
                 + Add Manually
@@ -150,7 +150,7 @@ export default function CompetitiveIntelPage() {
           padding: 24, marginBottom: 24,
           background: 'var(--bg-hover)', borderRadius: 8, textAlign: 'center',
         }}>
-          <div style={{ fontSize: 24, marginBottom: 8 }}>&#129302;</div>
+          <div style={{ fontSize: 24, marginBottom: 8 }}>{'\u{1F916}'}</div>
           <div style={{ fontWeight: 600, marginBottom: 6 }}>AI is researching competitors...</div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
             Analyzing {client.name}&apos;s market, industry, and services to identify competitors. This may take 15-30 seconds.
