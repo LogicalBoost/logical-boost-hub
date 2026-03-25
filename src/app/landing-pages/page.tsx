@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '@/lib/store'
 import { analyzeBrandKit } from '@/lib/api'
 import { showToast } from '@/lib/demo-toast'
+import LogoUpload from '@/components/LogoUpload'
 import type { BrandKit } from '@/types/database'
 
 type Stage = 'brand_kit' | 'competitive' | 'playbook' | 'concepts' | 'builder'
@@ -38,15 +39,23 @@ export default function LandingPagesPage() {
   const [activeStage, setActiveStage] = useState<Stage>('brand_kit')
   const [analyzing, setAnalyzing] = useState(false)
   const [brandKit, setBrandKit] = useState<BrandKit | null>(null)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [showLogoUpload, setShowLogoUpload] = useState(false)
 
-  // Load brand kit from client data if available
+  // Load brand kit and logo from client data if available
   useEffect(() => {
     if (client?.brand_kit) {
       setBrandKit(client.brand_kit)
     } else {
       setBrandKit(null)
     }
+    setLogoUrl(client?.logo_url || null)
   }, [client])
+
+  const handleLogoUploaded = useCallback((url: string) => {
+    setLogoUrl(url)
+    setShowLogoUpload(false)
+  }, [])
 
   if (!client) {
     return (
@@ -131,6 +140,25 @@ export default function LandingPagesPage() {
                 </div>
               </div>
             )}
+
+            {/* Logo Card (always visible) */}
+            <div className="card" style={{ marginBottom: 20 }}>
+              <div className="card-title">Logo</div>
+              <div className="card-body">
+                {canEdit ? (
+                  <LogoUpload
+                    clientId={client.id}
+                    currentLogoUrl={logoUrl}
+                    onUploadComplete={handleLogoUploaded}
+                  />
+                ) : logoUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={logoUrl} alt="Client logo" style={{ maxHeight: 100, objectFit: 'contain' }} />
+                ) : (
+                  <div style={{ color: 'var(--text-muted)' }}>No logo uploaded yet</div>
+                )}
+              </div>
+            </div>
 
             {brandKit ? (
               <div className="card-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
@@ -244,12 +272,6 @@ export default function LandingPagesPage() {
                   </div>
                 </div>
                 <div className="card">
-                  <div className="card-title">Logo</div>
-                  <div className="card-body" style={{ color: 'var(--text-muted)' }}>
-                    No logo uploaded yet
-                  </div>
-                </div>
-                <div className="card">
                   <div className="card-title">Button Style</div>
                   <div className="card-body" style={{ color: 'var(--text-muted)' }}>
                     No button style defined yet
@@ -266,9 +288,6 @@ export default function LandingPagesPage() {
                   disabled={analyzing}
                 >
                   {analyzing ? 'Analyzing...' : brandKit ? 'Re-analyze Website' : 'Analyze Website for Brand Kit'}
-                </button>
-                <button className="btn btn-secondary" disabled>
-                  Upload Logo
                 </button>
               </div>
             )}

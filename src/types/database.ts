@@ -24,6 +24,7 @@ export interface Client {
   ad_copy_notes: string | null
   competitors: Competitor[] | null
   brand_kit: BrandKit | null
+  logo_url: string | null
   intake_status: 'pending' | 'completed'
   created_at: string
   updated_at: string
