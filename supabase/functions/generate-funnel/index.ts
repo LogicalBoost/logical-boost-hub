@@ -144,7 +144,19 @@ Deno.serve(async (req: Request) => {
       .single()
 
     if (existing) {
-      return errorResponse('A funnel instance already exists for this Avatar + Offer. Use Generate More to add items.')
+      // Check if this instance has any copy components
+      const { count } = await supabase
+        .from('copy_components')
+        .select('*', { count: 'exact', head: true })
+        .eq('funnel_instance_id', existing.id)
+
+      if (count && count > 0) {
+        return errorResponse('A funnel instance already exists for this Avatar + Offer. Use Generate More to add items.')
+      }
+
+      // Instance exists but has 0 components (previous generation failed)
+      // Delete the empty instance so we can recreate it
+      await supabase.from('funnel_instances').delete().eq('id', existing.id)
     }
 
     // Fetch all required data
@@ -284,6 +296,10 @@ Generate the complete campaign asset library now. Remember: distribute content a
     }
 
     console.log(`Parsed ${copyComponents.length} copy components from AI response`)
+    if (copyComponents.length === 0) {
+      console.error('Zero components parsed. Raw response (first 500 chars):', response.substring(0, 500))
+      console.error('Unwrapped keys:', Object.keys(unwrapped))
+    }
 
     // Insert copy components
     let componentsCreated = 0

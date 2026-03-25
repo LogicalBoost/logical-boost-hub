@@ -342,14 +342,19 @@ export default function FunnelPage() {
     setGenerating(true)
     setLoading(true)
     try {
-      await generateFunnel(avatarId, offerId)
+      const result = await generateFunnel(avatarId, offerId)
       await Promise.all([
         refreshFunnelInstances(client.id),
         refreshCopyComponents(client.id),
       ])
-      showToast('Campaign generated successfully!')
+      if (result.components_created > 0) {
+        showToast(`Campaign generated! ${result.components_created} copy components created.`)
+      } else {
+        showToast('Campaign instance created but no copy components were generated. Try again or check the AI configuration.')
+      }
     } catch (err) {
-      showToast(`Error: ${(err as Error).message}`)
+      showToast(`Generation failed: ${(err as Error).message}`)
+      console.error('Funnel generation error:', err)
     } finally {
       setGenerating(false)
       setLoading(false)
