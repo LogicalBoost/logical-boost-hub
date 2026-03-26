@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '@/lib/store'
-import { analyzeBrandKit } from '@/lib/api'
+import { analyzeBrandKit, analyzeCompetitorPages } from '@/lib/api'
 import { showToast } from '@/lib/demo-toast'
 import LogoUpload from '@/components/LogoUpload'
-import type { BrandKit } from '@/types/database'
+import type { BrandKit, CompetitorIntel } from '@/types/database'
 
 type Stage = 'brand_kit' | 'competitive' | 'playbook' | 'concepts' | 'builder'
 
@@ -35,12 +35,22 @@ function ColorSwatch({ color, label }: { color: string; label: string }) {
 }
 
 export default function LandingPagesPage() {
-  const { client, canEdit, refreshClient } = useAppStore()
+  const { client, canEdit, refreshClient, competitors } = useAppStore()
   const [activeStage, setActiveStage] = useState<Stage>('brand_kit')
   const [analyzing, setAnalyzing] = useState(false)
   const [brandKit, setBrandKit] = useState<BrandKit | null>(null)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [showLogoUpload, setShowLogoUpload] = useState(false)
+  const [analyzingCompetitors, setAnalyzingCompetitors] = useState(false)
+  const [competitorAnalyses, setCompetitorAnalyses] = useState<Array<Record<string, unknown>>>([])
+  const [patternSummary, setPatternSummary] = useState('')
+  const [opportunities, setOpportunities] = useState<string[]>([])
+
+  // Get competitor intel with websites (for competitive analysis stage)
+  const competitorsWithSites = competitors.filter(c => c.competitor_website)
+  const uniqueCompetitorSites = [...new Map(competitorsWithSites.map(c => [c.competitor_website, c])).values()]
+  // Get landing page analyses already done
+  const landingPageAnalyses = competitors.filter(c => c.ad_type === 'landing_page' && c.source === 'ai_discovery')
 
   // Load brand kit and logo from client data if available
   useEffect(() => {
@@ -313,18 +323,173 @@ export default function LandingPagesPage() {
               Analyze competitor landing pages to understand above-fold patterns, page structure, offer presentation,
               and conversion tactics used in your client&apos;s industry.
             </p>
-            <div className="empty-state" style={{ padding: 40 }}>
-              <div className="empty-state-icon">&#128269;</div>
-              <div className="empty-state-text">No competitor pages analyzed yet</div>
-              <div className="empty-state-sub">
-                Add competitor landing page URLs in Competitive Intel, then analyze them here.
+
+            {/* Show competitors available for analysis */}
+            {uniqueCompetitorSites.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>
+                  Competitors with Websites ({uniqueCompetitorSites.length}):
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {uniqueCompetitorSites.map((c, i) => (
+                    <span key={i} className="tag" style={{ fontSize: 12 }}>
+                      {c.competitor_name}: {c.competitor_website}
+                    </span>
+                  ))}
+                </div>
               </div>
-              {canEdit && (
-                <button className="btn btn-primary" style={{ marginTop: 16 }} disabled>
-                  Analyze Competitor Pages
+            )}
+
+            {analyzingCompetitors && (
+              <div style={{
+                padding: 40, textAlign: 'center',
+                background: 'var(--bg-hover)', borderRadius: 8, marginBottom: 20,
+              }}>
+                <div style={{ fontSize: 24, marginBottom: 12 }}>&#128269;</div>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>Analyzing {uniqueCompetitorSites.length} competitor pages...</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                  AI is visiting competitor websites, analyzing above-fold patterns, page structure, and conversion tactics. This may take 30-60 seconds.
+                </div>
+              </div>
+            )}
+
+            {/* Show existing analyses */}
+            {(landingPageAnalyses.length > 0 || competitorAnalyses.length > 0) && (
+              <div>
+                {patternSummary && (
+                  <div className="card" style={{ marginBottom: 16 }}>
+                    <div className="card-title">Pattern Summary</div>
+                    <div className="card-body" style={{ fontSize: 14, lineHeight: 1.6 }}>{patternSummary}</div>
+                  </div>
+                )}
+                {opportunities.length > 0 && (
+                  <div className="card" style={{ marginBottom: 16 }}>
+                    <div className="card-title">Strategic Opportunities</div>
+                    <div className="card-body">
+                      {opportunities.map((opp, i) => (
+                        <div key={i} style={{ fontSize: 13, padding: '6px 0', borderBottom: i < opportunities.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                          {i + 1}. {opp}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="card-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                  {(competitorAnalyses.length > 0 ? competitorAnalyses : landingPageAnalyses.map(lp => {
+                    try {
+                      const content = typeof lp.content === 'string' ? JSON.parse(lp.content) : lp.content
+                      const notes = typeof lp.notes === 'string' ? JSON.parse(lp.notes) : lp.notes
+                      return {
+                        competitor_name: lp.competitor_name,
+                        website: lp.competitor_website,
+                        above_fold: content?.above_fold,
+                        page_structure: content?.page_structure,
+                        offer_analysis: content?.offer_analysis,
+                        conversion_tactics: content?.conversion_tactics,
+                        strategic_notes: notes,
+                      }
+                    } catch { return { competitor_name: lp.competitor_name, website: lp.competitor_website } }
+                  })).map((analysis: Record<string, unknown>, i: number) => {
+                    const af = (analysis.above_fold || {}) as Record<string, string>
+                    const ps = (analysis.page_structure || {}) as Record<string, string | string[]>
+                    const oa = (analysis.offer_analysis || {}) as Record<string, string>
+                    const sn = (analysis.strategic_notes || {}) as Record<string, unknown>
+                    const hasAboveFold = !!analysis.above_fold
+                    const hasOffer = !!analysis.offer_analysis
+                    const hasStructure = !!analysis.page_structure
+                    const hasNotes = !!analysis.strategic_notes
+                    return (
+                      <div key={i} className="card">
+                        <div className="card-title">{String(analysis.competitor_name || 'Competitor')}</div>
+                        <div className="card-meta" style={{ marginBottom: 8 }}>{String(analysis.website || '')}</div>
+                        <div className="card-body" style={{ fontSize: 13 }}>
+                          {hasAboveFold && (
+                            <div style={{ marginBottom: 12 }}>
+                              <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--accent)' }}>Above the Fold</div>
+                              {af.headline && <div>Headline: &quot;{af.headline}&quot;</div>}
+                              {af.cta_text && <div>CTA: &quot;{af.cta_text}&quot;</div>}
+                              {af.hero_type && <div>Hero: {af.hero_type}</div>}
+                            </div>
+                          )}
+                          {hasOffer && (
+                            <div style={{ marginBottom: 12 }}>
+                              <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--accent)' }}>Offer</div>
+                              {oa.primary_offer && <div>{oa.primary_offer}</div>}
+                              {oa.offer_type && <span className="tag">{oa.offer_type}</span>}
+                            </div>
+                          )}
+                          {hasStructure && (
+                            <div style={{ marginBottom: 12 }}>
+                              <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--accent)' }}>Structure</div>
+                              {Array.isArray(ps.sections) && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                  {(ps.sections as string[]).map((s: string, j: number) => (
+                                    <span key={j} className="tag" style={{ fontSize: 10 }}>{s}</span>
+                                  ))}
+                                </div>
+                              )}
+                              {ps.estimated_length && <div style={{ marginTop: 4 }}>Length: {ps.estimated_length as string}</div>}
+                            </div>
+                          )}
+                          {hasNotes && (
+                            <div>
+                              <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--accent)' }}>Strategic Notes</div>
+                              {Array.isArray(sn.strengths) && (
+                                <div style={{ marginBottom: 4 }}>
+                                  <span style={{ color: '#10b981' }}>Strengths:</span> {(sn.strengths as string[]).join('. ')}
+                                </div>
+                              )}
+                              {Array.isArray(sn.weaknesses) && (
+                                <div>
+                                  <span style={{ color: '#ef4444' }}>Weaknesses:</span> {(sn.weaknesses as string[]).join('. ')}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {landingPageAnalyses.length === 0 && competitorAnalyses.length === 0 && !analyzingCompetitors && uniqueCompetitorSites.length === 0 && (
+              <div className="empty-state" style={{ padding: 40 }}>
+                <div className="empty-state-icon">&#128269;</div>
+                <div className="empty-state-text">No competitor pages to analyze</div>
+                <div className="empty-state-sub">
+                  Add competitor websites in the Competitive Intel section first, then come back to analyze their landing pages.
+                </div>
+              </div>
+            )}
+
+            {canEdit && uniqueCompetitorSites.length > 0 && !analyzingCompetitors && (
+              <div style={{ marginTop: 20 }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={async () => {
+                    if (!client) return
+                    setAnalyzingCompetitors(true)
+                    try {
+                      const result = await analyzeCompetitorPages(client.id)
+                      if (result.analyses) {
+                        setCompetitorAnalyses(result.analyses)
+                        setPatternSummary(result.pattern_summary || '')
+                        setOpportunities(result.opportunities || [])
+                        showToast(`Analyzed ${result.analyses_added} competitor pages!`)
+                      }
+                    } catch (err) {
+                      showToast('Analysis failed: ' + (err as Error).message)
+                    } finally {
+                      setAnalyzingCompetitors(false)
+                    }
+                  }}
+                >
+                  {landingPageAnalyses.length > 0 ? 'Re-analyze Competitor Pages' : `Analyze ${uniqueCompetitorSites.length} Competitor Pages`}
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
 

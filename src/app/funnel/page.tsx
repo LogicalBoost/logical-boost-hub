@@ -1016,33 +1016,6 @@ export default function FunnelPage() {
             canEdit={canEdit}
           />
 
-          {/* ── Landing Page Preview ──────────────────────────────── */}
-          <div className="funnel-section-card">
-            <div className="funnel-section-header">
-              <h3>Landing Page Preview</h3>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn btn-secondary btn-sm" disabled>
-                  View Live Page
-                </button>
-              </div>
-            </div>
-            <div className="browser-frame">
-              <div className="browser-bar">
-                <span className="browser-dot red" />
-                <span className="browser-dot yellow" />
-                <span className="browser-dot green" />
-                <span className="browser-url">pages.logicalboost.com/{client.name.toLowerCase().replace(/\s+/g, '-')}</span>
-              </div>
-              <div className="browser-content">
-                <div className="lp-preview-hero">
-                  <h2>{instanceComponents.find((c) => c.type === 'hero_headline')?.text || instanceComponents.find((c) => c.type === 'headline')?.text || 'Your Landing Page Headline'}</h2>
-                  <p>{instanceComponents.find((c) => c.type === 'hero_subheadline')?.text || instanceComponents.find((c) => c.type === 'subheadline')?.text || 'Supporting subheadline text here'}</p>
-                  <button className="lp-preview-cta">{instanceComponents.find((c) => c.type === 'hero_cta')?.text || instanceComponents.find((c) => c.type === 'cta')?.text || 'Get Started'}</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Instance actions (delete for broken instances) */}
           {instanceComponents.length === 0 && (
             <div className="empty-state" style={{ padding: 40 }}>

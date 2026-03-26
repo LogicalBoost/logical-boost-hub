@@ -1137,7 +1137,7 @@ select.form-input {
    ============================================================================ */
 
 .funnel-page {
-  max-width: 1400px;
+  max-width: 100%;
 }
 
 /* Selectors row */
@@ -1229,14 +1229,15 @@ select.form-input {
 /* Tab navigation */
 .funnel-tabs {
   display: flex;
+  flex-wrap: wrap;
   border-bottom: 1px solid var(--border);
-  padding: 0 12px;
-  gap: 0;
+  padding: 4px 12px 0;
+  gap: 2px;
   background: rgba(0, 0, 0, 0.1);
 }
 
 .funnel-tab {
-  padding: 10px 14px;
+  padding: 8px 12px;
   font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);
@@ -1539,11 +1540,11 @@ select.form-input {
 
 /* Banner thumbnail grid */
 .banner-thumb-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 16px;
   padding: 20px 24px;
-  align-items: flex-start;
+  align-items: start;
 }
 
 .banner-thumb {
