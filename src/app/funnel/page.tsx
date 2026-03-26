@@ -292,6 +292,7 @@ function VideoAdGenerator({
   ctas,
   onDeny,
   onGenerateMore,
+  onGenerateVideos,
   generatingSection,
   canEdit,
 }: {
@@ -301,6 +302,7 @@ function VideoAdGenerator({
   ctas: CopyComponent[]
   onDeny: (id: string) => void
   onGenerateMore: (sectionType: string) => void
+  onGenerateVideos: () => void
   generatingSection: string | null
   canEdit: boolean
 }) {
@@ -321,11 +323,33 @@ function VideoAdGenerator({
     })
   }
 
+  const isEmpty = hooks.length === 0 && shortScripts.length === 0 && longScripts.length === 0
+
   return (
     <div className="funnel-section-card">
       <div className="funnel-section-header">
         <h3>Video Ad Generator</h3>
+        {canEdit && isEmpty && (
+          <button
+            className="btn btn-primary"
+            onClick={onGenerateVideos}
+            disabled={generatingSection === 'video'}
+            style={{ background: '#7c3aed' }}
+          >
+            {generatingSection === 'video' ? 'Generating...' : '\u{1F3AC} Generate Video Ads'}
+          </button>
+        )}
       </div>
+      {isEmpty && canEdit && (
+        <div style={{
+          padding: '32px 24px', textAlign: 'center',
+          background: 'rgba(124, 58, 237, 0.05)', borderBottom: '1px solid var(--border)',
+        }}>
+          <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8 }}>
+            No video content generated yet. Click the button above to generate hooks, short scripts, and long scripts in one batch.
+          </div>
+        </div>
+      )}
       <div className="video-generator">
         <div className="video-column">
           <div className="video-column-header">Hooks</div>
@@ -540,6 +564,22 @@ export default function FunnelPage() {
     [filteredComponents]
   )
 
+  // Check what's missing — used to show "Generate All" / "Generate Video" buttons
+  const hasAdCopy = useMemo(() => {
+    return instanceComponents.some(c => ['headline', 'google_headline', 'google_description', 'primary_text'].includes(c.type))
+  }, [instanceComponents])
+
+  const hasPersuasion = useMemo(() => {
+    return instanceComponents.some(c => ['benefit', 'proof', 'cta', 'hero_headline', 'objection_handler'].includes(c.type))
+  }, [instanceComponents])
+
+  const hasVideoContent = useMemo(() => {
+    return instanceComponents.some(c => ['video_hook', 'short_script', 'long_script', 'video_script'].includes(c.type))
+  }, [instanceComponents])
+
+  // True if substantial copy is missing (instance exists but incomplete generation)
+  const isMissingCopy = currentInstance && instanceComponents.length > 0 && (!hasAdCopy || !hasPersuasion || instanceComponents.length < 40)
+
   // Avatar component count for selector label
   const avatarComponentCount = useCallback(
     (avId: string) => {
@@ -561,13 +601,13 @@ export default function FunnelPage() {
     setGenerating(true)
     setLoading(true)
     try {
-      const result = await generateFunnel(avatarId, offerId)
+      const result = await generateFunnel(avatarId, offerId, 'full')
       await Promise.all([
         refreshFunnelInstances(client.id),
         refreshCopyComponents(client.id),
       ])
       if (result.components_created > 0) {
-        showToast(`Campaign generated! ${result.components_created} copy components created.`)
+        showToast(`Campaign generated! ${result.components_created} copy components created across ${result.batch_summary?.length || 3} batches.`)
       } else {
         showToast('Campaign instance created but no copy components were generated. Try again or check the AI configuration.')
       }
@@ -577,6 +617,40 @@ export default function FunnelPage() {
     } finally {
       setGenerating(false)
       setLoading(false)
+    }
+  }
+
+  // Generate ALL missing copy for an existing instance (3 parallel batches)
+  async function handleGenerateAllCopy() {
+    if (!client || !currentInstance) return
+    setGenerating(true)
+    setLoading(true)
+    try {
+      const result = await generateFunnel(avatarId, offerId, 'fill_all')
+      await refreshCopyComponents(client.id)
+      showToast(`Generated ${result.components_created} new copy components!`)
+    } catch (err) {
+      showToast(`Generation failed: ${(err as Error).message}`)
+      console.error('Generate all copy error:', err)
+    } finally {
+      setGenerating(false)
+      setLoading(false)
+    }
+  }
+
+  // Generate only video content for an existing instance
+  async function handleGenerateVideos() {
+    if (!client || !currentInstance) return
+    setGeneratingSection('video')
+    try {
+      const result = await generateFunnel(avatarId, offerId, 'video_only')
+      await refreshCopyComponents(client.id)
+      showToast(`Generated ${result.components_created} video components!`)
+    } catch (err) {
+      showToast(`Generation failed: ${(err as Error).message}`)
+      console.error('Generate video error:', err)
+    } finally {
+      setGeneratingSection(null)
     }
   }
 
@@ -722,6 +796,57 @@ export default function FunnelPage() {
             </div>
           </div>
 
+          {/* ── Generate Actions Bar ──────────────────────────────── */}
+          {canEdit && (isMissingCopy || !hasVideoContent) && (
+            <div className="funnel-actions-bar">
+              {generating ? (
+                <div className="generating-inline">
+                  <div className="generating-spinner" style={{ width: 20, height: 20 }} />
+                  <span>Generating copy components across 3 parallel AI batches... This takes 30-60 seconds.</span>
+                </div>
+              ) : (
+                <>
+                  {isMissingCopy && (
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleGenerateAllCopy}
+                      disabled={generating || !!generatingSection}
+                    >
+                      &#9889; Generate All Copy Components
+                    </button>
+                  )}
+                  {!hasVideoContent && (
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleGenerateVideos}
+                      disabled={generating || !!generatingSection}
+                      style={{ background: '#7c3aed' }}
+                    >
+                      &#127909; Generate Video Ads
+                    </button>
+                  )}
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    {instanceComponents.length} components generated.
+                    {isMissingCopy ? ' Missing ad copy, persuasion elements, or both.' : ''}
+                    {!hasVideoContent ? ' No video scripts yet.' : ''}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Full generating overlay */}
+          {generating && (
+            <div className="generating-overlay" style={{ padding: 40 }}>
+              <div className="generating-spinner" />
+              <div className="generating-text">AI is generating your complete campaign library...</div>
+              <div className="generating-sub">
+                Running 3 parallel batches: Ad Copy, Persuasion Elements, and Video Scripts.
+                Each batch generates ~20-80 components. This takes 30-60 seconds.
+              </div>
+            </div>
+          )}
+
           {/* ── Copy Generator Section ─────────────────────────────── */}
           <div className="funnel-section-card">
             <div className="funnel-section-header">
@@ -841,6 +966,7 @@ export default function FunnelPage() {
             ctas={ctaComponents}
             onDeny={handleDeny}
             onGenerateMore={handleGenerateMore}
+            onGenerateVideos={handleGenerateVideos}
             generatingSection={generatingSection}
             canEdit={canEdit}
           />

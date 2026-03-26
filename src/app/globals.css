@@ -1490,6 +1490,28 @@ select.form-input {
   line-height: 1.5;
 }
 
+/* Funnel Actions Bar */
+.funnel-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--accent-muted);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.generating-inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
 /* Banner Ad Mockups */
 .banner-mockups-grid {
   display: flex;

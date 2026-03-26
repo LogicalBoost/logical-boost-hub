@@ -239,7 +239,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { avatar_id, offer_id } = await req.json()
+    // mode: "full" (default) = create new instance with all components
+    //        "fill_all" = add all missing component types to existing instance
+    //        "video_only" = only generate video batch for existing instance
+    const { avatar_id, offer_id, mode = 'full' } = await req.json()
 
     if (!avatar_id || !offer_id) {
       return errorResponse('avatar_id and offer_id are required')
@@ -259,7 +262,12 @@ Deno.serve(async (req: Request) => {
       .eq('status', 'active')
       .single()
 
-    if (existing) {
+    // For fill_all or video_only modes, we NEED an existing instance
+    if ((mode === 'fill_all' || mode === 'video_only') && !existing) {
+      return errorResponse('No existing funnel instance found. Use full mode to create one first.')
+    }
+
+    if (existing && mode === 'full') {
       const { count } = await supabase
         .from('copy_components')
         .select('*', { count: 'exact', head: true })
@@ -295,21 +303,28 @@ Deno.serve(async (req: Request) => {
     }
     if (recommendedAngles.length > 5) recommendedAngles = recommendedAngles.slice(0, 5)
 
-    // Create funnel instance
-    const { data: funnelInstance, error: fiError } = await supabase
-      .from('funnel_instances')
-      .insert({
-        client_id: client.id,
-        avatar_id,
-        offer_id,
-        generated_at: new Date().toISOString(),
-        status: 'active',
-      })
-      .select()
-      .single()
+    // Use existing instance for fill/video modes, create new for full mode
+    let funnelInstance: Record<string, unknown>
+    if (mode === 'fill_all' || mode === 'video_only') {
+      funnelInstance = existing as Record<string, unknown>
+      console.log(`Using existing funnel instance ${existing!.id} for mode=${mode}`)
+    } else {
+      const { data: newInstance, error: fiError } = await supabase
+        .from('funnel_instances')
+        .insert({
+          client_id: client.id,
+          avatar_id,
+          offer_id,
+          generated_at: new Date().toISOString(),
+          status: 'active',
+        })
+        .select()
+        .single()
 
-    if (fiError || !funnelInstance) {
-      return errorResponse(`Failed to create funnel instance: ${fiError?.message}`)
+      if (fiError || !newInstance) {
+        return errorResponse(`Failed to create funnel instance: ${fiError?.message}`)
+      }
+      funnelInstance = newInstance as Record<string, unknown>
     }
 
     // Build user message (shared across all batches)
@@ -320,10 +335,16 @@ Deno.serve(async (req: Request) => {
       recommendedAngles,
     )
 
-    // ── Run 3 batches IN PARALLEL ──────────────────────────────────────
-    const batches = [BATCH_1_ADS, BATCH_2_PERSUASION, BATCH_3_VIDEO]
+    // ── Select which batches to run based on mode ──────────────────────
+    let batches: BatchConfig[]
+    if (mode === 'video_only') {
+      batches = [BATCH_3_VIDEO]
+    } else {
+      // full or fill_all: run all 3 batches
+      batches = [BATCH_1_ADS, BATCH_2_PERSUASION, BATCH_3_VIDEO]
+    }
 
-    console.log(`Starting 3 parallel generation batches for funnel ${funnelInstance.id}`)
+    console.log(`Starting ${batches.length} parallel generation batches (mode=${mode}) for funnel ${funnelInstance.id}`)
 
     const batchResults = await Promise.allSettled(
       batches.map(async (batch) => {

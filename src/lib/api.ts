@@ -43,10 +43,12 @@ export async function refineSystem(clientId: string, newCallNotes?: string, newM
 }
 
 // Workflow 4: Generate funnel (multi-angle — AI generates across all recommended angles)
-export async function generateFunnel(avatarId: string, offerId: string) {
+// mode: "full" = new instance, "fill_all" = add all missing to existing, "video_only" = just video batch
+export async function generateFunnel(avatarId: string, offerId: string, mode: 'full' | 'fill_all' | 'video_only' = 'full') {
   return callEdgeFunction('generate-funnel', {
     avatar_id: avatarId,
     offer_id: offerId,
+    mode,
   })
 }
 
