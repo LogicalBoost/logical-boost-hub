@@ -85,20 +85,39 @@ function AngleBadge({ slug }: { slug: string }) {
 function CopyRow({
   item,
   onDeny,
+  selected,
+  onToggleSelect,
+  selectionMode,
 }: {
   item: CopyComponent
   onDeny: (id: string) => void
+  selected?: boolean
+  onToggleSelect?: (id: string) => void
+  selectionMode?: boolean
 }) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
+    if (selectionMode && onToggleSelect) {
+      onToggleSelect(item.id)
+      return
+    }
     await copyToClipboard(item.text)
     setCopied(true)
     setTimeout(() => setCopied(false), 1200)
   }
 
   return (
-    <div className={`copy-row ${copied ? 'copy-row-copied' : ''}`} onClick={handleCopy}>
+    <div className={`copy-row ${copied ? 'copy-row-copied' : ''} ${selected ? 'copy-row-selected' : ''}`} onClick={handleCopy}>
+      {selectionMode && (
+        <input
+          type="checkbox"
+          className="copy-row-checkbox"
+          checked={!!selected}
+          onChange={() => onToggleSelect?.(item.id)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      )}
       <div className="copy-row-text">{item.text}</div>
       <div className="copy-row-meta">
         {(item.angle_ids || []).map((slug) => (
@@ -107,7 +126,7 @@ function CopyRow({
         <span className="copy-row-chars">({item.character_count || item.text.length})</span>
         <button
           className="copy-row-deny"
-          title="Deny"
+          title="Deny this item"
           onClick={(e) => {
             e.stopPropagation()
             onDeny(item.id)
@@ -509,6 +528,8 @@ export default function FunnelPage() {
   const [prompterSection, setPrompterSection] = useState('')
   const [promptText, setPromptText] = useState('')
   const [promptQuantity, setPromptQuantity] = useState(5)
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const approvedAvatars = avatars.filter((a) => a.status === 'approved')
   const approvedOffers = offers.filter((o) => o.status === 'approved')
@@ -738,8 +759,46 @@ export default function FunnelPage() {
   async function handleDeny(componentId: string) {
     if (!client) return
     await supabase.from('copy_components').update({ status: 'denied' }).eq('id', componentId)
+    selectedIds.delete(componentId)
+    setSelectedIds(new Set(selectedIds))
     await refreshCopyComponents(client.id)
   }
+
+  async function handleBulkDeny() {
+    if (!client || selectedIds.size === 0) return
+    const ids = Array.from(selectedIds)
+    // Batch update in chunks of 50
+    for (let i = 0; i < ids.length; i += 50) {
+      const batch = ids.slice(i, i + 50)
+      await supabase.from('copy_components').update({ status: 'denied' }).in('id', batch)
+    }
+    showToast(`Denied ${ids.length} items`)
+    setSelectedIds(new Set())
+    setSelectionMode(false)
+    await refreshCopyComponents(client.id)
+  }
+
+  function toggleSelect(id: string) {
+    const next = new Set(selectedIds)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedIds(next)
+  }
+
+  function selectAllInTab() {
+    const next = new Set(selectedIds)
+    tabComponents.forEach(c => next.add(c.id))
+    setSelectedIds(next)
+  }
+
+  function deselectAllInTab() {
+    const next = new Set(selectedIds)
+    tabComponents.forEach(c => next.delete(c.id))
+    setSelectedIds(next)
+  }
+
+  const tabSelectedCount = tabComponents.filter(c => selectedIds.has(c.id)).length
+  const allTabSelected = tabComponents.length > 0 && tabSelectedCount === tabComponents.length
 
   async function handleDeleteInstance() {
     if (!currentInstance || !client) return
@@ -960,12 +1019,43 @@ export default function FunnelPage() {
               ))}
             </div>
 
+            {/* Bulk selection bar */}
+            {selectionMode && (
+              <div className="bulk-action-bar">
+                <label className="bulk-select-all" onClick={() => allTabSelected ? deselectAllInTab() : selectAllInTab()}>
+                  <input type="checkbox" checked={allTabSelected} readOnly />
+                  <span>{allTabSelected ? 'Deselect All' : 'Select All'} in this tab</span>
+                </label>
+                <span className="bulk-count">{selectedIds.size} selected</span>
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={handleBulkDeny}
+                  disabled={selectedIds.size === 0}
+                >
+                  Deny {selectedIds.size} Items
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => { setSelectionMode(false); setSelectedIds(new Set()) }}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+
             {/* Content List */}
             <div className="funnel-tab-content">
               {tabComponents.length > 0 ? (
                 <>
                   {tabComponents.map((item) => (
-                    <CopyRow key={item.id} item={item} onDeny={handleDeny} />
+                    <CopyRow
+                      key={item.id}
+                      item={item}
+                      onDeny={handleDeny}
+                      selected={selectedIds.has(item.id)}
+                      onToggleSelect={toggleSelect}
+                      selectionMode={selectionMode}
+                    />
                   ))}
                 </>
               ) : (
@@ -978,19 +1068,40 @@ export default function FunnelPage() {
             {/* Tab Footer (team only) */}
             {canEdit && (
               <div className="funnel-tab-footer">
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => handleGenerateMore(activeTabDef.types[0])}
-                  disabled={!!generatingSection}
-                >
-                  {generatingSection === activeTabDef.types[0] ? 'Generating...' : 'Generate More'}
-                </button>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => openPrompter(activeTabDef.types[0])}
-                >
-                  Prompt AI
-                </button>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => handleGenerateMore(activeTabDef.types[0])}
+                    disabled={!!generatingSection}
+                  >
+                    {generatingSection === activeTabDef.types[0] ? 'Generating...' : 'Generate More'}
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => openPrompter(activeTabDef.types[0])}
+                  >
+                    Prompt AI
+                  </button>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {!selectionMode ? (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setSelectionMode(true)}
+                      title="Select items to bulk deny"
+                    >
+                      Select &amp; Deny
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={handleBulkDeny}
+                      disabled={selectedIds.size === 0}
+                    >
+                      Deny {selectedIds.size} Selected
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </div>
