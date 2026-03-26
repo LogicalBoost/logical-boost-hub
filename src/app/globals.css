@@ -1141,17 +1141,24 @@ select.form-input {
   }
 
   /* ── Funnel page responsive (tablet) ── */
-  .avatar-card-grid {
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 10px;
+  .funnel-selector-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
   }
 
-  .avatar-pick-card {
-    padding: 12px;
+  .funnel-selector-btn {
+    width: 100%;
+    justify-content: center;
   }
 
-  .avatar-pick-name {
-    font-size: 14px;
+  .funnel-selector-status {
+    justify-content: center;
+  }
+
+  .funnel-avatar-context {
+    font-size: 11px;
+    padding: 6px 16px;
   }
 
   .funnel-selectors {
@@ -1338,13 +1345,8 @@ select.form-input {
     padding: 3px 8px;
   }
 
-  /* Avatar cards: full width on phone */
-  .avatar-card-grid {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-
-  .avatar-pick-desc {
+  /* Avatar context hide angles on small phone */
+  .funnel-avatar-context-angles {
     display: none;
   }
 
@@ -1445,143 +1447,102 @@ select.form-input {
   overflow-x: hidden;
 }
 
-/* ── Avatar pick cards ── */
-.avatar-card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+/* ── Funnel selector bar (compact) ── */
+.funnel-selector-bar {
+  display: flex;
+  align-items: flex-end;
   gap: 12px;
-  margin-bottom: 16px;
-}
-
-.avatar-pick-card {
-  all: unset;
-  cursor: pointer;
+  padding: 14px 20px;
   background: var(--bg-frost);
   backdrop-filter: blur(16px);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  transition: all 0.15s ease;
-  position: relative;
+  margin-bottom: 8px;
 }
 
-.avatar-pick-card:hover {
-  border-color: var(--border-light);
-  background: rgba(16, 24, 22, 0.85);
-  transform: translateY(-1px);
+.funnel-selector-col {
+  flex: 1;
+  min-width: 0;
 }
 
-.avatar-pick-active {
-  border-color: var(--accent) !important;
-  background: rgba(16, 185, 129, 0.06) !important;
-  box-shadow: 0 0 0 1px var(--accent), 0 4px 16px rgba(16, 185, 129, 0.1);
-}
-
-.avatar-pick-rank {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.avatar-pick-rank-num {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  font-size: 12px;
-  font-weight: 700;
-  background: rgba(255,255,255,0.08);
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-
-.avatar-pick-active .avatar-pick-rank-num {
-  background: var(--accent);
-  color: var(--bg-primary);
-}
-
-.avatar-pick-priority {
-  font-size: 10px;
+.funnel-selector-label {
+  display: block;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  margin-bottom: 4px;
 }
 
-.avatar-pick-name {
-  font-family: 'Roboto', sans-serif;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1.3;
-}
-
-.avatar-pick-type {
-  font-size: 12px;
-  color: var(--text-muted);
+.funnel-avatar-select {
   font-weight: 500;
 }
 
-.avatar-pick-desc {
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.4;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+.funnel-selector-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+  height: 40px;
 }
 
-.avatar-pick-angles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  margin-top: 2px;
-}
-
-.avatar-pick-stats {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-}
-
-.avatar-pick-stat-active {
+.funnel-selector-status {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 6px;
+  background: var(--accent-muted);
   font-size: 12px;
   font-weight: 600;
   color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  height: 40px;
 }
 
-.avatar-pick-stat-sub {
-  font-size: 11px;
-  color: var(--text-muted);
+.funnel-selector-check {
+  font-size: 14px;
 }
 
-.avatar-pick-stat-empty {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-/* Campaign selector card (offer selection bar) */
-.funnel-selector-card {
-  background: var(--bg-frost);
-  backdrop-filter: blur(16px);
+/* Avatar context strip */
+.funnel-avatar-context {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: rgba(0,0,0,0.15);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px 20px;
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
   margin-bottom: 16px;
+  flex-wrap: wrap;
+  margin-top: -8px;
 }
 
-.funnel-selector-heading {
-  margin-bottom: 16px;
+.funnel-avatar-context-name {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.funnel-avatar-context-sep {
+  color: var(--text-muted);
+}
+
+.funnel-avatar-context-type {
+  color: var(--text-muted);
+}
+
+.funnel-avatar-context-angles {
+  display: inline-flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.funnel-avatar-context-offer {
+  color: var(--accent);
+  font-weight: 500;
 }
 
 /* Selectors row */
