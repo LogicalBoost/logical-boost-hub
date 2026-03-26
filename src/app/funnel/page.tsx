@@ -662,6 +662,18 @@ export default function FunnelPage() {
     [funnelInstances, copyComponents]
   )
 
+  // Avatar campaign info for selector (instance count + total components)
+  const avatarCampaignInfo = useCallback(
+    (avId: string) => {
+      const instances = funnelInstances.filter(f => f.avatar_id === avId && f.status === 'active')
+      const totalComponents = instances.reduce((sum, fi) => {
+        return sum + copyComponents.filter(c => c.funnel_instance_id === fi.id && c.status !== 'denied').length
+      }, 0)
+      return { instanceCount: instances.length, totalComponents }
+    },
+    [funnelInstances, copyComponents]
+  )
+
   // ── Handlers ────────────────────────────────────────────────────────────
 
   async function handleGenerate() {
@@ -848,15 +860,6 @@ export default function FunnelPage() {
   // Selected names for display
   const selectedAvatar = approvedAvatars.find(a => a.id === avatarId)
   const selectedOffer = approvedOffers.find(o => o.id === offerId)
-
-  // Count components per avatar (across all offers)
-  const avatarCampaignInfo = useCallback((avId: string) => {
-    const instances = funnelInstances.filter(f => f.avatar_id === avId && f.status === 'active')
-    const totalComponents = instances.reduce((sum, fi) => {
-      return sum + copyComponents.filter(c => c.funnel_instance_id === fi.id && c.status !== 'denied').length
-    }, 0)
-    return { instanceCount: instances.length, totalComponents }
-  }, [funnelInstances, copyComponents])
 
   // ── Render: Main page ────────────────────────────────────────────────
   return (
