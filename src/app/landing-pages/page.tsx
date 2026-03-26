@@ -5,7 +5,6 @@ import { useAppStore } from '@/lib/store'
 import {
   buildLandingPage,
   iterateLandingPage,
-  approveLandingPage,
   deployLandingPage,
   generateMissingCopySlots,
 } from '@/lib/api'
@@ -366,22 +365,51 @@ export default function LandingPagesPage() {
   }, [activePage, iteratePrompt, client, store])
 
   const handleApprove = useCallback(async () => {
-    if (!activePage) return
+    if (!activePage || !client) return
     setApproving(true)
     try {
-      const result = await approveLandingPage(activePage.id)
-      if (result.landing_page) {
-        setActivePage(result.landing_page)
-        showToast('Design approved! Converting to production code...')
-        setStep(7)
-        if (client) store.refreshLandingPages(client.id)
-      }
+      // Update status directly in database (no edge function needed)
+      const { data, error } = await supabase
+        .from('landing_pages')
+        .update({
+          deploy_status: 'approved',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', activePage.id)
+        .select()
+        .single()
+
+      if (error) throw error
+      setActivePage(data)
+      showToast('Design approved! You can now download the HTML or deploy.')
+      setStep(7)
+      store.refreshLandingPages(client.id)
     } catch (err) {
       showToast(`Approve error: ${(err as Error).message}`)
     } finally {
       setApproving(false)
     }
   }, [activePage, client, store])
+
+  const handleDownloadHtml = useCallback(() => {
+    if (!activePage) return
+    const html = activePage.stitch_output_code || activePage.page_html || ''
+    if (!html) {
+      showToast('No HTML to download')
+      return
+    }
+    const blob = new Blob([html], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const slug = (client?.name || 'landing-page').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    a.download = `${slug}-landing-page.html`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    showToast('HTML downloaded! Open it in your browser or edit with Claude Code.')
+  }, [activePage, client])
 
   const handleDeploy = useCallback(async () => {
     if (!activePage) return
@@ -968,6 +996,13 @@ export default function LandingPagesPage() {
                 </button>
               ))}
               <button
+                style={btn('ghost')}
+                onClick={handleDownloadHtml}
+                title="Download the HTML file"
+              >
+                Download HTML
+              </button>
+              <button
                 style={btn('primary')}
                 onClick={() => setStep(6)}
               >
@@ -1070,14 +1105,14 @@ export default function LandingPagesPage() {
       {/* STEP 6: Approve + Convert */}
       {/* ============================================================ */}
       {step === 6 && activePage && (
-        <div style={{ ...card({ maxWidth: 540, textAlign: 'center' as const, margin: '0 auto' }) }}>
-          <h3 style={{ fontSize: 18, marginBottom: 8 }}>Approve Design</h3>
-          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 24 }}>
-            Approving will lock the design and convert it to production-ready code for deployment.
+        <div style={{ ...card({ maxWidth: 600, margin: '0 auto' }) }}>
+          <h3 style={{ fontSize: 18, marginBottom: 8, textAlign: 'center' }}>Approve Design</h3>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20, textAlign: 'center' }}>
+            Approving locks the design. You can then download the HTML to edit locally with Claude Code.
           </p>
 
-          {approving || activePage.deploy_status === 'converting' ? (
-            <div>
+          {approving ? (
+            <div style={{ textAlign: 'center' }}>
               <div style={{
                 width: 48,
                 height: 48,
@@ -1088,22 +1123,51 @@ export default function LandingPagesPage() {
                 animation: 'spin 1s linear infinite',
               }} />
               <p style={{ fontSize: 14, color: 'var(--accent)', fontWeight: 500 }}>
-                Converting to production code...
+                Approving design...
               </p>
               <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </div>
           ) : (
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              <button style={btn('ghost')} onClick={() => setStep(5)}>
-                Back to Preview
-              </button>
-              <button
-                style={btn('primary')}
-                disabled={!canEdit}
-                onClick={handleApprove}
-              >
-                Approve Design
-              </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button style={btn('ghost')} onClick={() => setStep(5)}>
+                  Back to Preview
+                </button>
+                <button
+                  style={btn('primary')}
+                  disabled={!canEdit}
+                  onClick={handleApprove}
+                >
+                  Approve Design
+                </button>
+              </div>
+              {activePage.deploy_status === 'approved' && (
+                <div style={{
+                  background: 'rgba(52,211,153,0.08)',
+                  border: '1px solid rgba(52,211,153,0.25)',
+                  borderRadius: 'var(--radius)',
+                  padding: 16,
+                  textAlign: 'center',
+                }}>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)', marginBottom: 12 }}>
+                    Design Approved
+                  </p>
+                  <button
+                    style={{
+                      ...btn('primary'),
+                      width: '100%',
+                      justifyContent: 'center',
+                      marginBottom: 8,
+                    }}
+                    onClick={handleDownloadHtml}
+                  >
+                    Download HTML
+                  </button>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                    Download the HTML file, place it in a client directory, and use Claude Code to refine it locally.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
