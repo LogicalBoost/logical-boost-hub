@@ -25,6 +25,7 @@ export interface CopySlotDef {
   contentType: string
   notes: string
   isArray?: boolean
+  optional?: boolean
   source: SlotSource
 }
 
@@ -32,13 +33,12 @@ export interface CopySlotDef {
 export const TEMPLATE_1_SLOTS: CopySlotDef[] = [
   { id: 't1_headline', label: 'Hero Headline', contentType: 'headline', notes: '6–10 words', source: 'copy' },
   { id: 't1_subheadline', label: 'Hero Subheadline', contentType: 'subheadline', notes: '8–12 words', source: 'copy' },
-  { id: 't1_q1_prompt', label: 'Step 1 Question', contentType: 'quiz_question', notes: 'Quiz step 1 question', source: 'copy' },
-  { id: 't1_q1_options', label: 'Step 1 Options', contentType: 'quiz_option', notes: '4–6 tiles, 2–4 words each', isArray: true, source: 'copy' },
-  { id: 't1_q2_prompt', label: 'Step 2 Question', contentType: 'quiz_question', notes: 'Quiz step 2 question', source: 'copy' },
-  { id: 't1_q2_options', label: 'Step 2 Options', contentType: 'quiz_option', notes: '4–6 tiles, 2–4 words each', isArray: true, source: 'copy' },
-  { id: 't1_form_transition', label: 'Form Transition Text', contentType: 'transition_copy', notes: 'Line above form fields', source: 'copy' },
+  { id: 't1_q1_prompt', label: 'Step 1 Question', contentType: 'quiz_question', notes: 'Quiz step 1 question — add via iteration after build', optional: true, source: 'copy' },
+  { id: 't1_q1_options', label: 'Step 1 Options', contentType: 'quiz_option', notes: '4–6 tiles, 2–4 words each', optional: true, isArray: true, source: 'copy' },
+  { id: 't1_q2_prompt', label: 'Step 2 Question', contentType: 'quiz_question', notes: 'Quiz step 2 question — add via iteration after build', optional: true, source: 'copy' },
+  { id: 't1_q2_options', label: 'Step 2 Options', contentType: 'quiz_option', notes: '4–6 tiles, 2–4 words each', optional: true, isArray: true, source: 'copy' },
   { id: 't1_cta', label: 'Submit Button', contentType: 'cta', notes: 'Form submit CTA', source: 'copy' },
-  { id: 't1_trust_line', label: 'Trust Line', contentType: 'trust_line', notes: 'Below CTA, e.g. "No spam. Unsubscribe anytime."', source: 'copy' },
+  { id: 't1_trust_line', label: 'Trust Line', contentType: 'proof', notes: 'Below CTA — social proof line', source: 'copy' },
   { id: 't1_proof_rating', label: 'Star Rating', contentType: 'star_rating', notes: 'Rating + count + platform', source: 'business' },
   { id: 't1_testimonials', label: 'Testimonials', contentType: 'testimonial', notes: '2–4 testimonials', isArray: true, source: 'business' },
   { id: 't1_trust_badges', label: 'Trust Badges', contentType: 'trust_badge', notes: 'Badge labels / images', isArray: true, source: 'business' },
@@ -290,12 +290,12 @@ export function mapComponentsToSlots(
         if (typeCount < available.length) {
           filled[slot.id] = available[typeCount].text
           autoFilledTypes[slot.contentType] = typeCount + 1
-        } else {
-          // No more copy of this type — mark as missing
+        } else if (!slot.optional) {
           missing.push(slot.id)
         }
       }
-    } else {
+    } else if (!slot.optional) {
+      // Only mark as missing if not optional
       missing.push(slot.id)
     }
   }
