@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAppStore } from '@/lib/store'
 import { analyzeBrandKit, analyzeCompetitorPages, generatePlaybook, generateConcepts, generateLandingPage, editLandingPageSection } from '@/lib/api'
 import { showToast } from '@/lib/demo-toast'
+import { supabase } from '@/lib/supabase'
 import LogoUpload from '@/components/LogoUpload'
 import type { BrandKit, LandingPage, TemplateId } from '@/types/database'
 
@@ -61,6 +62,60 @@ export default function LandingPagesPage() {
   const [editingSectionId, setEditingSectionId] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [deploying, setDeploying] = useState(false)
+  const [pageSlug, setPageSlug] = useState('')
+
+  // Generate a slug from avatar + offer names
+  const generateSlug = useCallback((avatarName: string, offerName: string) => {
+    return (avatarName + '-' + offerName)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .substring(0, 60)
+  }, [])
+
+  // Deploy page HTML to Supabase Storage
+  const deployPage = useCallback(async (page: LandingPage, slug: string) => {
+    if (!client || !page.page_html) return
+    setDeploying(true)
+    try {
+      const clientSlug = client.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+      const filePath = `${client.id}/pages/${slug}.html`
+
+      // Upload HTML to Supabase Storage
+      const htmlBlob = new Blob([page.page_html], { type: 'text/html' })
+      const { error: uploadErr } = await supabase.storage
+        .from('client-assets')
+        .upload(filePath, htmlBlob, { cacheControl: '60', upsert: true, contentType: 'text/html' })
+
+      if (uploadErr) throw uploadErr
+
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('client-assets')
+        .getPublicUrl(filePath)
+
+      const deployedUrl = urlData.publicUrl
+
+      // Update the landing page record
+      const { error: updateErr } = await supabase
+        .from('landing_pages')
+        .update({ deployed_url: deployedUrl, deploy_status: 'deployed' })
+        .eq('id', page.id)
+
+      if (updateErr) throw updateErr
+
+      // Update local state
+      setActivePage({ ...page, deployed_url: deployedUrl, deploy_status: 'deployed' })
+      refreshLandingPages(client.id)
+      showToast('Page deployed! URL copied to clipboard.')
+      navigator.clipboard.writeText(deployedUrl).catch(() => {})
+    } catch (err) {
+      showToast('Deploy failed: ' + (err as Error).message)
+    } finally {
+      setDeploying(false)
+    }
+  }, [client, refreshLandingPages])
 
   // Get competitor intel with websites (for competitive analysis stage)
   const competitorsWithSites = competitors.filter(c => c.competitor_website)
@@ -796,10 +851,65 @@ export default function LandingPagesPage() {
                         const w = window.open('', '_blank')
                         if (w) { w.document.write(activePage.page_html!); w.document.close() }
                       }}>
-                        Open in Tab
+                        Preview
                       </button>
                     )}
                   </div>
+                </div>
+
+                {/* Deploy Bar */}
+                <div className="lp-deploy-bar">
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>SLUG:</label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={pageSlug || generateSlug(
+                        approvedAvatars.find(a => a.id === activePage.avatar_id)?.name || 'page',
+                        approvedOffers.find(o => o.id === activePage.offer_id)?.name || 'offer'
+                      )}
+                      onChange={e => setPageSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                      style={{ width: 200, fontSize: 13, padding: '4px 8px' }}
+                      placeholder="page-slug"
+                    />
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>.html</span>
+                    <button
+                      className="btn btn-primary btn-sm"
+                      disabled={deploying}
+                      onClick={() => {
+                        const slug = pageSlug || generateSlug(
+                          approvedAvatars.find(a => a.id === activePage.avatar_id)?.name || 'page',
+                          approvedOffers.find(o => o.id === activePage.offer_id)?.name || 'offer'
+                        )
+                        deployPage(activePage, slug)
+                      }}
+                    >
+                      {deploying ? 'Deploying...' : activePage.deploy_status === 'deployed' ? 'Re-deploy' : 'Deploy Page'}
+                    </button>
+                  </div>
+                  {activePage.deployed_url && (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: activePage.deployed_url ? 0 : undefined }}>
+                      <span className="tag" style={{ background: 'var(--success-muted)', color: 'var(--success)', fontSize: 11 }}>LIVE</span>
+                      <a
+                        href={activePage.deployed_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ fontSize: 12, color: 'var(--accent)', wordBreak: 'break-all' }}
+                      >
+                        {activePage.deployed_url}
+                      </a>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        style={{ fontSize: 11, padding: '2px 8px' }}
+                        onClick={() => {
+                          navigator.clipboard.writeText(activePage.deployed_url!)
+                          showToast('URL copied!')
+                        }}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* AI Edit Panel */}
