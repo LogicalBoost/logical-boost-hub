@@ -36,7 +36,7 @@ function ColorSwatch({ color, label }: { color: string; label: string }) {
 
 export default function LandingPagesPage() {
   const { client, canEdit, refreshClient, competitors, avatars, offers, landingPages, refreshLandingPages } = useAppStore()
-  const approvedAvatars = useMemo(() => avatars.filter(a => a.status === 'approved'), [avatars])
+  const approvedAvatars = useMemo(() => avatars.filter(a => a.status === 'approved').sort((a, b) => (a.priority || 99) - (b.priority || 99)), [avatars])
   const approvedOffers = useMemo(() => offers.filter(o => o.status === 'approved'), [offers])
   const [activeStage, setActiveStage] = useState<Stage>('brand_kit')
   const [analyzing, setAnalyzing] = useState(false)
@@ -970,8 +970,8 @@ export default function LandingPagesPage() {
                           <label className="lp-build-label">Avatar</label>
                           <select className="select" value={selectedAvatarId} onChange={e => setSelectedAvatarId(e.target.value)}>
                             <option value="">Select avatar...</option>
-                            {approvedAvatars.map(a => (
-                              <option key={a.id} value={a.id}>{a.name}</option>
+                            {approvedAvatars.map((a, i) => (
+                              <option key={a.id} value={a.id}>{i + 1}. {a.priority === 1 ? '★ ' : ''}{a.name}</option>
                             ))}
                           </select>
                         </div>

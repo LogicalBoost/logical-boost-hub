@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { showToast } from '@/lib/demo-toast'
 
@@ -21,6 +21,13 @@ export default function LogoUpload({ clientId, currentLogoUrl, onUploadComplete 
   const [dragOver, setDragOver] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentLogoUrl)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Sync previewUrl when currentLogoUrl prop changes (e.g. client switch, data load)
+  useEffect(() => {
+    if (currentLogoUrl) {
+      setPreviewUrl(currentLogoUrl)
+    }
+  }, [currentLogoUrl])
 
   const handleFile = useCallback(async (file: File) => {
     // Validate type
