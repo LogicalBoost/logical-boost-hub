@@ -171,9 +171,9 @@ const labelStyle: React.CSSProperties = {
 // Progress messages for build step
 // ============================================================
 const BUILD_MESSAGES = [
-  'Assembling copy slots into Stitch prompt...',
-  'Sending wireframe + copy to Stitch API...',
-  'Stitch is rendering your landing page...',
+  'Assembling copy slots and template wireframe...',
+  'Sending to the design engine...',
+  'Rendering your landing page...',
   'Applying brand styles and polish...',
   'Almost there, finalizing preview...',
 ]
@@ -465,7 +465,7 @@ export default function LandingPagesPage() {
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ fontSize: 26, marginBottom: 4 }}>Landing Page Builder</h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
-          Build, preview, and deploy high-converting landing pages with Stitch
+          Build, preview, and deploy high-converting landing pages
         </p>
       </div>
 
@@ -904,13 +904,13 @@ export default function LandingPagesPage() {
       )}
 
       {/* ============================================================ */}
-      {/* STEP 4: Build with Stitch */}
+      {/* STEP 4: Build Landing Page */}
       {/* ============================================================ */}
       {step === 4 && (
         <div style={{ ...card({ maxWidth: 540, textAlign: 'center' as const, margin: '0 auto' }) }}>
           <h3 style={{ fontSize: 18, marginBottom: 8 }}>Build Landing Page</h3>
           <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 24 }}>
-            Stitch will combine your template wireframe and copy slots into a pixel-perfect landing page.
+            Your template wireframe and copy slots will be combined into a pixel-perfect landing page.
           </p>
 
           {building ? (
