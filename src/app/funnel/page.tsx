@@ -843,39 +843,84 @@ export default function FunnelPage() {
     )
   }
 
+  // Selected names for display
+  const selectedAvatar = approvedAvatars.find(a => a.id === avatarId)
+  const selectedOffer = approvedOffers.find(o => o.id === offerId)
+
   // ── Render: Main page ────────────────────────────────────────────────
   return (
     <div className="funnel-page">
-      {/* Top: 2 Selectors Only */}
-      <div className="funnel-selectors">
-        <div className="selector-group">
-          <label className="form-label">Avatar</label>
-          <select
-            className="form-input"
-            value={avatarId}
-            onChange={(e) => setAvatarId(e.target.value)}
-          >
-            {approvedAvatars.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name} ({avatarComponentCount(a.id)})
-              </option>
-            ))}
-          </select>
+      {/* Campaign Selector Card */}
+      <div className="funnel-selector-card">
+        <div className="funnel-selector-heading">
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Campaign Builder</h2>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+            Select a target avatar and offer to generate or view your campaign copy library
+          </p>
         </div>
-        <div className="selector-group">
-          <label className="form-label">Offer</label>
-          <select
-            className="form-input"
-            value={offerId}
-            onChange={(e) => setOfferId(e.target.value)}
-          >
-            {approvedOffers.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </select>
+        <div className="funnel-selectors">
+          <div className="selector-group">
+            <label className="form-label">Target Avatar</label>
+            <select
+              className="form-input"
+              value={avatarId}
+              onChange={(e) => setAvatarId(e.target.value)}
+            >
+              {approvedAvatars.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name} ({avatarComponentCount(a.id)} components)
+                </option>
+              ))}
+            </select>
+            {selectedAvatar && (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                {selectedAvatar.avatar_type} · {(selectedAvatar.recommended_angles as string[] || []).slice(0, 3).map(a => getAngleLabel(a)).join(', ')}
+              </div>
+            )}
+          </div>
+          <div className="selector-group">
+            <label className="form-label">Offer</label>
+            <select
+              className="form-input"
+              value={offerId}
+              onChange={(e) => setOfferId(e.target.value)}
+            >
+              {approvedOffers.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+            {selectedOffer && (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                {selectedOffer.offer_type} · CTA: {selectedOffer.primary_cta}
+              </div>
+            )}
+          </div>
+          {!currentInstance && canEdit && !generating && (
+            <div className="selector-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <button
+                className="btn btn-primary btn-lg"
+                onClick={handleGenerate}
+                disabled={loading || !avatarId || !offerId}
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                &#9889; Generate Campaign
+              </button>
+            </div>
+          )}
         </div>
+        {currentInstance && (
+          <div style={{
+            marginTop: 12, padding: '8px 12px', borderRadius: 6,
+            background: 'var(--accent-muted)', fontSize: 12, color: 'var(--accent)',
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span style={{ fontWeight: 600 }}>&#10003; Campaign Active</span>
+            <span style={{ color: 'var(--text-muted)' }}>·</span>
+            <span>{instanceComponents.length} copy components generated</span>
+          </div>
+        )}
       </div>
 
       {currentInstance ? (
@@ -1149,24 +1194,14 @@ export default function FunnelPage() {
           </div>
         </div>
       ) : (
-        <div className="empty-state" style={{ padding: 80 }}>
+        <div className="empty-state" style={{ padding: 60 }}>
           <div className="empty-state-icon">&#9889;</div>
           <div className="empty-state-text">No campaign generated for this Avatar + Offer</div>
-          <div className="empty-state-sub">
+          <div className="empty-state-sub" style={{ maxWidth: 500 }}>
             {canEdit
-              ? 'AI will generate ~130-180 copy components across multiple angles in one shot'
+              ? 'Select your target avatar and offer above, then click "Generate Campaign" to create ~130-180 copy components across multiple marketing angles.'
               : 'No campaign has been generated for this combination yet.'}
           </div>
-          {canEdit && (
-            <button
-              className="btn btn-primary btn-lg"
-              style={{ marginTop: 20 }}
-              onClick={handleGenerate}
-              disabled={loading}
-            >
-              Generate Campaign
-            </button>
-          )}
         </div>
       )}
 

@@ -312,6 +312,7 @@ select optgroup {
 .content-area {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 24px;
   position: relative;
 }
@@ -919,8 +920,46 @@ select.form-input {
   display: none;
 }
 
-/* Responsive */
+/* ============================================================================
+   RESPONSIVE — Tablet landscape (1024px)
+   ============================================================================ */
+@media (max-width: 1024px) {
+  /* Video generator: 4 columns → 2 columns on tablet */
+  .video-generator {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Funnel stats: 4 columns → 2 on tablet */
+  .funnel-stats-bar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Funnel filter bar wraps on tablet */
+  .funnel-filter-bar {
+    flex-wrap: wrap;
+  }
+
+  /* Form input sm shrinks */
+  .form-input-sm {
+    min-width: 100px;
+  }
+
+  /* Funnel actions bar wraps */
+  .funnel-actions-bar {
+    flex-wrap: wrap;
+  }
+
+  /* Bulk action bar wraps */
+  .bulk-action-bar {
+    flex-wrap: wrap;
+  }
+}
+
+/* ============================================================================
+   RESPONSIVE — Tablet portrait / small laptop (768px)
+   ============================================================================ */
 @media (max-width: 768px) {
+  /* Sidebar: off-canvas with hamburger */
   .mobile-menu-btn {
     display: flex;
   }
@@ -936,6 +975,10 @@ select.form-input {
     transform: translateX(0);
   }
 
+  .sidebar-collapsed {
+    width: var(--sidebar-width) !important;
+  }
+
   .sidebar-overlay {
     display: block;
     position: fixed;
@@ -944,63 +987,16 @@ select.form-input {
     z-index: 140;
   }
 
+  /* Main area: no sidebar margin on mobile */
   .main-area {
-    margin-left: 0;
+    margin-left: 0 !important;
   }
 
+  /* Header: accommodate hamburger button */
   .header {
     padding: 0 16px 0 56px;
   }
 
-  .content-area {
-    padding: 16px;
-  }
-
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  .page-title {
-    font-size: 20px;
-  }
-
-  .card-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .selectors-row {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .selector-group {
-    min-width: unset;
-  }
-
-  .stats-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-
-  .stat-card {
-    padding: 14px;
-  }
-
-  .stat-value {
-    font-size: 22px;
-  }
-
-  .welcome-card {
-    padding: 20px;
-  }
-
-  .welcome-card h2 {
-    font-size: 18px;
-  }
-
-  /* Client switcher mobile */
   .client-switcher {
     flex: 1;
     min-width: 0;
@@ -1021,7 +1017,61 @@ select.form-input {
     display: none;
   }
 
-  /* Modal mobile */
+  /* Content area */
+  .content-area {
+    padding: 16px;
+  }
+
+  /* Page header stacks */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .page-title {
+    font-size: 20px;
+  }
+
+  /* Cards: single column */
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Selectors stack */
+  .selectors-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .selector-group {
+    min-width: unset;
+  }
+
+  /* Stats grid: 2 columns */
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .stat-card {
+    padding: 14px;
+  }
+
+  .stat-value {
+    font-size: 22px;
+  }
+
+  /* Welcome card */
+  .welcome-card {
+    padding: 20px;
+  }
+
+  .welcome-card h2 {
+    font-size: 18px;
+  }
+
+  /* Modal: bottom sheet on mobile */
   .modal-overlay {
     padding: 8px;
     align-items: flex-end;
@@ -1032,7 +1082,7 @@ select.form-input {
     border-radius: var(--radius) var(--radius) 0 0;
   }
 
-  /* Copy items mobile */
+  /* Copy items stack on mobile */
   .copy-item {
     flex-direction: column;
     gap: 8px;
@@ -1047,9 +1097,11 @@ select.form-input {
     margin-left: 0;
   }
 
-  /* Section cards mobile */
+  /* Section cards */
   .section-header {
     padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .section-body {
@@ -1058,9 +1110,10 @@ select.form-input {
 
   .section-actions {
     padding: 10px 16px;
+    flex-wrap: wrap;
   }
 
-  /* Funnel page mobile */
+  /* Generating overlay */
   .generating-overlay {
     padding: 40px 16px;
   }
@@ -1069,9 +1122,9 @@ select.form-input {
     font-size: 16px;
   }
 
-  /* Form mobile */
+  /* Form: prevent iOS zoom */
   .form-input, .form-textarea {
-    font-size: 16px; /* prevents zoom on iOS */
+    font-size: 16px;
   }
 
   /* Detail grid in modals */
@@ -1086,13 +1139,156 @@ select.form-input {
   .detail-value {
     font-size: 13px;
   }
-}
 
-@media (max-width: 480px) {
-  .stats-grid {
+  /* ── Funnel page responsive (tablet) ── */
+  .funnel-selectors {
+    flex-direction: column;
+  }
+
+  .funnel-section-header {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 16px;
+  }
+
+  .funnel-filter-bar {
+    padding: 8px 16px;
+    gap: 8px;
+  }
+
+  .form-input-sm {
+    min-width: 0;
+    flex: 1;
+  }
+
+  /* Tabs: horizontal scroll on mobile */
+  .funnel-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 8px;
+    scrollbar-width: none;
+  }
+  .funnel-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .funnel-tab {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
+  /* Copy row: deny button always visible on touch */
+  .copy-row {
+    padding: 8px 16px;
+  }
+
+  .copy-row-deny {
+    opacity: 1;
+  }
+
+  .copy-row-meta {
+    gap: 4px;
+  }
+
+  /* Tab footer stacks */
+  .funnel-tab-footer {
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 16px;
+  }
+
+  .funnel-tab-footer > div {
+    width: 100%;
+    display: flex;
+    gap: 6px;
+  }
+
+  .funnel-tab-footer .btn {
+    flex: 1;
+  }
+
+  /* Bulk action bar wraps */
+  .bulk-action-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 16px;
+  }
+
+  /* Video generator: single column on mobile */
+  .video-generator {
     grid-template-columns: 1fr;
   }
 
+  .video-column {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .video-column:last-child {
+    border-bottom: none;
+  }
+
+  .video-controls {
+    flex-wrap: wrap;
+  }
+
+  /* Banner thumbs: 2 columns on tablet */
+  .banner-thumb-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .banner-expanded {
+    margin: 0 16px 16px;
+  }
+
+  .banner-expanded-body {
+    padding: 12px;
+  }
+
+  /* Funnel actions bar */
+  .funnel-actions-bar {
+    padding: 12px 16px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .funnel-actions-bar .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Prompter modal */
+  .prompter-modal {
+    width: 95vw;
+    max-width: 95vw;
+  }
+
+  /* Landing page pipeline: vertical */
+  .lp-pipeline {
+    flex-direction: column;
+  }
+  .lp-stage {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .lp-stage:last-child {
+    border-bottom: none;
+  }
+
+  /* Platform rules grid */
+  .platform-rules-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================================
+   RESPONSIVE — Phone (480px)
+   ============================================================================ */
+@media (max-width: 480px) {
   .content-area {
     padding: 12px;
   }
@@ -1100,6 +1296,14 @@ select.form-input {
   .header {
     padding: 0 12px 0 52px;
     height: 50px;
+  }
+
+  .page-title {
+    font-size: 18px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
   }
 
   .btn {
@@ -1121,15 +1325,92 @@ select.form-input {
     padding: 3px 8px;
   }
 
-  .funnel-selectors { flex-direction: column; }
-  .funnel-stats-bar { grid-template-columns: repeat(2, 1fr); }
-  .funnel-filter-bar { flex-wrap: wrap; }
-  .funnel-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .video-generator { grid-template-columns: 1fr; }
-  .banner-scroll { grid-template-columns: 1fr; }
-  .banner-mockups-grid { flex-direction: column; }
-  .browser-frame { margin: 0 -8px; }
-  .prompter-modal { width: 95vw; }
+  /* Funnel stats: 2 columns on small phone */
+  .funnel-stats-bar {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .funnel-stat {
+    padding: 10px 8px;
+  }
+
+  .funnel-stat-value {
+    font-size: 22px;
+  }
+
+  .funnel-stat-label {
+    font-size: 10px;
+  }
+
+  /* Tabs: smaller on phone */
+  .funnel-tab {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+
+  .funnel-tab-count {
+    font-size: 9px;
+    padding: 1px 4px;
+  }
+
+  /* Copy row: stack text and meta vertically on phone */
+  .copy-row {
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 12px;
+  }
+
+  .copy-row-meta {
+    justify-content: flex-start;
+  }
+
+  /* Angle badges smaller */
+  .angle-badge {
+    font-size: 9px;
+    padding: 1px 5px;
+  }
+
+  /* Banner thumbs: single column on small phone */
+  .banner-thumb-grid {
+    grid-template-columns: 1fr 1fr;
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .banner-expanded {
+    margin: 0 12px 12px;
+  }
+
+  /* Video column list shorter */
+  .video-column-list {
+    max-height: 250px;
+  }
+
+  /* Filter bar: stack on phone */
+  .funnel-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .form-input-sm {
+    width: 100%;
+  }
+
+  /* Bulk action bar: tighter */
+  .bulk-action-bar {
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+
+  .bulk-count {
+    font-size: 11px;
+  }
+
+  /* Browser frame (if any legacy remains) */
+  .browser-frame {
+    margin: 0 -8px;
+  }
 }
 
 /* ============================================================================
@@ -1138,17 +1419,32 @@ select.form-input {
 
 .funnel-page {
   max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Campaign selector card */
+.funnel-selector-card {
+  background: var(--bg-frost);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+
+.funnel-selector-heading {
+  margin-bottom: 16px;
 }
 
 /* Selectors row */
 .funnel-selectors {
   display: flex;
   gap: 16px;
-  margin-bottom: 16px;
 }
 
 .funnel-selectors .selector-group {
   flex: 1;
+  min-width: 0;
 }
 
 /* Stats bar */
@@ -1327,6 +1623,8 @@ select.form-input {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .copy-row-chars {
@@ -1940,15 +2238,4 @@ select.form-input {
   white-space: nowrap;
 }
 
-@media (max-width: 768px) {
-  .lp-pipeline {
-    flex-direction: column;
-  }
-  .lp-stage {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-  .lp-stage:last-child {
-    border-bottom: none;
-  }
-}
+
