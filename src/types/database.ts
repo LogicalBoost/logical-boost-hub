@@ -150,11 +150,12 @@ export type CopyComponentType =
   | 'value_point'
   | 'cta'
   | 'video_hook'
-  | 'short_script'
-  | 'long_script'
   | 'video_script'
   | 'objection_handler'
   | 'description'
+  // Legacy types kept for backward compat with existing data
+  | 'short_script'
+  | 'long_script'
   | 'hero_headline'
   | 'hero_subheadline'
   | 'hero_cta'
@@ -182,6 +183,8 @@ export interface FunnelInstance {
   client_id: string
   avatar_id: string
   offer_id: string
+  primary_angle: string | null
+  secondary_angles: string[] | null
   generated_at: string
   status: 'active' | 'archived'
 }
@@ -205,14 +208,32 @@ export interface Creative {
   updated_at: string
 }
 
-export type TemplateId = 'clean_authority' | 'bold_conversion' | 'gap_play' | 'aggressive_dr'
+// 8 wireframe templates for the Stitch-powered landing page builder
+export type TemplateId =
+  | 'template_1'  // Conditional Funnel / Quiz-Led
+  | 'template_2'  // Problem/Solution + Category Segmentation
+  | 'template_3'  // Feature-Dense Authority Page
+  | 'template_4'  // Possibility Showcase / Output Gallery
+  | 'template_5'  // Video + Social Proof Wall
+  | 'template_6'  // VSL / Long-Form Direct Response
+  | 'template_7'  // Comparison / Challenger
+  | 'template_8'  // Urgency / Event-Driven
 
-export interface PageSectionData {
-  id: string
-  type: string
-  order: number
-  content: Record<string, unknown>
-  style_overrides?: Record<string, string>
+export const TEMPLATE_INFO: Record<TemplateId, { name: string; bestFor: string }> = {
+  template_1: { name: 'Conditional Funnel / Quiz-Led', bestFor: 'Lead gen, high volume, financial/legal/home services' },
+  template_2: { name: 'Problem/Solution + Category Segmentation', bestFor: 'Multiple damage types, law, financial products' },
+  template_3: { name: 'Feature-Dense Authority Page', bestFor: 'SaaS, B2B platforms, complex products' },
+  template_4: { name: 'Possibility Showcase / Output Gallery', bestFor: 'Agencies, AI tools, creative services' },
+  template_5: { name: 'Video + Social Proof Wall', bestFor: 'Coaching, courses, personal brands' },
+  template_6: { name: 'VSL / Long-Form Direct Response', bestFor: 'High-ticket, cold traffic, skeptical audiences' },
+  template_7: { name: 'Comparison / Us vs. Them', bestFor: 'Challenger brands, switching markets' },
+  template_8: { name: 'Urgency / Event-Driven', bestFor: 'Storm damage, seasonal, deadline-sensitive offers' },
+}
+
+export interface StitchIterationEntry {
+  prompt: string
+  stitch_preview_url: string | null
+  timestamp: string
 }
 
 export interface LandingPage {
@@ -221,18 +242,27 @@ export interface LandingPage {
   funnel_instance_id: string | null
   avatar_id: string
   offer_id: string
+  template_id: TemplateId | null
   copy_component_ids: string[]
+  copy_slots: Record<string, string> | null
   headline: string
   subheadline: string
   cta: string
-  sections: LandingPageSection[]
-  template_id: TemplateId | null
+  // Stitch pipeline fields
+  stitch_job_id: string | null
+  stitch_preview_url: string | null
+  stitch_output_code: string | null
+  iteration_history: StitchIterationEntry[] | null
+  react_output: string | null
+  // Deploy fields
+  deploy_status: 'draft' | 'pending_approval' | 'approved' | 'converting' | 'deployed' | 'failed'
+  deploy_url: string | null
+  // Legacy fields (kept for backward compat)
   page_html: string | null
-  section_data: PageSectionData[] | null
+  section_data: Record<string, unknown>[] | null
   brand_kit_snapshot: Record<string, unknown> | null
   preview_image_url: string | null
   deployed_url: string | null
-  deploy_status: 'draft' | 'deployed' | 'stale'
   status: 'approved' | 'denied'
   created_at: string
   updated_at: string
@@ -285,13 +315,17 @@ export interface IntakeQuestion {
 export interface CompetitorIntel {
   id: string
   client_id: string
-  competitor_name: string
-  competitor_website: string
-  source: 'meta_ad_library' | 'manual' | 'google_ads' | 'ai_discovery'
-  ad_type: 'social' | 'search' | 'display' | 'landing_page' | 'overview'
+  intel_type: 'ad' | 'landing_page' | 'keyword' | 'industry_playbook' | 'competitive_analysis'
+  competitor_name: string | null
+  competitor_website: string | null
+  source: 'meta_ad_library' | 'manual' | 'google_ads' | 'ai_analysis' | 'industry_research' | 'ai_discovery'
+  ad_type: 'social' | 'search' | 'display' | 'landing_page' | 'overview' | null
   content: string | null
   screenshot_url: string | null
   keywords: string[] | null
+  angles_used: string[] | null
+  landing_page_structure: string | null
+  ai_analysis: string | null
   notes: string | null
   captured_at: string
   created_at: string

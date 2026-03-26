@@ -8,14 +8,12 @@ const COLLAPSED_KEY = 'lbh_sidebar_collapsed'
 
 const navItems = [
   { href: '/dashboard/', label: 'Dashboard', icon: '◫' },
-  { href: '/business-overview/', label: 'Business Overview', icon: '◨' },
-  { href: '/intake/', label: 'Intake', icon: '◧' },
+  { href: '/stats/', label: 'Stats', icon: '◩' },
+  { href: '/copy/', label: 'Copy', icon: '◬' },
+  { href: '/landing-pages/', label: 'Landing Pages', icon: '◰' },
   { href: '/avatars/', label: 'Avatars', icon: '◪' },
   { href: '/offers/', label: 'Offers', icon: '◭' },
-  { href: '/funnel/', label: 'Funnel', icon: '◬' },
-  { href: '/competitive-intel/', label: 'Competitive Intel', icon: '◮' },
-  { href: '/landing-pages/', label: 'Landing Pages', icon: '◰' },
-  { href: '/stats/', label: 'Stats', icon: '◩' },
+  { href: '/competitor-intel/', label: 'Competitor Intel', icon: '◮' },
   { href: '/settings/', label: 'Settings', icon: '◷' },
 ]
 

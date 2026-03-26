@@ -52,7 +52,7 @@ export default function CompetitorAdsPage() {
     )
   }
 
-  const competitorNames = [...new Set(competitors.map((a) => a.competitor_name))]
+  const competitorNames = [...new Set(competitors.map((a) => a.competitor_name).filter((n): n is string => !!n))]
   const filtered = competitors.filter((ad) => {
     if (filterCompetitor !== 'all' && ad.competitor_name !== filterCompetitor) return false
     if (filterSource !== 'all' && ad.source !== filterSource) return false
