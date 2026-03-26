@@ -69,14 +69,24 @@ async function copyToClipboard(text: string): Promise<boolean> {
 }
 
 // ── Angle badge component ───────────────────────────────────────────────
-function AngleBadge({ slug }: { slug: string }) {
+function AngleBadge({ slug, compact }: { slug: string; compact?: boolean }) {
   const color = ANGLE_COLORS[slug] || '#6b7280'
+  const label = getAngleLabel(slug)
+  if (compact) {
+    return (
+      <span
+        className="angle-dot"
+        style={{ backgroundColor: color }}
+        title={label}
+      />
+    )
+  }
   return (
     <span
       className="angle-badge"
       style={{ backgroundColor: `${color}22`, color, borderColor: `${color}44` }}
     >
-      {getAngleLabel(slug)}
+      {label}
     </span>
   )
 }
@@ -120,9 +130,16 @@ function CopyRow({
       )}
       <div className="copy-row-text">{item.text}</div>
       <div className="copy-row-meta">
-        {(item.angle_ids || []).map((slug) => (
-          <AngleBadge key={slug} slug={slug} />
-        ))}
+        <span className="copy-row-angles-full">
+          {(item.angle_ids || []).map((slug) => (
+            <AngleBadge key={slug} slug={slug} />
+          ))}
+        </span>
+        <span className="copy-row-angles-compact">
+          {(item.angle_ids || []).map((slug) => (
+            <AngleBadge key={slug} slug={slug} compact />
+          ))}
+        </span>
         <span className="copy-row-chars">({item.character_count || item.text.length})</span>
         <button
           className="copy-row-deny"
@@ -460,31 +477,31 @@ function VideoAdGenerator({
       </div>
       <div className="video-controls">
         <button className="btn btn-secondary btn-sm" onClick={shuffle}>
-          &#8635; Shuffle Variations
+          &#8635; Shuffle
         </button>
-        <span className="combinations-counter">{combos.toLocaleString()} Combinations Ready</span>
+        <span className="combinations-counter">{combos.toLocaleString()} Combos</span>
         {canEdit && (
-          <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+          <div className="video-generate-btns">
             <button
               className="btn btn-secondary btn-sm"
               onClick={() => onGenerateMore('video_hook')}
               disabled={!!generatingSection}
             >
-              {generatingSection === 'video_hook' ? 'Generating...' : '+ Hooks'}
+              {generatingSection === 'video_hook' ? '...' : '+ Hooks'}
             </button>
             <button
               className="btn btn-secondary btn-sm"
               onClick={() => onGenerateMore('short_script')}
               disabled={!!generatingSection}
             >
-              {generatingSection === 'short_script' ? 'Generating...' : '+ Short Scripts'}
+              {generatingSection === 'short_script' ? '...' : '+ Short'}
             </button>
             <button
               className="btn btn-secondary btn-sm"
               onClick={() => onGenerateMore('long_script')}
               disabled={!!generatingSection}
             >
-              {generatingSection === 'long_script' ? 'Generating...' : '+ Long Scripts'}
+              {generatingSection === 'long_script' ? '...' : '+ Long'}
             </button>
           </div>
         )}
