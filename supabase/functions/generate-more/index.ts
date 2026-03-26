@@ -4,14 +4,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { callClaude, parseJsonResponse, corsHeaders, jsonResponse, errorResponse } from '../_shared/ai-client.ts'
-
-const FTC_COMPLIANCE = `
-FTC & PLATFORM COMPLIANCE (MANDATORY):
-- NEVER fabricate testimonials, reviews, or case studies.
-- NEVER invent statistics or numerical claims unless from real business data.
-- NEVER make income guarantees or unrealistic promises.
-- All claims must be truthful and substantiatable.
-- Be aggressive and compelling, but NEVER illegal, untrue, or fake.`
+import { buildGenerateMoreSystemPrompt } from '../_shared/copywriter-prompts.ts'
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -59,9 +52,6 @@ Deno.serve(async (req: Request) => {
     })
     const angles = avatar.recommended_angles as string[] || Array.from(existingAngles) || ['problem', 'outcome']
 
-    const rules = (client.ad_copy_rules || {}) as Record<string, unknown>
-    const platformRules = (rules.platform_rules || {}) as Record<string, Record<string, number>>
-
     const angleContext = angle_filter
       ? `Focus specifically on the "${angle_filter}" angle. All generated items should use this angle.`
       : `Distribute across these angles: ${angles.join(', ')}`
@@ -70,56 +60,42 @@ Deno.serve(async (req: Request) => {
       ? `\n\nUSER DIRECTION (follow this guidance closely):\n${user_prompt}`
       : ''
 
-    const systemPrompt = `You are an elite direct-response copywriter. You are adding ${generateCount} new items to an existing campaign section. You must generate fresh, complementary copy that does NOT duplicate what already exists.
-
-SECTION TYPE: ${section_type}
-QUANTITY: Generate exactly ${generateCount} new items.
-ANGLE INSTRUCTIONS: ${angleContext}
-
-AD COPY RULES (MANDATORY):
-Tone: ${JSON.stringify(rules.tone_descriptors || [])}
-Banned Words (NEVER USE): ${JSON.stringify(rules.banned_words || [])}
-Required Disclaimers: ${JSON.stringify(rules.required_disclaimers || [])}
-Platform Rules:
-  - Google Ads: Headlines max ${platformRules.google?.headline_max_chars || 30} chars, Descriptions max ${platformRules.google?.description_max_chars || 90} chars
-  - Meta Ads: Primary text max ${platformRules.meta?.primary_text_max_chars || 125} chars, Headlines max ${platformRules.meta?.headline_max_chars || 40} chars
-Brand Constraints: ${String(rules.brand_constraints || 'None')}
-Compliance Notes: ${String(rules.compliance_notes || 'None')}
-${FTC_COMPLIANCE}
-
-FORMATTING RULES (HARD CONSTRAINTS):
-- NEVER use em dashes (—) in any copy. Use commas, periods, colons, or separate sentences instead.
-
-SECTION-SPECIFIC RULES:
-- If section_type is "benefit" or "value_point": Write SHORT, punchy bullet points (5-10 words max). Think banner copy and landing page bullet lists. No full sentences. Examples: "24/7 Emergency Response", "Licensed & Insured Technicians", "Same-Day Service Available".
-
-RULES:
-- Read every existing item below. Your new items must be DIFFERENT: different angles, different phrasing, different emotional triggers.
-- Stay aligned with the Avatar + Offer combination.
-- Maintain the same quality bar as existing items. No filler.
-- Respect all character limits for the target platform.
-- Each item must include angle_ids array.
-
-Respond ONLY with valid JSON: { "new_components": [{ "type": "...", "text": "...", "platform": "...", "angle_ids": ["..."] }] }`
+    const systemPrompt = buildGenerateMoreSystemPrompt(
+      section_type,
+      generateCount,
+      angleContext,
+      (client.ad_copy_rules || {}) as Record<string, unknown>,
+      client.ad_copy_notes,
+      existingText,
+    )
 
     const userMessage = `AVATAR:
 Name: ${avatar.name}
+Type: ${avatar.avatar_type}
+Description: ${avatar.description}
 Pain Points: ${avatar.pain_points}
 Motivations: ${avatar.motivations}
+Objections: ${avatar.objections}
+Desired Outcome: ${avatar.desired_outcome}
 Messaging Style: ${avatar.messaging_style}
 
 OFFER:
 Name: ${offer.name}
+Type: ${offer.offer_type}
+Headline: ${offer.headline}
+Description: ${offer.description}
 Primary CTA: ${offer.primary_cta}
+Conversion Type: ${offer.conversion_type}
 Benefits: ${JSON.stringify(offer.benefits)}
+Proof Elements: ${JSON.stringify(offer.proof_elements)}
 
 BUSINESS:
 Company: ${client.name}
+Website: ${client.website}
+Summary: ${client.business_summary}
+Services: ${client.services}
 Trust Signals: ${client.trust_signals}
-Differentiators: ${client.differentiators}
-
-EXISTING ITEMS IN THIS SECTION (DO NOT DUPLICATE):
-${existingText || 'None yet'}${userDirection}`
+Differentiators: ${client.differentiators}${userDirection}`
 
     const response = await callClaude(systemPrompt, userMessage)
     const parsed = parseJsonResponse<{
