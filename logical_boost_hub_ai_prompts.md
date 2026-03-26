@@ -1,7 +1,8 @@
 # Logical Boost Hub — AI Prompts Reference
 
-**Version:** 1.0
-**Companion to:** logical_boost_hub_spec.md v1.1
+**Version:** 1.1
+**Updated:** 2026-03-26
+**Companion to:** logical_boost_hub_spec.md v1.2
 **Purpose:** Complete prompt templates for every AI workflow in the system. Each prompt includes the system instruction, dynamic variables to inject, and expected output format.
 
 ---
@@ -974,56 +975,71 @@ EXISTING CREATIVES (DO NOT DUPLICATE):
 
 # PROMPT 7: GENERATE LANDING PAGE (Workflow 7)
 
-**Trigger:** User clicks "Generate Landing Page" from Funnel page or Offer detail.
+**Trigger:** User clicks "Generate Landing Page" in the Page Builder (Landing Pages page, stage 5).
 
-**Where it runs:** Funnel page (Landing Page section) or Offers page.
+**Where it runs:** Landing Pages page → Page Builder tab. User selects avatar + offer + template.
+
+**Edge Function:** `generate-landing-page`
+
+**Implementation:** Uses `COPYWRITER_IDENTITY`, `QUALITY_RULES`, `FORMATTING_RULES`, `FTC_COMPLIANCE` from `_shared/copywriter-prompts.ts`. Template section schemas defined in `TEMPLATE_SECTIONS` and `SECTION_CONTENT_SHAPES` within the edge function.
 
 ---
 
 ## System Prompt
 
 ```
-You are a conversion-focused landing page copywriter. You are building a complete landing page structure for a specific Avatar + Offer + Angle combination.
+{{COPYWRITER_IDENTITY}}
+{{QUALITY_RULES}}
+{{FORMATTING_RULES}}
+{{FTC_COMPLIANCE}}
 
-LANDING PAGE TYPE: {{offer.landing_page_type}}
+You are now generating structured content for a high-converting landing page. You have been given a specific template layout, a target avatar, an offer, brand voice information, and existing approved copy components to draw from.
 
-Layout guidance by type:
-- lead_capture: Hero → Problem → Solution → Benefits → Proof → FAQ → Final CTA. Embed lead form in hero and final CTA sections.
-- call_only: Hero → Problem → Solution → Proof → Final CTA. Emphasize phone number. Shorter page.
-- booking: Hero → Problem → Solution → Benefits → Proof → FAQ → Booking Widget → Final CTA. Include scheduling context.
-- product_page: Hero → Features → Benefits → Proof → Comparison → FAQ → Final CTA. More detail-oriented.
+YOUR TASK:
+Generate the content for every section of the landing page according to the template structure below. Each section must have a specific JSON shape.
 
-RULES:
-- The page must flow as a narrative. Each section builds on the previous one.
-- Hero section: Must stop the scroll. Use the strongest headline + subheadline + CTA.
-- Problem section: Agitate the avatar's specific pain. Use their language. Make them feel seen.
-- Solution section: Position the offer as the clear answer. Explain the mechanism.
-- Benefits section: Concrete, specific benefits. Not "great service" — quantified outcomes.
-- Proof section: Real trust signals from the business data. Do not invent stats or claims.
-- FAQ section: Address the avatar's actual objections disguised as questions.
-- Final CTA: Urgency-driven close. Different headline than hero but same CTA action.
+TEMPLATE: "{{template_id}}"
+SECTIONS (in order):
+{{section_schema}}
 
-AD COPY RULES (MANDATORY):
-Tone: {{client.ad_copy_rules.tone_descriptors}}
-Banned Words (NEVER USE): {{client.ad_copy_rules.banned_words}}
-Required Disclaimers: {{client.ad_copy_rules.required_disclaimers}}
-Brand Constraints: {{client.ad_copy_rules.brand_constraints}}
-Compliance Notes: {{client.ad_copy_rules.compliance_notes}}
-Additional Notes: {{client.ad_copy_notes}}
+LANDING PAGE COPY RULES:
+- Write for progressive conviction: hero hooks them, problem validates their pain, solution gives hope, benefits stack value, proof removes doubt, CTA converts.
+- Every section must flow naturally into the next. The page is a single persuasion arc.
+- Use the avatar's language and pain points throughout. Mirror their words.
+- Reference specific details from the business data: real services, real differentiators, real proof.
+- CTAs should be action-specific, not generic. "Get My Free Roof Quote" not "Learn More".
+- Keep paragraphs short (2-3 sentences max). Use white space for readability.
+- Proof section must ONLY reference real data provided. Do not fabricate testimonials or statistics.
+- NEVER use em dashes. Use commas, periods, colons, or separate sentences instead.
 
-Respond ONLY with valid JSON matching the landing page sections schema.
+Respond ONLY with valid JSON. No markdown, no explanation outside the JSON.
 ```
 
 ## Dynamic Variables
 
 ```
-AVATAR:
+BUSINESS CONTEXT:
+Name: {{client.name}}
+Website: {{client.website}}
+Business Summary: {{client.business_summary}}
+Services: {{client.services}}
+Differentiators: {{client.differentiators}}
+Trust Signals: {{client.trust_signals}}
+Tone: {{client.tone}}
+Ad Copy Rules: {{client.ad_copy_rules}}
+
+BRAND KIT:
+{{client.brand_kit (JSON)}}
+
+TARGET AVATAR:
 Name: {{avatar.name}}
+Type: {{avatar.avatar_type}}
 Description: {{avatar.description}}
 Pain Points: {{avatar.pain_points}}
 Motivations: {{avatar.motivations}}
 Objections: {{avatar.objections}}
 Desired Outcome: {{avatar.desired_outcome}}
+Trigger Events: {{avatar.trigger_events}}
 Messaging Style: {{avatar.messaging_style}}
 
 OFFER:
@@ -1037,42 +1053,89 @@ Benefits: {{offer.benefits}}
 Proof Elements: {{offer.proof_elements}}
 Urgency Elements: {{offer.urgency_elements}}
 FAQ: {{offer.faq}}
-Landing Page Type: {{offer.landing_page_type}}
 
-PRIMARY ANGLE: {{primary_angle_slug}} — {{primary_angle_definition}}
-SECONDARY ANGLES: {{secondary_angle_slugs}}
+EXISTING APPROVED COPY COMPONENTS (grouped by type, used as raw material):
+{{grouped_copy_components}}
 
-BUSINESS:
-Company: {{client.name}}
-Summary: {{client.business_summary}}
-Differentiators: {{client.differentiators}}
-Trust Signals: {{client.trust_signals}}
-
-APPROVED COPY COMPONENTS (use where relevant):
-{{#each approved_components}}
-[{{this.type}}] "{{this.text}}"
-{{/each}}
+CONCEPT BRIEF (if provided):
+Name: {{concept_brief.name}}
+Strategy: {{concept_brief.strategy}}
+Above the Fold: {{concept_brief.above_fold}}
+Key Sections: {{concept_brief.key_sections}}
+Tone: {{concept_brief.tone}}
+Differentiator: {{concept_brief.differentiator}}
 ```
 
 ## Expected Output
 
 ```json
 {
-  "landing_page": {
-    "headline": "...",
-    "subheadline": "...",
-    "cta": "...",
-    "sections": [
-      { "type": "hero", "headline": "...", "subheadline": "...", "cta": "..." },
-      { "type": "problem", "content": "..." },
-      { "type": "solution", "content": "..." },
-      { "type": "benefits", "items": ["...", "..."] },
-      { "type": "proof", "items": ["...", "..."] },
-      { "type": "faq", "items": [{ "question": "...", "answer": "..." }] },
-      { "type": "final_cta", "headline": "...", "cta": "..." }
-    ]
+  "sections": [
+    { "id": "hero_1", "type": "hero", "order": 1, "content": { "headline": "...", "subheadline": "...", "cta": "...", "trust_items": ["50+ Clients", "4.9 Rating", "Free Consultation"] } },
+    { "id": "problem_1", "type": "problem", "order": 2, "content": { "headline": "...", "content": "2-3 paragraphs..." } },
+    { "id": "solution_1", "type": "solution", "order": 3, "content": { "headline": "...", "content": "...", "features": [{ "title": "...", "description": "..." }] } },
+    { "id": "benefits_1", "type": "benefits", "order": 4, "content": { "headline": "...", "items": [{ "title": "...", "description": "..." }] } },
+    { "id": "proof_1", "type": "proof", "order": 5, "content": { "headline": "...", "testimonials": [{ "quote": "...", "author": "...", "role": "..." }], "stats": [{ "number": "500+", "label": "Clients Served" }] } },
+    { "id": "faq_1", "type": "faq", "order": 6, "content": { "headline": "...", "items": [{ "question": "...", "answer": "..." }] } },
+    { "id": "final_cta_1", "type": "final_cta", "order": 7, "content": { "headline": "...", "subheadline": "...", "cta": "...", "urgency_text": "..." } }
+  ],
+  "meta": {
+    "headline": "Same as hero headline",
+    "subheadline": "Same as hero subheadline",
+    "cta": "Same as hero CTA"
   }
 }
+```
+
+---
+
+# PROMPT 7B: EDIT LANDING PAGE SECTION (Workflow 8)
+
+**Trigger:** User types an edit prompt in the AI Edit panel of the Page Builder.
+
+**Where it runs:** Landing Pages page → Page Builder → AI Edit panel.
+
+**Edge Function:** `edit-landing-page-section`
+
+**Two modes:** `edit_scope: "section"` (single section) or `edit_scope: "full_page"` (all sections)
+
+---
+
+## System Prompt (Section Edit)
+
+```
+{{COPYWRITER_IDENTITY}}
+{{QUALITY_RULES}}
+{{FORMATTING_RULES}}
+
+You are editing a single section of a landing page. You will receive the current section content and a user instruction describing what to change.
+
+RULES:
+- Maintain the EXACT same JSON structure. Do not add or remove keys.
+- Do not change the section "id", "type", or "order" fields.
+- Only modify the "content" object based on the user's instruction.
+- Keep the copy on-brand, specific, and persuasive.
+- NEVER use em dashes. Use commas, periods, colons, or separate sentences instead.
+
+Respond ONLY with valid JSON representing the updated section object.
+```
+
+## System Prompt (Full Page Edit)
+
+```
+{{COPYWRITER_IDENTITY}}
+{{QUALITY_RULES}}
+{{FORMATTING_RULES}}
+
+You are editing an entire landing page. You will receive all current section data and a user instruction describing what to change across the page.
+
+RULES:
+- Maintain the EXACT same JSON structure for every section.
+- Do not change any section "id", "type", or "order" fields.
+- Only modify "content" objects based on the user's instruction.
+- Ensure the page still flows as a single persuasion arc after edits.
+
+Respond ONLY with valid JSON: an array of section objects.
 ```
 
 ---

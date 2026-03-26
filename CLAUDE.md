@@ -20,7 +20,7 @@ src/
     dashboard/page.tsx     — Main dashboard with getting started checklist
     funnel/page.tsx        — Campaign funnel builder (avatar + offer + copy generator + video ads)
     intake/page.tsx        — AI-generated intake questionnaire
-    landing-pages/page.tsx — Landing page pipeline (brand kit → competitive → playbook → concepts → builder)
+    landing-pages/page.tsx — Landing page pipeline (brand kit → competitive → playbook → concepts → builder + deploy)
     login/page.tsx         — Login page
     offers/page.tsx        — Offer management (approve/deny)
     settings/page.tsx      — Settings and user management
@@ -47,10 +47,13 @@ supabase/
     002_rls_policies.sql   — Row Level Security policies per role
     003-009                — Phase 1 schema extensions, brand kit, storage, RLS fixes
     010_landing_page_playbook.sql — landing_page_playbook + landing_page_concepts on clients
+    011_landing_page_builder.sql — template_id, page_html, section_data, brand_kit_snapshot, deploy_status columns
+    012_storage_html_support.sql — Add text/html MIME type to client-assets bucket for LP deployment
   functions/
     _shared/
       ai-client.ts         — Shared Claude API wrapper (callClaude, parseJsonResponse, CORS helpers)
       copywriter-prompts.ts — Comprehensive copywriting agent prompts (quality rules, batch configs, section guidance)
+      template-renderer.ts — Landing page HTML renderer (3,300+ lines, 4 premium templates with glassmorphism/gradients)
     analyze-business/      — Workflow 1: Analyze business → generate avatars/offers
     analyze-brand-kit/     — Workflow 9: Extract brand colors, fonts, visual identity from website
     analyze-competitor-pages/ — Workflow 11: Analyze competitor landing pages
@@ -59,7 +62,9 @@ supabase/
     generate-funnel/       — Workflow 4: Generate full campaign (3 parallel batches: ads, persuasion, video)
     generate-intake/       — Workflow 2: Generate intake questions
     generate-more/         — Workflow 5: Generate more items per section with AI prompter
+    generate-landing-page/ — Workflow 13: Generate full landing page (AI content + HTML render) per avatar/offer/template
     generate-playbook/     — Workflow 12: Generate landing page industry playbook
+    edit-landing-page-section/ — Workflow 14: AI-powered section or full-page editing with user prompts
     recommend-angles/      — Recommend marketing angles for avatar+offer combo
     refine-system/         — Workflow 3: Refine avatars/offers after intake answers
     suggest-offers/        — Suggest new offers for a client
@@ -116,7 +121,51 @@ The user flow for onboarding a new client:
    - Competitive Analysis → `analyze-competitor-pages` analyzes competitor landing pages
    - Industry Playbook → `generate-playbook` synthesizes patterns, gaps, concept briefs
    - Concept Pages → Shows 4 strategic landing page concepts from playbook
-   - Page Builder → (coming soon) Build pages per Avatar+Offer
+   - Page Builder → Select avatar + offer + template → `generate-landing-page` → AI edit → deploy to live URL
+
+## Landing Page Builder
+
+The Page Builder (stage 5 of the Landing Pages pipeline) generates, edits, and deploys full landing pages.
+
+### Architecture
+- **AI generates structured JSON** (section_data) → **deterministic renderer produces self-contained HTML** (page_html)
+- This separation ensures consistent, well-formed HTML while AI controls content and renderer controls design
+- HTML is fully self-contained: inline CSS, Google Fonts, minimal JS (scroll animations, mobile nav)
+
+### 4 Premium Templates
+| Template | ID | Sections | Style |
+|----------|---|----------|-------|
+| Clean Authority | `clean_authority` | hero, problem, solution, benefits, proof, faq, final_cta | Professional, trust-focused |
+| Bold Conversion | `bold_conversion` | hero, urgency_bar, trust_strip, problem, solution, benefits, proof, faq, final_cta | Urgency-driven, high-conversion |
+| Gap Play | `gap_play` | hero, problem, process_steps, benefits, proof, faq, final_cta | Before/after gap positioning |
+| Aggressive DR | `aggressive_dr` | hero, urgency_bar, trust_strip, benefits, proof, problem, process_steps, proof, faq, final_cta | Direct response, proof-heavy |
+
+### Template Design (template-renderer.ts)
+- Dark-mode-first with gradient mesh backgrounds and animated floating orbs
+- Glassmorphism: frosted glass nav, cards with `backdrop-filter: blur`
+- Gradient text headlines (`-webkit-background-clip: text`)
+- Scroll-triggered animations via IntersectionObserver
+- Noise texture overlays, custom scrollbars, pill-shaped buttons with glow
+- Fully responsive with mobile hamburger nav
+
+### Builder UI (landing-pages/page.tsx)
+- Split-pane layout: section list (left) + iframe preview (right) using `srcDoc`
+- Desktop/Tablet/Mobile preview toggles
+- AI Edit panel: edit individual sections or full page with natural language prompts
+- Deploy bar: custom slug input → uploads HTML to Supabase Storage → shows LIVE badge with public URL
+- Avatar dropdown sorted by priority ranking
+
+### Deployment
+- HTML uploaded to Supabase Storage bucket `client-assets` at path `{client_id}/pages/{slug}.html`
+- Public URL format: `https://{project}.supabase.co/storage/v1/object/public/client-assets/{client_id}/pages/{slug}.html`
+- Deploy status tracked: `draft` → `deployed` (with `deployed_url` saved to DB)
+- Re-deploy overwrites existing file (upsert)
+- Future: subdomain support (e.g., start.clientname.com) via reverse proxy
+
+### Edge Functions
+- `generate-landing-page` — Fetches client/avatar/offer/copy_components, builds prompts, calls Claude (sonnet, 8192 tokens), renders HTML, inserts landing_pages record
+- `edit-landing-page-section` — Section-level or full-page AI editing, re-renders HTML after edit, updates DB
+- Both use `renderLandingPage(templateId, sections, brandKit, offer, clientName, logoUrl?)` from `template-renderer.ts`
 
 ## Copywriting Agent
 
