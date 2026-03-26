@@ -733,7 +733,7 @@ Deno.serve(async (req: Request) => {
       offerPrimaryCta: offer.primary_cta || offer.name,
       offerConversionType: offer.conversion_type || 'lead',
       templateSpec,
-      copySlots,
+      copySlots: copy_slots,
     })
 
     // Send to Stitch API

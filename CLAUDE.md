@@ -6,7 +6,7 @@ Multi-tenant marketing platform where an agency team builds and manages AI-power
 - **Frontend**: Next.js 16 (App Router), React 19, TypeScript
 - **Backend**: Supabase (Auth, PostgreSQL, Edge Functions)
 - **AI**: Anthropic Claude API (called from Supabase Edge Functions)
-- **Landing Pages**: Google Stitch API (`@google/stitch-sdk`) for design generation
+- **Landing Pages**: Google Stitch API (`@google/stitch-sdk`) for design generation. STITCH_API_KEY set as Supabase secret.
 - **Hosting**: GitHub Pages (static export) + Supabase cloud
 - **Deployment**: GitHub Actions auto-deploys to GitHub Pages on push to `master`
 
@@ -28,7 +28,7 @@ src/
     dashboard/page.tsx     — Main dashboard with getting started checklist
     funnel/page.tsx        — Legacy route (renamed to /copy/)
     intake/page.tsx        — AI-generated intake questionnaire
-    landing-pages/page.tsx — Stitch-powered landing page builder (7-step pipeline)
+    landing-pages/page.tsx — Landing page builder (7-step pipeline, design engine powered)
     login/page.tsx         — Login page
     offers/page.tsx        — Offer management (approve/deny)
     settings/page.tsx      — Settings and user management
@@ -41,8 +41,8 @@ src/
     Sidebar.tsx            — Navigation sidebar (9 nav items)
     LogoUpload.tsx         — Logo upload component
   lib/
-    api.ts                 — Edge function caller (all AI workflow API calls + Stitch pipeline)
-    stitch.ts              — Stitch integration: template slot definitions, serialization, copy mapping
+    api.ts                 — Edge function caller (all AI workflow API calls + landing page pipeline)
+    stitch.ts              — Landing page integration: template slot definitions, serialization, copy mapping
     store.tsx              — React Context state management (AppProvider/useAppStore)
     supabase.ts            — Supabase client + auth helpers + role-based client access
     demo-toast.ts          — Toast notification utility
@@ -62,11 +62,14 @@ supabase/
   functions/
     _shared/
       ai-client.ts         — Shared Claude API wrapper (callClaude, parseJsonResponse, CORS helpers)
+      stitch-client.ts     — Google Stitch SDK wrapper (generateWithStitch, editWithStitch)
       copywriter-prompts.ts — Comprehensive copywriting agent prompts (quality rules, batch configs, section guidance)
-      template-renderer.ts — Legacy HTML renderer (being replaced by Stitch pipeline)
+      template-renderer.ts — Legacy HTML renderer (replaced by Stitch pipeline)
     analyze-business/      — Workflow 1: Analyze business → generate avatars/offers
-    analyze-brand-kit/     — Workflow 9: Extract brand colors, fonts, visual identity (legacy — Stitch now extracts from URL)
+    analyze-brand-kit/     — Workflow 9: Extract brand colors, fonts, visual identity (legacy)
     analyze-competitor-pages/ — Workflow 11: Analyze competitor landing pages
+    build-landing-page/    — Workflow 7: Assemble master prompt + call Stitch API → get designed HTML
+    iterate-landing-page/  — Workflow 7b: Append change request to original prompt → Stitch redesign
     discover-competitors/  — Workflow 10: AI-powered competitor discovery
     generate-avatars/      — Generate additional avatars via AI prompter
     generate-funnel/       — Workflow 4: Generate full campaign (3 parallel batches: ads, persuasion, video)
@@ -84,7 +87,7 @@ supabase/
 1. Dashboard
 2. Stats (placeholder)
 3. Copy (centerpiece — formerly "Funnel")
-4. Landing Pages (Stitch builder)
+4. Landing Pages
 5. Business Overview
 6. Intake
 7. Avatars
@@ -125,7 +128,7 @@ Defined in `src/types/database.ts` with `ANGLES` constant, `ANGLE_COLORS` map, a
 - **Dashboard** → Shows "Add Your First Client" when none selected
 - Clients stored in `clients` table, loaded via `loadAllClients()`
 - Switching clients loads all related data (avatars, offers, copy, intake, competitors, landing pages)
-- `brand_reference_url` field on clients — alternative URL for Stitch brand extraction if website doesn't reflect brand
+- `brand_reference_url` field on clients — alternative URL for brand extraction if website doesn't reflect brand
 
 ## AI Workflow Pipeline
 
@@ -139,26 +142,47 @@ Defined in `src/types/database.ts` with `ANGLES` constant, `ANGLE_COLORS` map, a
    - Generates ~130-180 copy components across 15 canonical types
    - Per-section "Generate More" with AI prompter
    - Video Ad Generator with hooks, scripts, CTAs
-5. **Landing Pages** → Stitch-powered 7-step pipeline (see below)
+5. **Landing Pages** → Design engine pipeline (see below)
 
-## Landing Page Builder (Stitch Pipeline)
+## Landing Page Builder
 
-The Landing Pages page implements a 7-step pipeline powered by Google Stitch API.
+The Landing Pages page implements a 7-step pipeline. The design engine is Google Stitch API (`@google/stitch-sdk`). **Never mention "Stitch" in user-facing UI.**
 
-### Architecture
-- User selects Avatar + Offer → Platform packages copy payload → Sends to Stitch API with template prompt → Stitch returns visual preview → User approves → Platform converts to React → Deploys
-- **No brand kit extraction needed** — Stitch extracts design system directly from client's website URL at render time
-- Copy slots are always serialized to plain strings before assembly (never raw objects)
-- All iterations stored in `iteration_history` for version control
+### The 3-Step Process (How It Actually Works)
+1. **Gather copy + business info** — Frontend collects avatar, offer, template, copy slots, business assets
+2. **Send to Stitch API** — Edge function assembles the master prompt (6 parts) and sends it to Stitch with the client's website URL. Stitch visits the URL, extracts the brand, and returns designed HTML.
+3. **Convert to React** — Take the Stitch HTML output, convert it to a React site, save it in a client directory, provide a preview link. User can then edit locally with Claude Code.
 
-### The 7 Steps
+### Master Prompt Assembly (build-landing-page edge function)
+The edge function assembles a 6-part prompt before sending to Stitch:
+1. **Part 1: Brand Extraction** — Tells Stitch to visit `clients.website` and extract colors, fonts, spacing, button styles. The client's website IS the brand kit.
+2. **Part 2: Global Design Rules** — Static rules: soft gradients, design accents, mobile-first responsive (320/768/1024), image/video placeholders, hard rules (no nav links, no generic fonts, etc.)
+3. **Part 3: Page Purpose** — Client name, avatar name+description, offer name+description, primary CTA, conversion type
+4. **Part 4: Template Layout Spec** — One of 8 template-specific section-by-section specs with `{{slot_id}}` placeholders
+5. **Part 5: Copy** — All copy slots serialized as `slot_id: value` lines using `serializeCopySlots()`
+6. **Part 6: Final Instructions** — "Build this page now" with output format rules
+
+### Iteration Prompt Pattern
+Change requests append to the ORIGINAL full prompt (not just the HTML):
+```
+[original 6-part prompt] + "---" + [iteration instruction with change request]
+```
+This preserves brand context, copy, and template spec for every iteration.
+
+### Copy Slot Sources
+Each slot has a `source` field:
+- `'copy'` — AI-generatable. Auto-filled from `copy_components` via `mapComponentsToSlots()`.
+- `'business'` — Business assets (testimonials, ratings, badges, disclaimers). Manual entry only. AI cannot generate these.
+- `'media'` — Video URLs, images. User provides manually.
+
+### Frontend Pipeline (7 UI Steps)
 1. **Select Avatar + Offer** — Two dropdowns, approved only, avatars sorted by priority
 2. **Select Template** — 8 template cards with name and "Best for" description
-3. **Review Copy Slots** — Auto-fills from approved copy_components, inline editing, "Generate Missing Copy" for gaps
-4. **Build with Stitch** — Assembles prompt (template spec + copy payload + client website URL + global design rules), sends to Stitch API
+3. **Review Copy Slots** — Auto-fills copy slots from approved components; business/media slots shown separately for manual entry; optional slots (quiz questions) don't block build
+4. **Build Page** — Assembles master prompt, sends to Stitch API, receives designed HTML
 5. **Preview + Iterate** — Interactive preview in iframe, change request panel, version history
-6. **Approve + Convert** — Converts Stitch output to React component
-7. **Deploy** — One-click deploy, live URL displayed
+6. **Approve** — Approve the design for React conversion
+7. **Deploy** — Convert to React, save to client directory, provide preview link
 
 ### 8 Wireframe Templates
 | ID | Name | Best For |
@@ -172,24 +196,28 @@ The Landing Pages page implements a 7-step pipeline powered by Google Stitch API
 | `template_7` | Comparison / Us vs. Them | Challenger brands, switching markets |
 | `template_8` | Urgency / Event-Driven | Storm damage, seasonal, deadline-sensitive offers |
 
-### Stitch Integration (src/lib/stitch.ts)
-- `TEMPLATE_SLOTS` — Copy slot definitions for all 8 templates (slot ID, label, content type, notes)
-- `mapComponentsToSlots()` — Maps copy_components to template slots by type, returns filled + missing
-- `serializeCopySlots()` — Serializes all slot values to plain strings (prevents [object Object])
-- `serializeSlotValue()` — Handles strings, arrays, objects → plain string
+### Key Files
+- **`supabase/functions/build-landing-page/index.ts`** — Master prompt assembly + Stitch API call. Contains all 6 global rules, all 8 template specs with `{{slot_id}}` placeholders, `serializeCopySlots()`, `assembleStitchPrompt()`.
+- **`supabase/functions/iterate-landing-page/index.ts`** — Appends change request to original prompt, calls Stitch for redesign.
+- **`supabase/functions/_shared/stitch-client.ts`** — Stitch SDK wrapper (`generateWithStitch()`).
+- **`src/lib/stitch.ts`** — Frontend: `TEMPLATE_SLOTS` (slot definitions per template with `source` field), `mapComponentsToSlots()`, `serializeCopySlots()`.
+- **`src/lib/api.ts`** — `buildLandingPage()`, `iterateLandingPage()`, `approveLandingPage()`, `deployLandingPage()`, `generateMissingCopySlots()`.
 
-### API Functions (src/lib/api.ts)
-- `buildLandingPage()` — Sends copy payload + template to Stitch via edge function
-- `iterateLandingPage()` — Sends change prompt to iterate on preview
-- `approveLandingPage()` — Triggers React conversion
-- `deployLandingPage()` — Deploys to live URL
-- `generateMissingCopySlots()` — AI fills gaps in template slots
+### Variable Names: Edge Function vs Database
+The edge function receives `copy_slots` from the request body (snake_case) but the `assembleStitchPrompt()` function parameter is `copySlots` (camelCase). Always pass as `copySlots: copy_slots`.
 
 ### Deploy Status Flow
 `draft` → `pending_approval` → `approved` → `converting` → `deployed` (or `failed`)
 
 ### A/B Testing
 Create two `landing_page` records with same `funnel_instance_id` but different `template_id`. Both deployed to separate URLs.
+
+### Remaining TODO
+- `approve-landing-page` edge function — Convert Stitch HTML to React component, save to client directory
+- `deploy-landing-page` edge function — Deploy to live URL
+- `generate-missing-copy` edge function — AI fills gaps in template slots
+- React conversion pipeline: Stitch HTML → React component in `/clients/{client-slug}/` directory
+- Preview link served via dev server or static hosting
 
 ## Competitor Intel (3-Tab Hub)
 
@@ -229,6 +257,7 @@ The `_shared/copywriter-prompts.ts` contains the comprehensive copywriting syste
 
 ### Edge Functions (Supabase Secrets)
 - `ANTHROPIC_API_KEY` — Claude API key for AI generation
+- `STITCH_API_KEY` — Google Stitch API key for landing page design (from stitch.withgoogle.com → Settings)
 
 ## Deployment
 
@@ -260,6 +289,7 @@ The `_shared/copywriter-prompts.ts` contains the comprehensive copywriting syste
 | angle | Angle | Psychological messaging approach (15 canonical) |
 | copy_component | (not shown) | Atomic building block of messaging |
 | funnel_instance | (internal) | Avatar + Offer + Angle combo record |
-| landing_page | Landing Page | Built via Stitch pipeline |
+| landing_page | Landing Page | Built via design engine pipeline |
 | wireframe_template | Template | 1 of 8 structural layouts |
-| stitch_prompt | (internal) | Assembled prompt sent to Stitch |
+| master_prompt | (internal) | 6-part assembled prompt sent to Stitch API |
+| stitch | (internal only) | Google Stitch API — NEVER mention in user-facing UI |
