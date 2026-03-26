@@ -266,7 +266,7 @@ export default function LandingPagesPage() {
       approvedCopy.map(c => ({ id: c.id, type: c.type, text: c.text }))
     )
     setCopySlots(filled)
-    setMissingSlotIds(missing)
+    setMissingSlotIds(missing) // Only copy slots — business/media excluded
     setSlotOptions(options)
     setStep(3)
   }, [copyComponents, selectedAvatarId, selectedOfferId])
@@ -299,10 +299,15 @@ export default function LandingPagesPage() {
     }
   }, [client, selectedAvatarId, selectedOfferId, selectedTemplate, missingSlotIds])
 
+  // Only copy slots need to be filled to proceed — business/media slots are optional
+  const copyOnlySlots = useMemo(
+    () => templateSlots.filter(s => s.source === 'copy'),
+    [templateSlots]
+  )
   const allSlotsFilled = useMemo(() => {
-    if (templateSlots.length === 0) return false
-    return templateSlots.every(slot => copySlots[slot.id]?.trim())
-  }, [templateSlots, copySlots])
+    if (copyOnlySlots.length === 0) return false
+    return copyOnlySlots.every(slot => copySlots[slot.id]?.trim())
+  }, [copyOnlySlots, copySlots])
 
   const handleBuild = useCallback(async () => {
     if (!client || !selectedAvatarId || !selectedOfferId || !selectedTemplate) return
@@ -663,7 +668,7 @@ export default function LandingPagesPage() {
             <div>
               <h3 style={{ fontSize: 18, marginBottom: 4 }}>Review Copy Slots</h3>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                {templateSlots.length - missingSlotIds.length} of {templateSlots.length} slots filled
+                {copyOnlySlots.length - missingSlotIds.length} of {copyOnlySlots.length} copy slots filled
                 {missingSlotIds.length > 0 && (
                   <span style={{ color: 'var(--warning)', marginLeft: 8 }}>
                     ({missingSlotIds.length} missing)
@@ -691,8 +696,9 @@ export default function LandingPagesPage() {
             </div>
           </div>
 
+          {/* Copy Slots */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {templateSlots.map(slot => {
+            {templateSlots.filter(s => s.source === 'copy').map(slot => {
               const value = copySlots[slot.id] || ''
               const isFilled = value.trim().length > 0
               return (
@@ -765,6 +771,77 @@ export default function LandingPagesPage() {
               )
             })}
           </div>
+
+          {/* Business Asset Slots */}
+          {templateSlots.some(s => s.source === 'business' || s.source === 'media') && (
+            <div style={{ marginTop: 24 }}>
+              <h4 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 12 }}>
+                Business Assets &amp; Media
+                <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }}>
+                  These are entered manually — not AI-generated copy
+                </span>
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {templateSlots.filter(s => s.source === 'business' || s.source === 'media').map(slot => {
+                  const value = copySlots[slot.id] || ''
+                  const sourceLabel = slot.source === 'media' ? 'Media' : 'Business Asset'
+                  const sourceColor = slot.source === 'media' ? '#8b5cf6' : '#6b7280'
+                  return (
+                    <div key={slot.id} style={card({ padding: 16, opacity: 0.85 })}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                        <span style={{
+                          fontSize: 11,
+                          color: sourceColor,
+                          background: `${sourceColor}18`,
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          fontWeight: 600,
+                        }}>
+                          {sourceLabel}
+                        </span>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                          {slot.label}
+                        </span>
+                        {slot.isArray && (
+                          <span style={{
+                            fontSize: 11,
+                            color: 'var(--accent)',
+                            background: 'var(--accent-muted)',
+                            padding: '2px 8px',
+                            borderRadius: 4,
+                          }}>
+                            array
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>{slot.notes}</p>
+                      <textarea
+                        value={value}
+                        onChange={e => handleSlotChange(slot.id, e.target.value)}
+                        placeholder={
+                          slot.source === 'media'
+                            ? `Paste ${slot.label.toLowerCase()} URL...`
+                            : `Enter from Business Overview — ${slot.label.toLowerCase()}...`
+                        }
+                        rows={slot.isArray ? 3 : 1}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--border)',
+                          background: 'var(--bg-input)',
+                          color: 'var(--text-primary)',
+                          fontSize: 13,
+                          resize: 'vertical',
+                          lineHeight: 1.5,
+                        }}
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

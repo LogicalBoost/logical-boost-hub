@@ -336,23 +336,27 @@ function TemplateCopySection({
     return mapComponentsToSlots(selectedTemplate, comps)
   }, [selectedTemplate, instanceComponents])
 
-  const slots = selectedTemplate ? (TEMPLATE_SLOTS[selectedTemplate] || []) : []
+  const allSlots = selectedTemplate ? (TEMPLATE_SLOTS[selectedTemplate] || []) : []
+  // Only show copy slots here — business assets belong in Business Overview
+  const copySlots = allSlots.filter(s => s.source === 'copy')
+  const businessSlotCount = allSlots.filter(s => s.source === 'business').length
+  const mediaSlotCount = allSlots.filter(s => s.source === 'media').length
 
   // Group missing slots by content type for batch generation
   const missingByType = useMemo(() => {
     if (!slotMapping) return {}
     const groups: Record<string, CopySlotDef[]> = {}
     for (const slotId of slotMapping.missing) {
-      const slotDef = slots.find(s => s.id === slotId)
+      const slotDef = copySlots.find(s => s.id === slotId)
       if (slotDef) {
         if (!groups[slotDef.contentType]) groups[slotDef.contentType] = []
         groups[slotDef.contentType].push(slotDef)
       }
     }
     return groups
-  }, [slotMapping, slots])
+  }, [slotMapping, copySlots])
 
-  const totalSlots = slots.length
+  const totalSlots = copySlots.length
   const filledCount = slotMapping ? Object.keys(slotMapping.filled).length : 0
   const missingCount = slotMapping ? slotMapping.missing.length : 0
 
@@ -431,9 +435,9 @@ function TemplateCopySection({
             )}
           </div>
 
-          {/* Slot list */}
+          {/* Slot list — copy slots only */}
           <div style={{ maxHeight: 500, overflowY: 'auto' }}>
-            {slots.map(slot => {
+            {copySlots.map(slot => {
               const isFilled = !!slotMapping.filled[slot.id]
               const isMissing = slotMapping.missing.includes(slot.id)
               const options = slotMapping.options[slot.id] || []
@@ -522,6 +526,24 @@ function TemplateCopySection({
               )
             })}
           </div>
+
+          {/* Business assets note */}
+          {(businessSlotCount > 0 || mediaSlotCount > 0) && (
+            <div style={{
+              padding: '12px 20px',
+              borderTop: '1px solid var(--border)',
+              fontSize: 12,
+              color: 'var(--text-muted)',
+            }}>
+              {businessSlotCount > 0 && (
+                <span>{businessSlotCount} business asset slot{businessSlotCount !== 1 ? 's' : ''} (testimonials, ratings, badges, disclaimers) — enter in Business Overview or Landing Page builder</span>
+              )}
+              {businessSlotCount > 0 && mediaSlotCount > 0 && <span> · </span>}
+              {mediaSlotCount > 0 && (
+                <span>{mediaSlotCount} media slot{mediaSlotCount !== 1 ? 's' : ''} (video URLs) — add in Landing Page builder</span>
+              )}
+            </div>
+          )}
         </>
       )}
 
