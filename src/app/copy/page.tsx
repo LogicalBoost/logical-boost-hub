@@ -108,8 +108,10 @@ function CopyRow({
   selectionMode?: boolean
 }) {
   const [copied, setCopied] = useState(false)
+  const [confirmingDeny, setConfirmingDeny] = useState(false)
 
   const handleCopy = async () => {
+    if (confirmingDeny) return
     if (selectionMode && onToggleSelect) {
       onToggleSelect(item.id)
       return
@@ -143,16 +145,40 @@ function CopyRow({
           ))}
         </span>
         <span className="copy-row-chars">({item.character_count || item.text.length})</span>
-        <button
-          className="copy-row-deny"
-          title="Deny this item"
-          onClick={(e) => {
-            e.stopPropagation()
-            onDeny(item.id)
-          }}
-        >
-          &times;
-        </button>
+        {confirmingDeny ? (
+          <span className="copy-row-deny-confirm" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="copy-row-deny-yes"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDeny(item.id)
+                setConfirmingDeny(false)
+              }}
+            >
+              Remove
+            </button>
+            <button
+              className="copy-row-deny-cancel"
+              onClick={(e) => {
+                e.stopPropagation()
+                setConfirmingDeny(false)
+              }}
+            >
+              Cancel
+            </button>
+          </span>
+        ) : (
+          <button
+            className="copy-row-deny"
+            title="Remove this item"
+            onClick={(e) => {
+              e.stopPropagation()
+              setConfirmingDeny(true)
+            }}
+          >
+            &times;
+          </button>
+        )}
       </div>
       {copied && <span className="copy-feedback">Copied!</span>}
     </div>

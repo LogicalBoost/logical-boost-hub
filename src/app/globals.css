@@ -1901,11 +1901,13 @@ select.form-input {
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 14px;
-  padding: 2px 4px;
+  font-size: 18px;
+  padding: 4px 6px;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, color 0.15s;
+  line-height: 1;
+  border-radius: 4px;
 }
 
 .copy-row:hover .copy-row-deny {
@@ -1914,6 +1916,46 @@ select.form-input {
 
 .copy-row-deny:hover {
   color: var(--danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.copy-row-deny-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.copy-row-deny-yes {
+  background: var(--danger);
+  border: none;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.copy-row-deny-yes:hover {
+  opacity: 0.85;
+}
+
+.copy-row-deny-cancel {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.copy-row-deny-cancel:hover {
+  border-color: var(--text-muted);
 }
 
 .copy-row-selected {
@@ -2726,8 +2768,8 @@ select.form-input {
 
   .copy-row-deny {
     opacity: 1;
-    font-size: 16px;
-    padding: 0 2px;
+    font-size: 20px;
+    padding: 4px 6px;
   }
 
   /* Stats: 4-up grid that fits */
