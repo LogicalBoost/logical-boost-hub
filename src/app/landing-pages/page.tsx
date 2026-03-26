@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '@/lib/store'
-import { analyzeBrandKit, analyzeCompetitorPages } from '@/lib/api'
+import { analyzeBrandKit, analyzeCompetitorPages, generatePlaybook, generateConcepts } from '@/lib/api'
 import { showToast } from '@/lib/demo-toast'
 import LogoUpload from '@/components/LogoUpload'
 import type { BrandKit, CompetitorIntel } from '@/types/database'
@@ -45,12 +45,26 @@ export default function LandingPagesPage() {
   const [competitorAnalyses, setCompetitorAnalyses] = useState<Array<Record<string, unknown>>>([])
   const [patternSummary, setPatternSummary] = useState('')
   const [opportunities, setOpportunities] = useState<string[]>([])
+  const [generatingPlaybook, setGeneratingPlaybook] = useState(false)
+  const [generatingConcepts, setGeneratingConcepts] = useState(false)
 
   // Get competitor intel with websites (for competitive analysis stage)
   const competitorsWithSites = competitors.filter(c => c.competitor_website)
   const uniqueCompetitorSites = [...new Map(competitorsWithSites.map(c => [c.competitor_website, c])).values()]
   // Get landing page analyses already done
   const landingPageAnalyses = competitors.filter(c => c.ad_type === 'landing_page' && c.source === 'ai_discovery')
+
+  // Playbook and concepts from client data
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const playbook = (client?.landing_page_playbook || null) as any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const concepts = (client?.landing_page_concepts || null) as any[] | null
+
+  // Requirements check
+  const hasBrandKit = !!client?.brand_kit
+  const hasCompetitorAnalysis = landingPageAnalyses.length > 0 || competitorAnalyses.length > 0
+  const hasPlaybook = !!playbook
+  const hasConcepts = !!concepts && concepts.length > 0
 
   // Load brand kit and logo from client data if available
   useEffect(() => {
@@ -117,15 +131,18 @@ export default function LandingPagesPage() {
       <div className="lp-pipeline">
         {STAGES.map((stage, i) => {
           const isActive = activeStage === stage.key
-          const stageIndex = STAGES.findIndex(s => s.key === activeStage)
-          const isPast = i < stageIndex
+          // Determine if each stage is complete based on actual data
+          const isComplete = (stage.key === 'brand_kit' && hasBrandKit)
+            || (stage.key === 'competitive' && hasCompetitorAnalysis)
+            || (stage.key === 'playbook' && hasPlaybook)
+            || (stage.key === 'concepts' && hasConcepts)
           return (
             <button
               key={stage.key}
-              className={`lp-stage ${isActive ? 'lp-stage-active' : ''} ${isPast ? 'lp-stage-complete' : ''}`}
+              className={`lp-stage ${isActive ? 'lp-stage-active' : ''} ${isComplete ? 'lp-stage-complete' : ''}`}
               onClick={() => setActiveStage(stage.key)}
             >
-              <span className="lp-stage-number">{isPast ? '&#10003;' : i + 1}</span>
+              <span className="lp-stage-number">{isComplete ? '&#10003;' : i + 1}</span>
               <span className="lp-stage-label">{stage.label}</span>
             </button>
           )
@@ -499,18 +516,173 @@ export default function LandingPagesPage() {
               The industry playbook synthesizes all competitive intelligence into actionable insights:
               common patterns, market gaps, disconnects between ads and landing pages, and strategic concept briefs.
             </p>
-            <div className="empty-state" style={{ padding: 40 }}>
-              <div className="empty-state-icon">&#128218;</div>
-              <div className="empty-state-text">No playbook generated yet</div>
-              <div className="empty-state-sub">
-                Complete competitive analysis first, then generate the playbook.
+
+            {/* Requirements checklist */}
+            <div className="card" style={{ marginBottom: 20, padding: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: 'var(--text-secondary)' }}>Requirements</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ fontSize: 13, color: hasBrandKit ? 'var(--success)' : 'var(--text-muted)' }}>
+                  {hasBrandKit ? '\u2713' : '\u2717'} Brand Kit analyzed
+                  {!hasBrandKit && <span style={{ fontSize: 11, marginLeft: 8 }}>&mdash; <button className="btn btn-secondary btn-sm" style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => setActiveStage('brand_kit')}>Go to Brand Kit</button></span>}
+                </div>
+                <div style={{ fontSize: 13, color: hasCompetitorAnalysis ? 'var(--success)' : 'var(--text-muted)' }}>
+                  {hasCompetitorAnalysis ? '\u2713' : '\u2717'} Competitive analysis completed ({landingPageAnalyses.length + competitorAnalyses.length} pages)
+                  {!hasCompetitorAnalysis && <span style={{ fontSize: 11, marginLeft: 8 }}>&mdash; <button className="btn btn-secondary btn-sm" style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => setActiveStage('competitive')}>Go to Analysis</button></span>}
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                  {client?.business_summary ? '\u2713' : '\u2717'} Business overview data
+                  {!client?.business_summary && <span style={{ fontSize: 11, marginLeft: 8 }}>&mdash; Complete Business Overview first</span>}
+                </div>
               </div>
-              {canEdit && (
-                <button className="btn btn-primary" style={{ marginTop: 16 }} disabled>
-                  Generate Industry Playbook
-                </button>
-              )}
             </div>
+
+            {generatingPlaybook && (
+              <div style={{ padding: 40, textAlign: 'center', background: 'var(--bg-card)', borderRadius: 8, marginBottom: 20 }}>
+                <div className="generating-spinner" style={{ width: 30, height: 30, margin: '0 auto 12px' }} />
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>Generating Industry Playbook...</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                  AI is synthesizing competitor data, market patterns, and strategic opportunities. This takes 30-60 seconds.
+                </div>
+              </div>
+            )}
+
+            {hasPlaybook && playbook ? (
+              <div>
+                {/* Industry Patterns */}
+                {playbook.industry_patterns && (
+                  <div className="card" style={{ marginBottom: 16 }}>
+                    <div className="card-title">Industry Patterns</div>
+                    <div className="card-body" style={{ fontSize: 13 }}>
+                      {Object.entries(playbook.industry_patterns as Record<string, string[]>).map(([key, items]) => (
+                        <div key={key} style={{ marginBottom: 10 }}>
+                          <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--accent)', textTransform: 'capitalize' }}>
+                            {key.replace(/_/g, ' ')}
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                            {(items || []).map((item, j) => (
+                              <span key={j} className="tag" style={{ fontSize: 11 }}>{item}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Market Gaps */}
+                {Array.isArray(playbook.market_gaps) && (
+                  <div className="card" style={{ marginBottom: 16 }}>
+                    <div className="card-title">Market Gaps &amp; Opportunities</div>
+                    <div className="card-body">
+                      {(playbook.market_gaps as Array<Record<string, string>>).map((gap, i) => (
+                        <div key={i} style={{ padding: '8px 0', borderBottom: i < (playbook.market_gaps as Array<unknown>).length - 1 ? '1px solid var(--border)' : 'none' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--warning)' }}>{gap.gap}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{gap.opportunity}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Strategic Recommendations */}
+                {Array.isArray(playbook.strategic_recommendations) && (
+                  <div className="card" style={{ marginBottom: 16 }}>
+                    <div className="card-title">Strategic Recommendations</div>
+                    <div className="card-body">
+                      {(playbook.strategic_recommendations as Array<Record<string, string>>).map((rec, i) => (
+                        <div key={i} style={{ padding: '8px 0', borderBottom: i < (playbook.strategic_recommendations as Array<unknown>).length - 1 ? '1px solid var(--border)' : 'none' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span className="tag" style={{ fontSize: 10, background: rec.priority === 'high' ? 'var(--danger-muted)' : rec.priority === 'medium' ? 'var(--warning-muted)' : 'var(--bg-card)' }}>
+                              {rec.priority}
+                            </span>
+                            <span style={{ fontSize: 13, fontWeight: 600 }}>{rec.recommendation}</span>
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4, marginLeft: 52 }}>{rec.rationale}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Copy Direction */}
+                {playbook.copy_direction && (
+                  <div className="card" style={{ marginBottom: 16 }}>
+                    <div className="card-title">Copy Direction</div>
+                    <div className="card-body" style={{ fontSize: 13 }}>
+                      {Object.entries(playbook.copy_direction as Record<string, unknown>).map(([key, value]) => (
+                        <div key={key} style={{ marginBottom: 8 }}>
+                          <div style={{ fontWeight: 600, marginBottom: 2, color: 'var(--accent)', textTransform: 'capitalize' }}>
+                            {key.replace(/_/g, ' ')}
+                          </div>
+                          <div style={{ color: 'var(--text-secondary)' }}>
+                            {Array.isArray(value) ? (value as string[]).join(' \u2022 ') : String(value)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Concept Briefs Preview */}
+                {Array.isArray(playbook.concept_briefs) && (
+                  <div className="card" style={{ marginBottom: 16 }}>
+                    <div className="card-title">Concept Briefs (4 strategic directions)</div>
+                    <div className="card-body">
+                      {(playbook.concept_briefs as Array<Record<string, unknown>>).map((brief, i) => (
+                        <div key={i} style={{ padding: '10px 0', borderBottom: i < 3 ? '1px solid var(--border)' : 'none' }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{String(brief.name)}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>{String(brief.strategy)}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                            Above fold: {String(brief.above_fold)} &bull; Tone: {String(brief.tone)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : !generatingPlaybook ? (
+              <div className="empty-state" style={{ padding: 40 }}>
+                <div className="empty-state-icon">&#128218;</div>
+                <div className="empty-state-text">No playbook generated yet</div>
+                <div className="empty-state-sub">
+                  {!hasCompetitorAnalysis
+                    ? 'Complete competitive analysis first, then generate the playbook.'
+                    : 'Ready to generate! Click below to synthesize competitive data into an actionable playbook.'}
+                </div>
+              </div>
+            ) : null}
+
+            {canEdit && !generatingPlaybook && (
+              <div style={{ marginTop: 20 }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={async () => {
+                    if (!client) return
+                    setGeneratingPlaybook(true)
+                    try {
+                      const result = await generatePlaybook(client.id)
+                      if (result.playbook) {
+                        await refreshClient(client.id)
+                        showToast('Industry playbook generated!')
+                      }
+                    } catch (err) {
+                      showToast('Playbook generation failed: ' + (err as Error).message)
+                    } finally {
+                      setGeneratingPlaybook(false)
+                    }
+                  }}
+                  disabled={!hasCompetitorAnalysis && !client?.business_summary}
+                >
+                  {hasPlaybook ? 'Regenerate Playbook' : 'Generate Industry Playbook'}
+                </button>
+                {!hasCompetitorAnalysis && !client?.business_summary && (
+                  <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+                    Requires at least competitive analysis or business overview data.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -520,41 +692,67 @@ export default function LandingPagesPage() {
               AI generates 4 strategically unique landing page concepts based on the playbook and brand kit.
               Each concept takes a different strategic approach. The client selects their preferred direction.
             </p>
+
+            {/* Requirements */}
+            {!hasPlaybook && (
+              <div className="card" style={{ marginBottom: 20, padding: 16, borderLeft: '3px solid var(--warning)' }}>
+                <div style={{ fontSize: 13, color: 'var(--warning)', fontWeight: 600, marginBottom: 4 }}>Playbook Required</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  Generate the Industry Playbook first — it provides the strategic briefs that concepts are built from.
+                  <button className="btn btn-secondary btn-sm" style={{ marginLeft: 8, padding: '2px 8px', fontSize: 11 }} onClick={() => setActiveStage('playbook')}>Go to Playbook</button>
+                </div>
+              </div>
+            )}
+
+            {generatingConcepts && (
+              <div style={{ padding: 40, textAlign: 'center', background: 'var(--bg-card)', borderRadius: 8, marginBottom: 20 }}>
+                <div className="generating-spinner" style={{ width: 30, height: 30, margin: '0 auto 12px' }} />
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>Generating 4 Concept Pages...</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                  AI is creating strategic landing page concepts from the playbook. This takes 30-60 seconds.
+                </div>
+              </div>
+            )}
+
+            {/* Show concept briefs from playbook as the concept cards */}
             <div className="card-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-              <div className="card" style={{ opacity: 0.5 }}>
-                <div className="card-title">1A: Proven Pattern, Clean</div>
-                <div className="card-meta">Dominant market formula, executed sharper</div>
-                <div className="card-body" style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                  Not generated yet
+              {(hasPlaybook && Array.isArray(playbook.concept_briefs) ? (playbook.concept_briefs as Array<Record<string, unknown>>) : [
+                { name: '1A: Proven Pattern, Clean', strategy: 'Dominant market formula, executed sharper' },
+                { name: '1B: Proven Pattern, Bold', strategy: 'Same strategy, bolder visual and urgency' },
+                { name: '2: Gap Play', strategy: 'Exploits biggest gap competitors miss' },
+                { name: '3: Aggressive DR', strategy: 'Pure conversion machine, max CTAs' },
+              ]).map((concept, i) => (
+                <div key={i} className="card" style={{ opacity: hasPlaybook ? 1 : 0.5 }}>
+                  <div className="card-title">{String(concept.name)}</div>
+                  <div className="card-meta" style={{ marginBottom: 8 }}>{String(concept.strategy || '')}</div>
+                  <div className="card-body" style={{ fontSize: 13 }}>
+                    {hasPlaybook ? (
+                      <>
+                        {concept.above_fold && <div style={{ marginBottom: 6 }}><strong style={{ color: 'var(--accent)' }}>Above Fold:</strong> {String(concept.above_fold)}</div>}
+                        {Array.isArray(concept.key_sections) && (
+                          <div style={{ marginBottom: 6 }}>
+                            <strong style={{ color: 'var(--accent)' }}>Sections:</strong>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                              {(concept.key_sections as string[]).map((s, j) => (
+                                <span key={j} className="tag" style={{ fontSize: 10 }}>{s}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {concept.tone && <div style={{ marginBottom: 4 }}><strong style={{ color: 'var(--accent)' }}>Tone:</strong> {String(concept.tone)}</div>}
+                        {concept.differentiator && <div><strong style={{ color: 'var(--accent)' }}>Differentiator:</strong> {String(concept.differentiator)}</div>}
+                      </>
+                    ) : (
+                      <div style={{ color: 'var(--text-muted)' }}>Generate playbook to populate concept details</div>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="card" style={{ opacity: 0.5 }}>
-                <div className="card-title">1B: Proven Pattern, Bold</div>
-                <div className="card-meta">Same strategy, bolder visual and urgency</div>
-                <div className="card-body" style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                  Not generated yet
-                </div>
-              </div>
-              <div className="card" style={{ opacity: 0.5 }}>
-                <div className="card-title">2: Gap Play</div>
-                <div className="card-meta">Exploits biggest gap competitors miss</div>
-                <div className="card-body" style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                  Not generated yet
-                </div>
-              </div>
-              <div className="card" style={{ opacity: 0.5 }}>
-                <div className="card-title">3: Aggressive DR</div>
-                <div className="card-meta">Pure conversion machine, max CTAs</div>
-                <div className="card-body" style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                  Not generated yet
-                </div>
-              </div>
+              ))}
             </div>
-            {canEdit && (
-              <div style={{ marginTop: 20 }}>
-                <button className="btn btn-primary" disabled>
-                  Generate 4 Concept Pages
-                </button>
+
+            {canEdit && hasPlaybook && !generatingConcepts && (
+              <div style={{ marginTop: 20, fontSize: 13, color: 'var(--text-muted)' }}>
+                Concept briefs auto-populated from playbook. The Page Builder stage will use these to create actual pages.
               </div>
             )}
           </div>

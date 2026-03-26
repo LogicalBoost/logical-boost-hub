@@ -102,6 +102,16 @@ export async function analyzeCompetitorPages(clientId: string) {
   return callEdgeFunction('analyze-competitor-pages', { client_id: clientId })
 }
 
+// Workflow 12: Generate landing page playbook
+export async function generatePlaybook(clientId: string) {
+  return callEdgeFunction('generate-playbook', { client_id: clientId })
+}
+
+// Workflow 13: Generate landing page concepts
+export async function generateConcepts(clientId: string) {
+  return callEdgeFunction('generate-concepts', { client_id: clientId })
+}
+
 // Workflow 10: AI-powered competitor discovery
 export async function discoverCompetitors(
   clientId: string,

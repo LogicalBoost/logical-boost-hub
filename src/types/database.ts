@@ -25,6 +25,8 @@ export interface Client {
   competitors: Competitor[] | null
   brand_kit: BrandKit | null
   logo_url: string | null
+  landing_page_playbook: Record<string, unknown> | null
+  landing_page_concepts: Record<string, unknown>[] | null
   intake_status: 'pending' | 'completed'
   created_at: string
   updated_at: string
