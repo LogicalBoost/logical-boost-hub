@@ -531,10 +531,12 @@ export default function FunnelPage() {
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
-  const approvedAvatars = avatars.filter((a) => a.status === 'approved')
+  const approvedAvatars = avatars
+    .filter((a) => a.status === 'approved')
+    .sort((a, b) => (a.priority || 99) - (b.priority || 99))
   const approvedOffers = offers.filter((o) => o.status === 'approved')
 
-  // Set defaults
+  // Set defaults — pick highest-priority avatar
   useEffect(() => {
     if (approvedAvatars.length > 0 && !avatarId) setAvatarId(approvedAvatars[0].id)
   }, [approvedAvatars, avatarId])
@@ -847,81 +849,123 @@ export default function FunnelPage() {
   const selectedAvatar = approvedAvatars.find(a => a.id === avatarId)
   const selectedOffer = approvedOffers.find(o => o.id === offerId)
 
+  // Count components per avatar (across all offers)
+  const avatarCampaignInfo = useCallback((avId: string) => {
+    const instances = funnelInstances.filter(f => f.avatar_id === avId && f.status === 'active')
+    const totalComponents = instances.reduce((sum, fi) => {
+      return sum + copyComponents.filter(c => c.funnel_instance_id === fi.id && c.status !== 'denied').length
+    }, 0)
+    return { instanceCount: instances.length, totalComponents }
+  }, [funnelInstances, copyComponents])
+
   // ── Render: Main page ────────────────────────────────────────────────
   return (
     <div className="funnel-page">
-      {/* Campaign Selector Card */}
-      <div className="funnel-selector-card">
-        <div className="funnel-selector-heading">
-          <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Campaign Builder</h2>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 0' }}>
-            Select a target avatar and offer to generate or view your campaign copy library
-          </p>
+      {/* Page header */}
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Campaign Funnels</h1>
+          <p className="page-subtitle">Select an avatar to build and manage their campaign copy library</p>
         </div>
-        <div className="funnel-selectors">
-          <div className="selector-group">
-            <label className="form-label">Target Avatar</label>
-            <select
-              className="form-input"
-              value={avatarId}
-              onChange={(e) => setAvatarId(e.target.value)}
-            >
-              {approvedAvatars.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name} ({avatarComponentCount(a.id)} components)
-                </option>
-              ))}
-            </select>
-            {selectedAvatar && (
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                {selectedAvatar.avatar_type} · {(selectedAvatar.recommended_angles as string[] || []).slice(0, 3).map(a => getAngleLabel(a)).join(', ')}
-              </div>
-            )}
-          </div>
-          <div className="selector-group">
-            <label className="form-label">Offer</label>
-            <select
-              className="form-input"
-              value={offerId}
-              onChange={(e) => setOfferId(e.target.value)}
-            >
-              {approvedOffers.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name}
-                </option>
-              ))}
-            </select>
-            {selectedOffer && (
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                {selectedOffer.offer_type} · CTA: {selectedOffer.primary_cta}
-              </div>
-            )}
-          </div>
-          {!currentInstance && canEdit && !generating && (
-            <div className="selector-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <button
-                className="btn btn-primary btn-lg"
-                onClick={handleGenerate}
-                disabled={loading || !avatarId || !offerId}
-                style={{ width: '100%', justifyContent: 'center' }}
-              >
-                &#9889; Generate Campaign
-              </button>
-            </div>
-          )}
-        </div>
-        {currentInstance && (
-          <div style={{
-            marginTop: 12, padding: '8px 12px', borderRadius: 6,
-            background: 'var(--accent-muted)', fontSize: 12, color: 'var(--accent)',
-            display: 'flex', alignItems: 'center', gap: 8,
-          }}>
-            <span style={{ fontWeight: 600 }}>&#10003; Campaign Active</span>
-            <span style={{ color: 'var(--text-muted)' }}>·</span>
-            <span>{instanceComponents.length} copy components generated</span>
-          </div>
-        )}
       </div>
+
+      {/* ── Avatar Cards (ranked by priority) ── */}
+      <div className="avatar-card-grid">
+        {approvedAvatars.map((avatar, idx) => {
+          const isSelected = avatar.id === avatarId
+          const info = avatarCampaignInfo(avatar.id)
+          const angles = (avatar.recommended_angles as string[] || []).slice(0, 4)
+          const priorityLabel = avatar.priority === 1 ? 'Top Priority' : avatar.priority === 2 ? 'High Priority' : avatar.priority === 3 ? 'Medium' : avatar.priority <= 5 ? 'Lower' : ''
+
+          return (
+            <button
+              key={avatar.id}
+              className={`avatar-pick-card ${isSelected ? 'avatar-pick-active' : ''}`}
+              onClick={() => setAvatarId(avatar.id)}
+            >
+              <div className="avatar-pick-rank">
+                <span className="avatar-pick-rank-num">{idx + 1}</span>
+                {priorityLabel && <span className="avatar-pick-priority">{priorityLabel}</span>}
+              </div>
+              <div className="avatar-pick-name">{avatar.name}</div>
+              <div className="avatar-pick-type">{avatar.avatar_type}</div>
+              {avatar.description && (
+                <div className="avatar-pick-desc">
+                  {avatar.description.length > 80 ? avatar.description.slice(0, 80) + '...' : avatar.description}
+                </div>
+              )}
+              {angles.length > 0 && (
+                <div className="avatar-pick-angles">
+                  {angles.map(slug => (
+                    <AngleBadge key={slug} slug={slug} />
+                  ))}
+                </div>
+              )}
+              <div className="avatar-pick-stats">
+                {info.instanceCount > 0 ? (
+                  <>
+                    <span className="avatar-pick-stat-active">{info.totalComponents} components</span>
+                    <span className="avatar-pick-stat-sub">{info.instanceCount} campaign{info.instanceCount !== 1 ? 's' : ''}</span>
+                  </>
+                ) : (
+                  <span className="avatar-pick-stat-empty">No campaigns yet</span>
+                )}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ── Selected Avatar + Offer Bar ── */}
+      {selectedAvatar && (
+        <div className="funnel-selector-card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Selected Avatar
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>
+                {selectedAvatar.name}
+              </div>
+            </div>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <label className="form-label" style={{ marginBottom: 4 }}>Offer</label>
+              <select
+                className="form-input"
+                value={offerId}
+                onChange={(e) => setOfferId(e.target.value)}
+              >
+                {approvedOffers.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}{o.offer_type ? ` (${o.offer_type})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {!currentInstance && canEdit && !generating && (
+              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <button
+                  className="btn btn-primary btn-lg"
+                  onClick={handleGenerate}
+                  disabled={loading || !avatarId || !offerId}
+                >
+                  &#9889; Generate Campaign
+                </button>
+              </div>
+            )}
+            {currentInstance && (
+              <div style={{
+                padding: '6px 12px', borderRadius: 6,
+                background: 'var(--accent-muted)', fontSize: 12, color: 'var(--accent)',
+                display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
+              }}>
+                <span style={{ fontWeight: 600 }}>&#10003;</span>
+                <span>{instanceComponents.length} components</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {currentInstance ? (
         <>
