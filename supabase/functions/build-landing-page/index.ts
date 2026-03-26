@@ -738,7 +738,7 @@ Deno.serve(async (req: Request) => {
 
     // Send to Stitch API
     const stitchResult = await generateWithStitch(fullPrompt, {
-      projectId: `lbh-${client_id}-${Date.now()}`,
+      title: `${client.name} - Landing Page`,
       device: 'DESKTOP',
     })
 

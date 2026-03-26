@@ -64,7 +64,7 @@ Deno.serve(async (req: Request) => {
 
     // Send to Stitch API for redesign
     const stitchResult = await generateWithStitch(fullIterationPrompt, {
-      projectId: page.stitch_job_id || `lbh-iterate-${Date.now()}`,
+      title: `Iteration ${history.length + 1}`,
       device: 'DESKTOP',
     })
 
