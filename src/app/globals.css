@@ -244,10 +244,12 @@ select optgroup {
 
 .main-area {
   flex: 1;
+  min-width: 0;
   margin-left: var(--sidebar-width);
   display: flex;
   flex-direction: column;
   height: 100vh;
+  overflow-x: hidden;
   transition: margin-left 0.2s ease;
 }
 
@@ -2513,4 +2515,298 @@ select.form-input {
   white-space: nowrap;
 }
 
+/* ============================================================================
+   RESPONSIVE OVERRIDES — MUST be LAST in the file to win over funnel base styles
+   ============================================================================ */
+
+/* Tablet / Mobile: compact angle dots, stacked copy rows */
+@media (max-width: 768px) {
+  /* Switch angle badges to compact dots */
+  .copy-row-angles-full { display: none !important; }
+  .copy-row-angles-compact { display: inline-flex !important; gap: 3px; align-items: center; }
+
+  /* Avatar context strip: hide full badges, show dots */
+  .funnel-avatar-context .angle-badge {
+    font-size: 0;
+    padding: 0;
+    border: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    min-width: 8px;
+  }
+
+  /* Copy row: keep horizontal but compact */
+  .copy-row {
+    padding: 6px 12px;
+    gap: 8px;
+    min-height: 36px;
+  }
+
+  .copy-row-text {
+    font-size: 13px;
+    line-height: 1.35;
+    min-width: 0;
+  }
+
+  .copy-row-meta {
+    flex-shrink: 0;
+    gap: 3px;
+  }
+
+  .copy-row-chars {
+    font-size: 10px;
+  }
+
+  .copy-row-deny {
+    opacity: 1;
+    font-size: 16px;
+    padding: 0 2px;
+  }
+
+  /* Stats: 4-up grid that fits */
+  .funnel-stats-bar {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+
+  .funnel-stat {
+    padding: 8px 4px;
+  }
+
+  .funnel-stat-value {
+    font-size: 20px;
+  }
+
+  .funnel-stat-label {
+    font-size: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Section card */
+  .funnel-section-card {
+    border-radius: var(--radius-sm);
+  }
+
+  .funnel-section-header {
+    padding: 10px 12px;
+  }
+
+  .funnel-section-header h3 {
+    font-size: 14px;
+  }
+
+  /* Filter bar */
+  .funnel-filter-bar {
+    flex-direction: column;
+    padding: 8px 12px;
+    gap: 6px;
+  }
+
+  .funnel-filter-bar .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Tabs: horizontal scroll */
+  .funnel-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 0 8px;
+    gap: 0;
+  }
+  .funnel-tabs::-webkit-scrollbar { display: none; }
+
+  .funnel-tab {
+    flex-shrink: 0;
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
+  /* Tab footer stacks */
+  .funnel-tab-footer {
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 12px;
+  }
+
+  .funnel-tab-footer > div {
+    width: 100%;
+    display: flex;
+    gap: 6px;
+  }
+
+  .funnel-tab-footer .btn {
+    flex: 1;
+  }
+
+  /* Selector bar */
+  .funnel-selector-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .funnel-selector-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .funnel-selector-status {
+    justify-content: center;
+  }
+
+  .funnel-avatar-context {
+    font-size: 11px;
+    padding: 6px 12px;
+    gap: 6px;
+  }
+
+  /* Video generator: stacked columns */
+  .video-generator {
+    grid-template-columns: 1fr;
+  }
+
+  .video-column {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .video-column:last-child {
+    border-bottom: none;
+  }
+
+  .video-column-header {
+    font-size: 11px;
+    padding: 8px 12px;
+  }
+
+  .video-column-list {
+    max-height: 200px;
+  }
+
+  .video-column-list .copy-row {
+    padding: 4px 10px;
+  }
+
+  .video-column-list .copy-row-text {
+    font-size: 12px;
+  }
+
+  .video-controls {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 12px;
+  }
+
+  .video-generate-btns {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .video-generate-btns .btn {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
+
+  /* Bulk action bar */
+  .bulk-action-bar {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 12px;
+  }
+
+  /* Funnel actions bar */
+  .funnel-actions-bar {
+    flex-direction: column;
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .funnel-actions-bar .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Banner thumbs */
+  .banner-thumb-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .banner-expanded {
+    margin: 0 12px 12px;
+  }
+
+  /* Prompter modal full-width */
+  .prompter-modal {
+    width: 95vw;
+    max-width: 95vw;
+  }
+}
+
+/* Phone-specific (480px) */
+@media (max-width: 480px) {
+  .funnel-stat-label {
+    font-size: 7px;
+  }
+
+  .funnel-stat-value {
+    font-size: 18px;
+  }
+
+  .funnel-stat {
+    padding: 6px 2px;
+  }
+
+  .funnel-tab {
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+
+  .funnel-tab-count {
+    font-size: 8px;
+    padding: 1px 4px;
+  }
+
+  .angle-dot {
+    width: 6px;
+    height: 6px;
+  }
+
+  .copy-row {
+    padding: 5px 8px;
+  }
+
+  .copy-row-text {
+    font-size: 12px;
+  }
+
+  .funnel-selector-bar {
+    padding: 10px 8px;
+  }
+
+  .funnel-avatar-context {
+    padding: 5px 8px;
+    font-size: 10px;
+  }
+
+  .video-generate-btns .btn {
+    font-size: 11px;
+    padding: 5px 6px;
+  }
+
+  .combinations-counter {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+}
 
