@@ -2,7 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+
+const COLLAPSED_KEY = 'lbh_sidebar_collapsed'
 
 const navItems = [
   { href: '/dashboard/', label: 'Dashboard', icon: '◫' },
@@ -20,6 +22,23 @@ const navItems = [
 export default function Sidebar() {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
+
+  // Restore collapsed state from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(COLLAPSED_KEY)
+      if (saved === 'true') setCollapsed(true)
+    } catch { /* storage unavailable */ }
+  }, [])
+
+  const toggleCollapse = useCallback(() => {
+    setCollapsed(prev => {
+      const next = !prev
+      try { localStorage.setItem(COLLAPSED_KEY, String(next)) } catch {}
+      return next
+    })
+  }, [])
 
   // Close sidebar on route change
   useEffect(() => {
@@ -53,10 +72,17 @@ export default function Sidebar() {
         <div className="sidebar-overlay" onClick={() => setMobileOpen(false)} />
       )}
 
-      <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
+      <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''} ${collapsed ? 'sidebar-collapsed' : ''}`}>
         <div className="sidebar-logo">
-          <img src="/logical-boost-hub/images/logow.png" alt="LogicalBoost" className="sidebar-logo-img" />
-          <span className="beta-badge">BETA</span>
+          {!collapsed && (
+            <>
+              <img src="/logical-boost-hub/images/logow.png" alt="LogicalBoost" className="sidebar-logo-img" />
+              <span className="beta-badge">BETA</span>
+            </>
+          )}
+          {collapsed && (
+            <img src="/logical-boost-hub/images/logow.png" alt="LB" className="sidebar-logo-img" style={{ height: 22 }} />
+          )}
         </div>
         <nav className="sidebar-nav">
           {navItems.map((item) => {
@@ -66,13 +92,25 @@ export default function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={`nav-item ${isActive ? 'active' : ''}`}
+                title={collapsed ? item.label : undefined}
               >
                 <span className="nav-icon">{item.icon}</span>
-                <span className="nav-label">{item.label}</span>
+                {!collapsed && <span className="nav-label">{item.label}</span>}
               </Link>
             )
           })}
         </nav>
+        {/* Collapse toggle button */}
+        <button
+          className="sidebar-collapse-btn"
+          onClick={toggleCollapse}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          <span style={{ transform: collapsed ? 'rotate(180deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' }}>
+            &#9664;
+          </span>
+        </button>
       </aside>
     </>
   )

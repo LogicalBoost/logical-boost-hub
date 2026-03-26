@@ -5,7 +5,7 @@ import { useAppStore } from '@/lib/store'
 import { generateFunnel, generateMore } from '@/lib/api'
 import { showToast } from '@/lib/demo-toast'
 import { ANGLES, getAngleLabel, ANGLE_COLORS } from '@/types/database'
-import type { CopyComponent, CopyComponentType } from '@/types/database'
+import type { CopyComponent, CopyComponentType, BrandKit } from '@/types/database'
 import { supabase } from '@/lib/supabase'
 
 // ── Tab definitions (maps to copy component types) ──────────────────────
@@ -22,6 +22,31 @@ const TABS: { key: string; label: string; types: CopyComponentType[] }[] = [
   { key: 'ctas', label: 'CTAs', types: ['cta', 'hero_cta'] },
   { key: 'hero', label: 'Hero Copy', types: ['hero_headline', 'hero_subheadline', 'hero_cta'] },
   { key: 'objections', label: 'Objection Handlers', types: ['objection_handler'] },
+]
+
+// All section types that can be generated via Generate More
+const ALL_SECTION_TYPES: { value: string; label: string }[] = [
+  { value: 'google_headline', label: 'Google Headlines' },
+  { value: 'headline', label: 'Meta Headlines' },
+  { value: 'primary_text', label: 'Primary Text' },
+  { value: 'google_description', label: 'Google Descriptions' },
+  { value: 'description', label: 'Descriptions' },
+  { value: 'subheadline', label: 'Subheadlines' },
+  { value: 'benefit', label: 'Benefits' },
+  { value: 'value_point', label: 'Value Points' },
+  { value: 'proof', label: 'Proof' },
+  { value: 'urgency', label: 'Urgency' },
+  { value: 'fear_point', label: 'Fear Points' },
+  { value: 'cta', label: 'CTAs' },
+  { value: 'video_hook', label: 'Video Hooks' },
+  { value: 'short_script', label: 'Short Video Scripts (~30s)' },
+  { value: 'long_script', label: 'Long Video Scripts (~60s)' },
+  { value: 'video_script', label: 'Full Video Scripts' },
+  { value: 'objection_handler', label: 'Objection Handlers' },
+  { value: 'hero_headline', label: 'Hero Headlines' },
+  { value: 'hero_subheadline', label: 'Hero Subheadlines' },
+  { value: 'hero_cta', label: 'Hero CTAs' },
+  { value: 'urgency_bar', label: 'Urgency Bars' },
 ]
 
 // ── Copy to clipboard helper ────────────────────────────────────────────
@@ -96,6 +121,169 @@ function CopyRow({
   )
 }
 
+// ── Banner Ad Mockups section ────────────────────────────────────────────
+function BannerAdMockups({
+  components,
+  brandKit,
+  clientName,
+  logoUrl,
+}: {
+  components: CopyComponent[]
+  brandKit: BrandKit | null
+  clientName: string
+  logoUrl: string | null
+}) {
+  const [shuffleKey, setShuffleKey] = useState(0)
+
+  // Extract brand colors
+  const primaryColor = brandKit?.colors?.primary_color || '#10b981'
+  const bgColor = brandKit?.colors?.background_color || '#0f1a17'
+  const textColor = brandKit?.colors?.text_color || '#ffffff'
+  const accentColor = brandKit?.colors?.accent_color || primaryColor
+
+  // Gather copy by type for mockups
+  const headlines = components.filter(c => ['headline', 'google_headline', 'hero_headline'].includes(c.type))
+  const ctas = components.filter(c => ['cta', 'hero_cta'].includes(c.type))
+  const benefits = components.filter(c => ['benefit', 'value_point'].includes(c.type))
+  const descriptions = components.filter(c => ['description', 'google_description', 'subheadline'].includes(c.type))
+
+  // Pick random items based on shuffleKey
+  const pick = <T,>(arr: T[]) => arr.length > 0 ? arr[(shuffleKey + Math.floor(Math.random() * arr.length)) % arr.length] : null
+
+  // Banner sizes
+  const bannerConfigs = [
+    { label: 'Leaderboard (728x90)', width: 728, height: 90, layout: 'horizontal' as const },
+    { label: 'Medium Rectangle (300x250)', width: 300, height: 250, layout: 'vertical' as const },
+    { label: 'Large Rectangle (336x280)', width: 336, height: 280, layout: 'vertical' as const },
+    { label: 'Wide Skyscraper (160x600)', width: 160, height: 600, layout: 'tall' as const },
+    { label: 'Half Page (300x600)', width: 300, height: 600, layout: 'tall' as const },
+  ]
+
+  return (
+    <div className="funnel-section-card">
+      <div className="funnel-section-header">
+        <h3>Banner Ad Mockups</h3>
+        <button
+          className="btn btn-secondary btn-sm"
+          onClick={() => setShuffleKey(prev => prev + 1)}
+        >
+          &#8635; Shuffle Copy
+        </button>
+      </div>
+      {headlines.length === 0 ? (
+        <div className="funnel-tab-empty" style={{ padding: 40 }}>
+          No copy components generated yet. Generate a campaign first, then banner mockups will appear here using your copy.
+        </div>
+      ) : (
+        <div className="banner-mockups-grid">
+          {bannerConfigs.map((config, idx) => {
+            const h = pick(headlines)
+            const c = pick(ctas)
+            const b = pick(benefits)
+            const d = pick(descriptions)
+            const scale = Math.min(1, 320 / config.width)
+            return (
+              <div key={`${config.label}-${shuffleKey}`} className="banner-mockup-wrapper">
+                <div className="banner-mockup-label">{config.label}</div>
+                <div
+                  className="banner-mockup"
+                  style={{
+                    width: config.width,
+                    height: config.height,
+                    transform: `scale(${scale})`,
+                    transformOrigin: 'top left',
+                    background: idx % 2 === 0
+                      ? `linear-gradient(135deg, ${bgColor} 0%, ${primaryColor}33 100%)`
+                      : `linear-gradient(135deg, ${primaryColor}22 0%, ${bgColor} 100%)`,
+                    border: `1px solid ${primaryColor}44`,
+                    borderRadius: 4,
+                    padding: config.layout === 'horizontal' ? '8px 16px' : '16px',
+                    display: 'flex',
+                    flexDirection: config.layout === 'horizontal' ? 'row' : 'column',
+                    alignItems: config.layout === 'horizontal' ? 'center' : 'flex-start',
+                    justifyContent: config.layout === 'horizontal' ? 'space-between' : 'space-between',
+                    gap: 8,
+                    overflow: 'hidden',
+                    color: textColor,
+                    fontFamily: 'system-ui, sans-serif',
+                  }}
+                >
+                  {/* Logo */}
+                  {logoUrl && config.layout !== 'horizontal' && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={logoUrl} alt="" style={{ height: config.layout === 'tall' ? 24 : 28, objectFit: 'contain', opacity: 0.9 }} />
+                  )}
+                  <div style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    gap: config.layout === 'horizontal' ? 2 : 6,
+                    minWidth: 0,
+                  }}>
+                    <div style={{
+                      fontWeight: 700,
+                      fontSize: config.layout === 'horizontal' ? 13 : config.layout === 'tall' ? 14 : 16,
+                      lineHeight: 1.2,
+                      overflow: 'hidden',
+                      display: '-webkit-box',
+                      WebkitLineClamp: config.layout === 'horizontal' ? 1 : 3,
+                      WebkitBoxOrient: 'vertical',
+                    }}>
+                      {h?.text || 'Your Headline Here'}
+                    </div>
+                    {config.layout !== 'horizontal' && d && (
+                      <div style={{
+                        fontSize: config.layout === 'tall' ? 11 : 12,
+                        opacity: 0.8,
+                        lineHeight: 1.3,
+                        overflow: 'hidden',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                      }}>
+                        {d.text}
+                      </div>
+                    )}
+                    {config.layout === 'tall' && b && (
+                      <div style={{
+                        fontSize: 11, opacity: 0.7,
+                        marginTop: 4,
+                        overflow: 'hidden',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                      }}>
+                        {b.text}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{
+                    backgroundColor: accentColor,
+                    color: '#fff',
+                    padding: config.layout === 'horizontal' ? '6px 14px' : '8px 16px',
+                    borderRadius: 4,
+                    fontWeight: 600,
+                    fontSize: config.layout === 'horizontal' ? 12 : 13,
+                    whiteSpace: 'nowrap',
+                    textAlign: 'center',
+                    flexShrink: 0,
+                  }}>
+                    {c?.text || 'Learn More'}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      <div style={{ padding: '12px 24px', fontSize: 12, color: 'var(--text-muted)' }}>
+        CSS mockups using your copy components and brand kit colors. No image API required. Click Shuffle to see different copy combinations.
+      </div>
+    </div>
+  )
+}
+
 // ── Video Ad Generator section ──────────────────────────────────────────
 function VideoAdGenerator({
   hooks,
@@ -103,12 +291,18 @@ function VideoAdGenerator({
   longScripts,
   ctas,
   onDeny,
+  onGenerateMore,
+  generatingSection,
+  canEdit,
 }: {
   hooks: CopyComponent[]
   shortScripts: CopyComponent[]
   longScripts: CopyComponent[]
   ctas: CopyComponent[]
   onDeny: (id: string) => void
+  onGenerateMore: (sectionType: string) => void
+  generatingSection: string | null
+  canEdit: boolean
 }) {
   const [shuffled, setShuffled] = useState<{
     hook: CopyComponent | null
@@ -181,6 +375,31 @@ function VideoAdGenerator({
           &#8635; Shuffle Variations
         </button>
         <span className="combinations-counter">{combos.toLocaleString()} Combinations Ready</span>
+        {canEdit && (
+          <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => onGenerateMore('video_hook')}
+              disabled={!!generatingSection}
+            >
+              {generatingSection === 'video_hook' ? 'Generating...' : '+ Hooks'}
+            </button>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => onGenerateMore('short_script')}
+              disabled={!!generatingSection}
+            >
+              {generatingSection === 'short_script' ? 'Generating...' : '+ Short Scripts'}
+            </button>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => onGenerateMore('long_script')}
+              disabled={!!generatingSection}
+            >
+              {generatingSection === 'long_script' ? 'Generating...' : '+ Long Scripts'}
+            </button>
+          </div>
+        )}
       </div>
       {shuffled.hook && (
         <div className="shuffle-result">
@@ -517,7 +736,7 @@ export default function FunnelPage() {
                   onClick={() => openPrompter(activeTabDef.types[0])}
                   disabled={!!generatingSection}
                 >
-                  Generate More +30
+                  + Generate More
                 </button>
               )}
               <select
@@ -607,29 +826,12 @@ export default function FunnelPage() {
           </div>
 
           {/* ── Banner Ad Mockups ──────────────────────────────────── */}
-          <div className="funnel-section-card">
-            <div className="funnel-section-header">
-              <h3>Banner Ad Mockups</h3>
-            </div>
-            <div className="banner-scroll">
-              {[1, 2, 3].map((i) => {
-                const headline = instanceComponents.find((c) => c.type === 'headline')
-                const cta = instanceComponents.find((c) => c.type === 'cta')
-                return (
-                  <div key={i} className="banner-card">
-                    <div className="banner-placeholder">
-                      <div className="banner-placeholder-icon">&#128247;</div>
-                    </div>
-                    <div className="banner-copy">
-                      <div className="banner-headline">{headline?.text || 'Headline'}</div>
-                      <div className="banner-cta">{cta?.text || 'Learn More'}</div>
-                    </div>
-                    <span className="tag">Static</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+          <BannerAdMockups
+            components={instanceComponents}
+            brandKit={client?.brand_kit || null}
+            clientName={client?.name || ''}
+            logoUrl={client?.logo_url || null}
+          />
 
           {/* ── Video Ad Generator ────────────────────────────────── */}
           <VideoAdGenerator
@@ -638,6 +840,9 @@ export default function FunnelPage() {
             longScripts={longScripts}
             ctas={ctaComponents}
             onDeny={handleDeny}
+            onGenerateMore={handleGenerateMore}
+            generatingSection={generatingSection}
+            canEdit={canEdit}
           />
 
           {/* ── Landing Page Preview ──────────────────────────────── */}
@@ -720,8 +925,16 @@ export default function FunnelPage() {
             </div>
             <div className="modal-body">
               <div style={{ marginBottom: 16 }}>
-                <label className="form-label">Section</label>
-                <div className="prompter-section-tag">{prompterSection}</div>
+                <label className="form-label">Section Type</label>
+                <select
+                  className="form-input"
+                  value={prompterSection}
+                  onChange={(e) => setPrompterSection(e.target.value)}
+                >
+                  {ALL_SECTION_TYPES.map((st) => (
+                    <option key={st.value} value={st.value}>{st.label}</option>
+                  ))}
+                </select>
                 {angleFilter !== 'all' && (
                   <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-secondary)' }}>
                     Filtered to: <AngleBadge slug={angleFilter} />
@@ -758,7 +971,7 @@ export default function FunnelPage() {
                 Cancel
               </button>
               <button className="btn btn-primary" onClick={handlePrompterGenerate}>
-                Generate {promptQuantity} Items
+                Generate {promptQuantity} {ALL_SECTION_TYPES.find(s => s.value === prompterSection)?.label || 'Items'}
               </button>
             </div>
           </div>
