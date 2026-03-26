@@ -142,7 +142,7 @@ export default function LandingPagesPage() {
               className={`lp-stage ${isActive ? 'lp-stage-active' : ''} ${isComplete ? 'lp-stage-complete' : ''}`}
               onClick={() => setActiveStage(stage.key)}
             >
-              <span className="lp-stage-number">{isComplete ? '&#10003;' : i + 1}</span>
+              <span className={`lp-stage-check ${isComplete ? 'lp-stage-check-done' : ''}`}>✓</span>
               <span className="lp-stage-label">{stage.label}</span>
             </button>
           )

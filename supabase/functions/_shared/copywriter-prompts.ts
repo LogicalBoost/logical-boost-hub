@@ -184,22 +184,27 @@ VIDEO HOOKS (video_hook): Generate 12-15.
 - Each hook must be SPECIFIC to this avatar's world. Reference their actual daily frustrations, goals, or industry.
 
 SHORT SCRIPTS (short_script): Generate 4-6.
-- Complete 30-second video scripts. ~75-90 words each.
-- Structure: [HOOK - 3 sec] → [PROBLEM or STORY - 10 sec] → [SOLUTION BRIDGE - 10 sec] → [CTA - 7 sec]
+- The BODY of a 30-second video ad. ~60-75 words each.
+- IMPORTANT: Do NOT include a hook at the start or CTA at the end. Hooks and CTAs are generated separately and will be combined with these scripts to build complete videos. The user picks a hook + script body + CTA.
+- Structure: [PROBLEM or STORY - 10 sec] → [SOLUTION BRIDGE - 10 sec] → [PROOF/BENEFIT - 7 sec]
 - Write in a conversational tone as if talking directly to the avatar.
 - Include [brackets] for visual/stage directions.
 - Each script should use a different angle combination.
+- Start directly with the problem, story, or insight — NOT with a hook line.
 
 LONG SCRIPTS (long_script): Generate 3-4.
-- Complete 60-second video scripts. ~150-180 words each.
-- Structure: [HOOK - 3 sec] → [PROBLEM AGITATION - 15 sec] → [SOLUTION INTRO - 10 sec] → [HOW IT WORKS/PROOF - 20 sec] → [CTA + URGENCY - 12 sec]
-- Build an emotional arc: start with pain, amplify it, introduce hope, deliver the solution, end with urgency.
+- The BODY of a 60-second video ad. ~120-150 words each.
+- IMPORTANT: Do NOT include a hook at the start or CTA at the end. Hooks and CTAs are generated separately. The user picks a hook + script body + CTA to assemble complete videos.
+- Structure: [PROBLEM AGITATION - 15 sec] → [SOLUTION INTRO - 10 sec] → [HOW IT WORKS/PROOF - 20 sec] → [CLOSE/URGENCY SETUP - 10 sec]
+- Build an emotional arc: pain → amplify → hope → solution → urgency setup (but NO final CTA line).
 - Include specific stage directions in [brackets].
+- Start directly with the problem or story — NOT with a hook line.
 
 FULL VIDEO SCRIPTS (video_script): Generate 2-3.
-- Extended scripts (90+ seconds). ~225-270 words each.
+- The BODY of extended scripts (90+ seconds). ~200-240 words each.
+- IMPORTANT: Do NOT include a hook at the start or CTA at the end. These are script BODIES that get paired with separate hooks and CTAs.
 - These are mini-stories. Weave 3-4 angles into a compelling narrative.
-- Include timing notes: [0:00-0:03], [0:03-0:15], etc.
+- Include timing notes for the body sections only.
 - Perfect for YouTube pre-roll, longer Instagram Reels, or testimonial-style content.
 
 TOTAL: ~20-28 components for this batch.
@@ -208,7 +213,8 @@ CRITICAL FOR ALL SCRIPTS:
 - Write the way people TALK, not the way they write. Short sentences. Conversational rhythm.
 - Every script must reference something specific to this avatar's life, industry, or daily experience.
 - Hooks must work WITHOUT sound (think captions). Keep them visually punchy.
-- Include at least one proof point or credibility marker per script.`,
+- Include at least one proof point or credibility marker per script.
+- SCRIPTS ARE BODY ONLY: Short scripts, long scripts, and full video scripts must NOT include a hook at the beginning or CTA at the end. These are the MIDDLE section of a video. The user will combine a separate hook + script body + separate CTA to build complete videos. This 3-part structure is intentional.`,
 }
 
 // ── Build the system prompt for a batch ───────────────────────────────────
@@ -448,17 +454,24 @@ function getSectionGuidance(sectionType: string): string {
 - Mix: questions, bold claims, pattern interrupts, story openers, stat hooks, challenges.
 - Must work as captions (no sound). Keep visually punchy.`,
 
-    short_script: `SECTION GUIDANCE — Short Video Scripts (~30 sec):
-- Structure: [HOOK] → [PROBLEM/STORY] → [SOLUTION BRIDGE] → [CTA]
+    short_script: `SECTION GUIDANCE — Short Video Script BODY (~30 sec):
+- Write ONLY the body/middle of the video. Do NOT include a hook at the start or CTA at the end.
+- Hooks and CTAs are separate components — the user combines hook + body + CTA to build complete videos.
+- Structure: [PROBLEM/STORY] → [SOLUTION BRIDGE] → [PROOF/BENEFIT]
 - Conversational. Write how people TALK, not how they write.
-- Include [stage directions] in brackets.`,
+- Include [stage directions] in brackets.
+- Start directly with the problem, story, or insight.`,
 
-    long_script: `SECTION GUIDANCE — Long Video Scripts (~60 sec):
-- Structure: [HOOK] → [PROBLEM AGITATION] → [SOLUTION] → [PROOF] → [CTA + URGENCY]
-- Build emotional arc: pain → amplify → hope → solution → urgency.
-- Include [stage directions] in brackets.`,
+    long_script: `SECTION GUIDANCE — Long Video Script BODY (~60 sec):
+- Write ONLY the body/middle of the video. Do NOT include a hook at the start or CTA at the end.
+- Hooks and CTAs are separate components — the user combines hook + body + CTA to build complete videos.
+- Structure: [PROBLEM AGITATION] → [SOLUTION] → [PROOF] → [URGENCY SETUP]
+- Build emotional arc: pain → amplify → hope → solution → urgency setup.
+- Include [stage directions] in brackets.
+- Start directly with the problem or story.`,
 
-    video_script: `SECTION GUIDANCE — Full Video Scripts (90+ sec):
+    video_script: `SECTION GUIDANCE — Full Video Script BODY (90+ sec):
+- Write ONLY the body/middle. Do NOT include a hook or CTA — those are separate components.
 - Mini-stories weaving 3-4 angles. Include timing notes.
 - Testimonial-style, educational, or narrative formats.`,
   }

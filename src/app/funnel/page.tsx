@@ -225,7 +225,7 @@ function VideoAdGenerator({
       )}
       <div className="video-generator">
         <div className="video-column">
-          <div className="video-column-header">Hooks</div>
+          <div className="video-column-header">1. Hooks</div>
           <div className="video-column-list">
             {hooks.slice(0, 15).map((h, i) => (
               <CopyRow key={h.id} item={{ ...h, text: `${i + 1}. ${h.text}` }} onDeny={onDeny} />
@@ -234,7 +234,7 @@ function VideoAdGenerator({
           </div>
         </div>
         <div className="video-column">
-          <div className="video-column-header">Short Script (~30s)</div>
+          <div className="video-column-header">2. Script Body (~30s)</div>
           <div className="video-column-list">
             {shortScripts.map((s, i) => (
               <div key={s.id} className="video-script-card">
@@ -246,7 +246,7 @@ function VideoAdGenerator({
           </div>
         </div>
         <div className="video-column">
-          <div className="video-column-header">Long Script (~60s)</div>
+          <div className="video-column-header">3. Script Body (~60s)</div>
           <div className="video-column-list">
             {longScripts.map((s, i) => (
               <div key={s.id} className="video-script-card">
@@ -258,7 +258,7 @@ function VideoAdGenerator({
           </div>
         </div>
         <div className="video-column">
-          <div className="video-column-header">CTAs</div>
+          <div className="video-column-header">4. CTAs</div>
           <div className="video-column-list">
             {ctas.slice(0, 10).map((c) => (
               <CopyRow key={c.id} item={c} onDeny={onDeny} />

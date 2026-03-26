@@ -141,18 +141,18 @@ select optgroup {
 }
 
 .beta-badge {
-  font-size: 9px;
+  font-size: 7px;
   font-weight: 700;
-  letter-spacing: 1.5px;
+  letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--accent);
-  border: 1px solid var(--accent);
-  border-radius: 4px;
-  padding: 2px 6px;
+  border: none;
+  padding: 0;
   line-height: 1;
-  opacity: 0.8;
-  align-self: center;
-  margin-left: -2px;
+  opacity: 0.7;
+  align-self: flex-end;
+  margin-left: -4px;
+  margin-bottom: 2px;
   white-space: nowrap;
 }
 
@@ -2487,29 +2487,22 @@ select.form-input {
   background: var(--accent-muted);
   color: var(--accent);
 }
-.lp-stage-active .lp-stage-number {
-  background: var(--accent);
-  color: var(--bg-primary);
+.lp-stage-active .lp-stage-check {
+  color: var(--accent);
 }
 .lp-stage-complete {
   color: var(--text-secondary);
 }
-.lp-stage-complete .lp-stage-number {
-  background: var(--success);
-  color: var(--bg-primary);
-}
-.lp-stage-number {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  font-size: 11px;
+.lp-stage-check {
+  font-size: 14px;
   font-weight: 700;
-  background: rgba(255,255,255,0.08);
   color: var(--text-muted);
+  opacity: 0.3;
   flex-shrink: 0;
+}
+.lp-stage-check-done {
+  color: var(--success);
+  opacity: 1;
 }
 .lp-stage-label {
   white-space: nowrap;
