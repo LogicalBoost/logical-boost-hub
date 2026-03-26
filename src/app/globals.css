@@ -1537,6 +1537,70 @@ select.form-input {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
 }
 
+/* Banner thumbnail grid */
+.banner-thumb-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 20px 24px;
+  align-items: flex-start;
+}
+
+.banner-thumb {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.banner-thumb:hover {
+  border-color: var(--border-light);
+  background: var(--bg-card-hover);
+}
+
+.banner-thumb-active {
+  border-color: var(--accent) !important;
+  background: var(--accent-muted) !important;
+}
+
+.banner-thumb-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Expanded full-size banner preview */
+.banner-expanded {
+  margin: 0 24px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-secondary);
+}
+
+.banner-expanded-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.banner-expanded-body {
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+}
+
 /* Legacy banner styles (keep for compatibility) */
 .banner-scroll {
   display: grid;
