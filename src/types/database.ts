@@ -205,10 +205,20 @@ export interface Creative {
   updated_at: string
 }
 
+export type TemplateId = 'clean_authority' | 'bold_conversion' | 'gap_play' | 'aggressive_dr'
+
+export interface PageSectionData {
+  id: string
+  type: string
+  order: number
+  content: Record<string, unknown>
+  style_overrides?: Record<string, string>
+}
+
 export interface LandingPage {
   id: string
   client_id: string
-  funnel_instance_id: string
+  funnel_instance_id: string | null
   avatar_id: string
   offer_id: string
   copy_component_ids: string[]
@@ -216,6 +226,10 @@ export interface LandingPage {
   subheadline: string
   cta: string
   sections: LandingPageSection[]
+  template_id: TemplateId | null
+  page_html: string | null
+  section_data: PageSectionData[] | null
+  brand_kit_snapshot: Record<string, unknown> | null
   preview_image_url: string | null
   deployed_url: string | null
   deploy_status: 'draft' | 'deployed' | 'stale'
@@ -244,13 +258,18 @@ export const ANGLE_COLORS: Record<string, string> = {
 }
 
 export type LandingPageSection =
-  | { type: 'hero'; headline: string; subheadline: string; cta: string }
-  | { type: 'problem'; content: string }
-  | { type: 'solution'; content: string }
-  | { type: 'benefits'; items: string[] }
-  | { type: 'proof'; items: string[] }
-  | { type: 'faq'; items: FaqItem[] }
-  | { type: 'final_cta'; headline: string; cta: string }
+  | { type: 'hero'; headline: string; subheadline: string; cta: string; trust_items?: string[] }
+  | { type: 'problem'; headline?: string; content: string }
+  | { type: 'solution'; headline?: string; content: string; steps?: { title: string; description: string }[] }
+  | { type: 'benefits'; headline?: string; items: string[] }
+  | { type: 'proof'; headline?: string; items: string[] }
+  | { type: 'faq'; headline?: string; items: FaqItem[] }
+  | { type: 'final_cta'; headline: string; subheadline?: string; cta: string }
+  | { type: 'urgency_bar'; text: string }
+  | { type: 'comparison'; headline?: string; client_name: string; items: { feature: string; client: boolean; competitor: boolean }[] }
+  | { type: 'process_steps'; headline?: string; steps: { number: number; title: string; description: string }[] }
+  | { type: 'trust_strip'; items: string[] }
+  | { type: 'form'; headline?: string; subheadline?: string; fields: string[]; cta: string }
 
 export interface IntakeQuestion {
   id: string

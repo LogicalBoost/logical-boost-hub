@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAppStore } from '@/lib/store'
-import { analyzeBrandKit, analyzeCompetitorPages, generatePlaybook, generateConcepts } from '@/lib/api'
+import { analyzeBrandKit, analyzeCompetitorPages, generatePlaybook, generateConcepts, generateLandingPage, editLandingPageSection } from '@/lib/api'
 import { showToast } from '@/lib/demo-toast'
 import LogoUpload from '@/components/LogoUpload'
-import type { BrandKit, CompetitorIntel } from '@/types/database'
+import type { BrandKit, LandingPage, TemplateId } from '@/types/database'
 
 type Stage = 'brand_kit' | 'competitive' | 'playbook' | 'concepts' | 'builder'
 
@@ -35,7 +35,9 @@ function ColorSwatch({ color, label }: { color: string; label: string }) {
 }
 
 export default function LandingPagesPage() {
-  const { client, canEdit, refreshClient, competitors } = useAppStore()
+  const { client, canEdit, refreshClient, competitors, avatars, offers, landingPages, refreshLandingPages } = useAppStore()
+  const approvedAvatars = useMemo(() => avatars.filter(a => a.status === 'approved'), [avatars])
+  const approvedOffers = useMemo(() => offers.filter(o => o.status === 'approved'), [offers])
   const [activeStage, setActiveStage] = useState<Stage>('brand_kit')
   const [analyzing, setAnalyzing] = useState(false)
   const [brandKit, setBrandKit] = useState<BrandKit | null>(null)
@@ -47,6 +49,18 @@ export default function LandingPagesPage() {
   const [opportunities, setOpportunities] = useState<string[]>([])
   const [generatingPlaybook, setGeneratingPlaybook] = useState(false)
   const [generatingConcepts, setGeneratingConcepts] = useState(false)
+  // Builder state
+  const [selectedAvatarId, setSelectedAvatarId] = useState('')
+  const [selectedOfferId, setSelectedOfferId] = useState('')
+  const [selectedTemplateId, setSelectedTemplateId] = useState<TemplateId>('clean_authority')
+  const [generatingPage, setGeneratingPage] = useState(false)
+  const [activePage, setActivePage] = useState<LandingPage | null>(null)
+  const [previewSize, setPreviewSize] = useState<'desktop' | 'tablet' | 'mobile'>('desktop')
+  const [editingPrompt, setEditingPrompt] = useState('')
+  const [editScope, setEditScope] = useState<'section' | 'full_page'>('full_page')
+  const [editingSectionId, setEditingSectionId] = useState('')
+  const [isEditing, setIsEditing] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
 
   // Get competitor intel with websites (for competitive analysis stage)
   const competitorsWithSites = competitors.filter(c => c.competitor_website)
@@ -760,23 +774,283 @@ export default function LandingPagesPage() {
 
         {activeStage === 'builder' && (
           <div style={{ padding: 24 }}>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: 20, fontSize: 14, lineHeight: 1.6 }}>
-              Build and deploy landing pages for each Avatar + Offer combination.
-              Pages inherit the selected design direction, use copy from the funnel, and are styled with the brand kit.
-              Use the AI prompter to iterate on page sections.
-            </p>
-            <div className="empty-state" style={{ padding: 40 }}>
-              <div className="empty-state-icon">&#9889;</div>
-              <div className="empty-state-text">No landing pages built yet</div>
-              <div className="empty-state-sub">
-                Complete the concept selection stage first, then build pages for each Avatar + Offer.
+            {/* If editing an active page, show the builder */}
+            {activePage ? (
+              <div className="lp-builder">
+                {/* Builder header */}
+                <div className="lp-builder-header">
+                  <button className="btn btn-secondary btn-sm" onClick={() => setActivePage(null)}>
+                    &larr; Back to Pages
+                  </button>
+                  <div className="lp-builder-meta">
+                    <span className="tag">{approvedAvatars.find(a => a.id === activePage.avatar_id)?.name || 'Avatar'}</span>
+                    <span className="tag">{approvedOffers.find(o => o.id === activePage.offer_id)?.name || 'Offer'}</span>
+                    <span className="tag">{activePage.template_id?.replace(/_/g, ' ') || 'Template'}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <button className={`btn btn-sm ${showEditModal ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setShowEditModal(!showEditModal)}>
+                      &#9998; AI Edit
+                    </button>
+                    {activePage.page_html && (
+                      <button className="btn btn-secondary btn-sm" onClick={() => {
+                        const w = window.open('', '_blank')
+                        if (w) { w.document.write(activePage.page_html!); w.document.close() }
+                      }}>
+                        Open in Tab
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* AI Edit Panel */}
+                {showEditModal && (
+                  <div className="lp-edit-panel">
+                    <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                        <input type="radio" checked={editScope === 'full_page'} onChange={() => setEditScope('full_page')} />
+                        Edit full page
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                        <input type="radio" checked={editScope === 'section'} onChange={() => setEditScope('section')} />
+                        Edit section:
+                      </label>
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {editScope === 'section' && activePage.section_data && (
+                        <select className="select" style={{ fontSize: 12, padding: '4px 8px' }} value={editingSectionId} onChange={e => setEditingSectionId(e.target.value)}>
+                          <option value="">Select section...</option>
+                          {((activePage.section_data || []) as any[]).map((s: any) => (
+                            <option key={s.id} value={s.id}>{String(s.type || '').replace(/_/g, ' ')} ({s.id})</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <textarea
+                        className="textarea"
+                        placeholder="Describe what you want to change... e.g. 'Make the headline more urgent' or 'Add a money-back guarantee to the proof section'"
+                        value={editingPrompt}
+                        onChange={e => setEditingPrompt(e.target.value)}
+                        rows={2}
+                        style={{ flex: 1, fontSize: 13 }}
+                      />
+                      <button
+                        className="btn btn-primary"
+                        disabled={isEditing || !editingPrompt.trim() || (editScope === 'section' && !editingSectionId)}
+                        onClick={async () => {
+                          if (!activePage) return
+                          setIsEditing(true)
+                          try {
+                            const result = await editLandingPageSection(
+                              activePage.id,
+                              editingPrompt,
+                              editScope,
+                              editScope === 'section' ? editingSectionId : undefined
+                            )
+                            if (result.landing_page) {
+                              setActivePage(result.landing_page)
+                              if (client?.id) refreshLandingPages(client.id)
+                              showToast('Page updated!')
+                              setEditingPrompt('')
+                            }
+                          } catch (err) {
+                            showToast('Edit failed: ' + (err as Error).message)
+                          } finally {
+                            setIsEditing(false)
+                          }
+                        }}
+                      >
+                        {isEditing ? 'Editing...' : 'Apply'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Section List + Preview */}
+                <div className="lp-builder-layout">
+                  {/* Left: Section list */}
+                  <div className="lp-builder-sections">
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: 'var(--text-secondary)' }}>
+                      Sections ({((activePage.section_data || []) as unknown[]).length})
+                    </div>
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                    {((activePage.section_data || []) as any[])
+                      .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+                      .map((section: any) => (
+                        <div key={section.id} className="lp-section-card">
+                          <div className="lp-section-type">{String(section.type || '').replace(/_/g, ' ')}</div>
+                          <div className="lp-section-preview">
+                            {section.content?.headline && String(section.content.headline)}
+                            {section.content?.text && String(section.content.text).substring(0, 60) + '...'}
+                            {section.content?.content && String(section.content.content).substring(0, 60) + '...'}
+                            {section.content?.items && `${(section.content.items as unknown[]).length} items`}
+                          </div>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            style={{ fontSize: 11, padding: '2px 6px' }}
+                            onClick={() => {
+                              setEditScope('section')
+                              setEditingSectionId(section.id)
+                              setShowEditModal(true)
+                            }}
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+
+                  {/* Right: Preview */}
+                  <div className="lp-builder-preview">
+                    <div className="lp-preview-controls">
+                      <button className={`btn btn-sm ${previewSize === 'desktop' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setPreviewSize('desktop')}>Desktop</button>
+                      <button className={`btn btn-sm ${previewSize === 'tablet' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setPreviewSize('tablet')}>Tablet</button>
+                      <button className={`btn btn-sm ${previewSize === 'mobile' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setPreviewSize('mobile')}>Mobile</button>
+                    </div>
+                    <div className="lp-preview-frame" style={{
+                      maxWidth: previewSize === 'mobile' ? 375 : previewSize === 'tablet' ? 768 : '100%',
+                      margin: previewSize !== 'desktop' ? '0 auto' : undefined,
+                    }}>
+                      {activePage.page_html ? (
+                        <iframe
+                          srcDoc={activePage.page_html}
+                          title="Landing Page Preview"
+                          className="lp-preview-iframe"
+                        />
+                      ) : (
+                        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+                          No HTML preview available
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-              {canEdit && (
-                <button className="btn btn-primary" style={{ marginTop: 16 }} disabled>
-                  Build Landing Page
-                </button>
-              )}
-            </div>
+            ) : (
+              <>
+                {/* Page list if any exist */}
+                {landingPages.length > 0 && (
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
+                      Built Pages ({landingPages.length})
+                    </div>
+                    <div className="card-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))' }}>
+                      {landingPages.map(page => (
+                        <div key={page.id} className="card lp-page-card" onClick={() => setActivePage(page)} style={{ cursor: 'pointer' }}>
+                          <div className="card-title" style={{ fontSize: 13 }}>
+                            {approvedAvatars.find(a => a.id === page.avatar_id)?.name || 'Unknown Avatar'}
+                          </div>
+                          <div className="card-meta">
+                            {approvedOffers.find(o => o.id === page.offer_id)?.name || 'Unknown Offer'}
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                            <span className="tag" style={{ fontSize: 10 }}>{page.template_id?.replace(/_/g, ' ') || 'template'}</span>
+                            <span className="tag" style={{ fontSize: 10, background: page.deploy_status === 'deployed' ? 'var(--success-muted)' : 'var(--bg-hover)' }}>
+                              {page.deploy_status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* New page generator */}
+                <div className="card" style={{ padding: 20 }}>
+                  <div className="card-title" style={{ marginBottom: 16 }}>Build New Landing Page</div>
+
+                  {approvedAvatars.length === 0 || approvedOffers.length === 0 ? (
+                    <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                      You need at least one approved Avatar and one approved Offer to build a landing page.
+                      Go to the Avatars and Offers pages to review and approve them.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="lp-build-form">
+                        <div className="lp-build-row">
+                          <label className="lp-build-label">Avatar</label>
+                          <select className="select" value={selectedAvatarId} onChange={e => setSelectedAvatarId(e.target.value)}>
+                            <option value="">Select avatar...</option>
+                            {approvedAvatars.map(a => (
+                              <option key={a.id} value={a.id}>{a.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="lp-build-row">
+                          <label className="lp-build-label">Offer</label>
+                          <select className="select" value={selectedOfferId} onChange={e => setSelectedOfferId(e.target.value)}>
+                            <option value="">Select offer...</option>
+                            {approvedOffers.map(o => (
+                              <option key={o.id} value={o.id}>{o.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="lp-build-row">
+                          <label className="lp-build-label">Template</label>
+                          <div className="lp-template-grid">
+                            {([
+                              { id: 'clean_authority' as TemplateId, name: 'Clean Authority', desc: 'Professional, generous whitespace, single-column flow' },
+                              { id: 'bold_conversion' as TemplateId, name: 'Bold Conversion', desc: 'Full-bleed sections, urgency elements, strong contrast' },
+                              { id: 'gap_play' as TemplateId, name: 'Gap Play', desc: 'Story-driven, comparison tables, editorial feel' },
+                              { id: 'aggressive_dr' as TemplateId, name: 'Aggressive DR', desc: 'Maximum density, CTAs throughout, multi-proof' },
+                            ]).map(tmpl => (
+                              <button
+                                key={tmpl.id}
+                                className={`lp-template-option ${selectedTemplateId === tmpl.id ? 'lp-template-selected' : ''}`}
+                                onClick={() => setSelectedTemplateId(tmpl.id)}
+                              >
+                                <div style={{ fontWeight: 600, fontSize: 13 }}>{tmpl.name}</div>
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{tmpl.desc}</div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {generatingPage && (
+                        <div style={{ padding: 30, textAlign: 'center', background: 'var(--bg-hover)', borderRadius: 8, marginTop: 16 }}>
+                          <div className="generating-spinner" style={{ width: 30, height: 30, margin: '0 auto 12px' }} />
+                          <div style={{ fontWeight: 600, marginBottom: 8 }}>Building Landing Page...</div>
+                          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                            AI is generating section content and rendering the page with your brand kit. This takes 30-60 seconds.
+                          </div>
+                        </div>
+                      )}
+
+                      {canEdit && !generatingPage && (
+                        <button
+                          className="btn btn-primary"
+                          style={{ marginTop: 16 }}
+                          disabled={!selectedAvatarId || !selectedOfferId}
+                          onClick={async () => {
+                            if (!client) return
+                            setGeneratingPage(true)
+                            try {
+                              const result = await generateLandingPage(
+                                client.id,
+                                selectedAvatarId,
+                                selectedOfferId,
+                                selectedTemplateId
+                              )
+                              if (result.landing_page) {
+                                setActivePage(result.landing_page)
+                                await refreshLandingPages(client.id)
+                                showToast('Landing page generated!')
+                              }
+                            } catch (err) {
+                              showToast('Generation failed: ' + (err as Error).message)
+                            } finally {
+                              setGeneratingPage(false)
+                            }
+                          }}
+                        >
+                          Generate Landing Page
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>

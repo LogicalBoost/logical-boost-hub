@@ -112,6 +112,38 @@ export async function generateConcepts(clientId: string) {
   return callEdgeFunction('generate-concepts', { client_id: clientId })
 }
 
+// Workflow 14: Generate a landing page for avatar + offer + template
+export async function generateLandingPage(
+  clientId: string,
+  avatarId: string,
+  offerId: string,
+  templateId: string,
+  conceptBriefIndex?: number
+) {
+  return callEdgeFunction('generate-landing-page', {
+    client_id: clientId,
+    avatar_id: avatarId,
+    offer_id: offerId,
+    template_id: templateId,
+    concept_brief_index: conceptBriefIndex,
+  })
+}
+
+// Workflow 15: Edit a landing page section or full page via AI prompter
+export async function editLandingPageSection(
+  landingPageId: string,
+  userPrompt: string,
+  editScope: 'section' | 'full_page',
+  sectionId?: string
+) {
+  return callEdgeFunction('edit-landing-page-section', {
+    landing_page_id: landingPageId,
+    user_prompt: userPrompt,
+    edit_scope: editScope,
+    section_id: sectionId,
+  })
+}
+
 // Workflow 10: AI-powered competitor discovery
 export async function discoverCompetitors(
   clientId: string,
