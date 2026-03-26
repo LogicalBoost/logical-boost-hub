@@ -1,7 +1,27 @@
-// Iterate Landing Page — takes a change request and modifies the existing HTML
+// Iterate Landing Page -- takes a change request and sends the original prompt
+// plus the iteration instruction back to Stitch for a new design.
+//
+// Uses the iteration pattern from the master prompt spec:
+// [original full prompt] + [iteration instruction with change request]
+// This preserves brand extraction, global rules, and copy context.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { callClaude, corsHeaders, jsonResponse, errorResponse } from '../_shared/ai-client.ts'
+import { corsHeaders, jsonResponse, errorResponse } from '../_shared/ai-client.ts'
+import { generateWithStitch } from '../_shared/stitch-client.ts'
+
+/**
+ * Assemble the iteration prompt per the master spec:
+ * Original prompt + change instruction appended.
+ */
+function assembleIterationPrompt(previousPrompt: string, userChangeRequest: string): string {
+  const iterationInstruction = `The following changes are requested to the landing page you just built:
+
+${userChangeRequest}
+
+Apply these changes to the page. Keep everything else exactly the same -- same brand extraction, same copy, same section structure. Return the complete updated page code.`.trim()
+
+  return [previousPrompt, iterationInstruction].join('\n\n---\n\n')
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -31,51 +51,37 @@ Deno.serve(async (req: Request) => {
       return errorResponse(`Landing page not found: ${fetchError?.message || 'No data'}`)
     }
 
-    const currentHtml = page.stitch_output_code || page.page_html || ''
-    if (!currentHtml) {
-      return errorResponse('No existing HTML to iterate on')
+    // Get the original prompt from iteration history
+    const history = Array.isArray(page.iteration_history) ? page.iteration_history : []
+    const originalPrompt = history.length > 0 ? history[0].prompt_sent : null
+
+    if (!originalPrompt) {
+      return errorResponse('No original prompt found in iteration history. The page must be built with the new pipeline first.')
     }
 
-    const systemPrompt = `You are an expert landing page designer. You will receive an existing HTML landing page and a change request. Apply the requested changes while preserving the overall structure and design quality.
+    // Assemble the iteration prompt: original + change request
+    const fullIterationPrompt = assembleIterationPrompt(originalPrompt, user_prompt)
 
-RULES:
-- Return the COMPLETE modified HTML document (<!DOCTYPE html> to </html>)
-- Preserve all existing styles, fonts, and layout unless the change request specifically asks to modify them
-- Keep the page mobile-responsive
-- Do not remove sections unless explicitly asked
-- NEVER use em dashes
-- No markdown, no explanation, no code fences — ONLY the HTML
-
-OUTPUT FORMAT:
-Return ONLY the complete HTML document. Nothing else.`
-
-    const userMessage = `Here is the current landing page HTML:
-
-${currentHtml}
-
-CHANGE REQUEST:
-${user_prompt}
-
-Apply the changes and return the complete updated HTML.`
-
-    const html = await callClaude(systemPrompt, userMessage, {
-      model: 'claude-sonnet-4-20250514',
-      maxTokens: 16384,
+    // Send to Stitch API for redesign
+    const stitchResult = await generateWithStitch(fullIterationPrompt, {
+      projectId: page.stitch_job_id || `lbh-iterate-${Date.now()}`,
+      device: 'DESKTOP',
     })
 
-    // Clean up
-    let cleanHtml = html.trim()
+    // Clean up HTML
+    let cleanHtml = stitchResult.html.trim()
     if (cleanHtml.startsWith('```')) {
       cleanHtml = cleanHtml.replace(/^```(?:html)?\s*\n?/, '').replace(/\n?```\s*$/, '')
     }
 
-    // Build iteration history
-    const history = Array.isArray(page.iteration_history) ? [...page.iteration_history] : []
+    // Build updated iteration history per the spec
     history.push({
-      version: history.length + 1,
-      prompt: user_prompt,
-      stitch_preview_url: null,
-      created_at: new Date().toISOString(),
+      iteration: history.length,
+      prompt_sent: fullIterationPrompt,
+      change_request: user_prompt,
+      preview_url: stitchResult.imageUrl,
+      output_code: cleanHtml,
+      timestamp: new Date().toISOString(),
     })
 
     // Update the landing page
@@ -84,6 +90,7 @@ Apply the changes and return the complete updated HTML.`
       .update({
         page_html: cleanHtml,
         stitch_output_code: cleanHtml,
+        stitch_preview_url: stitchResult.imageUrl,
         iteration_history: history,
         updated_at: new Date().toISOString(),
       })

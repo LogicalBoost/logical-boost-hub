@@ -112,7 +112,7 @@ export async function generateConcepts(clientId: string) {
   return callEdgeFunction('generate-concepts', { client_id: clientId })
 }
 
-// Workflow 7: Build landing page via Stitch pipeline
+// Workflow 7: Build landing page via design engine pipeline
 export async function buildLandingPage(
   clientId: string,
   avatarId: string,
@@ -129,7 +129,7 @@ export async function buildLandingPage(
   })
 }
 
-// Iterate on a Stitch landing page with a change prompt
+// Iterate on a landing page with a change prompt
 export async function iterateLandingPage(
   landingPageId: string,
   userPrompt: string
@@ -140,7 +140,7 @@ export async function iterateLandingPage(
   })
 }
 
-// Approve a Stitch landing page and convert to React
+// Approve a landing page and convert to React
 export async function approveLandingPage(landingPageId: string) {
   return callEdgeFunction('approve-landing-page', {
     landing_page_id: landingPageId,

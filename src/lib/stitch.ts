@@ -185,30 +185,40 @@ export const TEMPLATE_SLOTS: Record<string, CopySlotDef[]> = {
 // ============================================================
 
 /**
- * Serialize a copy slot value to a plain string for Stitch prompt assembly.
- * CRITICAL: Stitch prompts must never contain [object Object].
+ * Serialize a copy slot value to a plain string for prompt assembly.
+ * Follows the master prompt spec's serialization rules exactly.
+ * CRITICAL: Prompts must never contain [object Object].
  */
 export function serializeSlotValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') {
+    return '[MISSING - DO NOT RENDER]'
+  }
   if (typeof value === 'string') return value
   if (Array.isArray(value)) {
-    if (value.length === 0) return ''
+    if (value.length === 0) return '[MISSING - DO NOT RENDER]'
     if (typeof value[0] === 'string') return value.join(' | ')
-    // Array of objects — format as labeled list
-    return value.map((item, i) => {
-      if (typeof item === 'object' && item !== null) {
-        return Object.entries(item).map(([k, v]) => `${k}: ${v}`).join(', ')
-      }
-      return String(item)
-    }).join('\n')
+    // Array of objects -- format using the spec's labeled line patterns
+    if (typeof value[0] === 'object') {
+      const formatted = value.map((item: Record<string, unknown>) => {
+        if (item.label && item.description) return `${item.label}: ${item.description}`
+        if (item.question && item.answer) return `Q: ${item.question} | A: ${item.answer}`
+        if (item.name && item.result) return `${item.name}: ${item.result}`
+        if (item.step && item.label && item.description) return `Step ${item.step} - ${item.label}: ${item.description}`
+        if (item.quote && item.name) return `"${item.quote}" -- ${item.name}${item.descriptor ? ', ' + item.descriptor : ''}`
+        return Object.values(item).filter(v => v).join(': ')
+      }).join(' | ')
+      return formatted
+    }
   }
   if (typeof value === 'object' && value !== null) {
-    return Object.entries(value).map(([k, v]) => `${k}: ${v}`).join('\n')
+    return Object.entries(value as Record<string, unknown>).map(([k, v]) => `${k}=${v}`).join(', ')
   }
-  return String(value ?? '')
+  return String(value)
 }
 
 /**
- * Serialize all copy slots to plain strings.
+ * Serialize all copy slots to plain strings for the prompt.
+ * Returns a Record<string, string> suitable for passing to the edge function.
  */
 export function serializeCopySlots(slots: Record<string, unknown>): Record<string, string> {
   const serialized: Record<string, string> = {}
