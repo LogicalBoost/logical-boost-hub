@@ -4,9 +4,11 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAppStore } from '@/lib/store'
 import { generateFunnel, generateMore } from '@/lib/api'
 import { showToast } from '@/lib/demo-toast'
-import { ANGLES, getAngleLabel, ANGLE_COLORS } from '@/types/database'
-import type { CopyComponent, CopyComponentType, BrandKit } from '@/types/database'
+import { ANGLES, getAngleLabel, ANGLE_COLORS, TEMPLATE_INFO } from '@/types/database'
+import type { CopyComponent, CopyComponentType, BrandKit, TemplateId } from '@/types/database'
 import { supabase } from '@/lib/supabase'
+import { TEMPLATE_SLOTS, mapComponentsToSlots } from '@/lib/stitch'
+import type { CopySlotDef } from '@/lib/stitch'
 
 // ── Tab definitions (maps to copy component types) ──────────────────────
 const TABS: { key: string; label: string; types: CopyComponentType[] }[] = [
@@ -310,6 +312,230 @@ function VideoAdGenerator({
   )
 }
 
+// ── Landing Page Copy Section ──────────────────────────────────────────
+function TemplateCopySection({
+  instanceComponents,
+  onGenerateMore,
+  generatingSection,
+  canEdit,
+}: {
+  instanceComponents: CopyComponent[]
+  onGenerateMore: (sectionType: string, templatePrompt?: string) => void
+  generatingSection: string | null
+  canEdit: boolean
+}) {
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateId | ''>('')
+  const [expandedSlot, setExpandedSlot] = useState<string | null>(null)
+
+  const templateIds = Object.keys(TEMPLATE_INFO) as TemplateId[]
+
+  // Map components to selected template's slots
+  const slotMapping = useMemo(() => {
+    if (!selectedTemplate) return null
+    const comps = instanceComponents.map(c => ({ id: c.id, type: c.type, text: c.text }))
+    return mapComponentsToSlots(selectedTemplate, comps)
+  }, [selectedTemplate, instanceComponents])
+
+  const slots = selectedTemplate ? (TEMPLATE_SLOTS[selectedTemplate] || []) : []
+
+  // Group missing slots by content type for batch generation
+  const missingByType = useMemo(() => {
+    if (!slotMapping) return {}
+    const groups: Record<string, CopySlotDef[]> = {}
+    for (const slotId of slotMapping.missing) {
+      const slotDef = slots.find(s => s.id === slotId)
+      if (slotDef) {
+        if (!groups[slotDef.contentType]) groups[slotDef.contentType] = []
+        groups[slotDef.contentType].push(slotDef)
+      }
+    }
+    return groups
+  }, [slotMapping, slots])
+
+  const totalSlots = slots.length
+  const filledCount = slotMapping ? Object.keys(slotMapping.filled).length : 0
+  const missingCount = slotMapping ? slotMapping.missing.length : 0
+
+  function handleGenerateForSlot(slot: CopySlotDef) {
+    const templateName = selectedTemplate ? TEMPLATE_INFO[selectedTemplate].name : ''
+    const prompt = `Generate content specifically for a "${slot.label}" slot in a ${templateName} landing page template. Requirements: ${slot.notes}. Make it compelling, specific, and conversion-focused.`
+    onGenerateMore(slot.contentType, prompt)
+  }
+
+  function handleGenerateAllMissing() {
+    if (!selectedTemplate || !slotMapping) return
+    const templateName = TEMPLATE_INFO[selectedTemplate].name
+    // Generate the most common missing type with template context
+    const types = Object.keys(missingByType)
+    if (types.length === 0) return
+    // Find the type with the most missing slots
+    const primaryType = types.reduce((a, b) => missingByType[a].length > missingByType[b].length ? a : b)
+    const slotDescs = missingByType[primaryType].map(s => `"${s.label}" (${s.notes})`).join(', ')
+    const prompt = `Generate content for a ${templateName} landing page template. These specific slots need content: ${slotDescs}. Each piece of content should be distinct and optimized for its specific slot position on the page.`
+    onGenerateMore(primaryType, prompt)
+  }
+
+  return (
+    <div className="funnel-section-card">
+      <div className="funnel-section-header">
+        <h3>Landing Page Copy</h3>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          Generate copy tailored to specific landing page templates
+        </span>
+      </div>
+
+      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+        <label className="form-label" style={{ marginBottom: 6 }}>Select Template</label>
+        <select
+          className="form-input"
+          value={selectedTemplate}
+          onChange={(e) => { setSelectedTemplate(e.target.value as TemplateId | ''); setExpandedSlot(null) }}
+          style={{ maxWidth: 400 }}
+        >
+          <option value="">Choose a template to see its copy slots...</option>
+          {templateIds.map(tid => (
+            <option key={tid} value={tid}>
+              {TEMPLATE_INFO[tid].name} — {TEMPLATE_INFO[tid].bestFor}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {selectedTemplate && slotMapping && (
+        <>
+          {/* Status bar */}
+          <div style={{
+            padding: '12px 20px',
+            display: 'flex', alignItems: 'center', gap: 16,
+            borderBottom: '1px solid var(--border)',
+            background: 'rgba(255,255,255,0.02)',
+          }}>
+            <div style={{ fontSize: 13 }}>
+              <span style={{ color: 'var(--accent)' }}>{filledCount}</span>
+              <span style={{ color: 'var(--text-muted)' }}> / {totalSlots} slots filled</span>
+            </div>
+            {missingCount > 0 && (
+              <span style={{ fontSize: 12, color: '#f59e0b' }}>
+                {missingCount} missing
+              </span>
+            )}
+            <div style={{ flex: 1 }} />
+            {canEdit && missingCount > 0 && (
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleGenerateAllMissing}
+                disabled={!!generatingSection}
+              >
+                {generatingSection ? 'Generating...' : `Generate Missing Copy`}
+              </button>
+            )}
+          </div>
+
+          {/* Slot list */}
+          <div style={{ maxHeight: 500, overflowY: 'auto' }}>
+            {slots.map(slot => {
+              const isFilled = !!slotMapping.filled[slot.id]
+              const isMissing = slotMapping.missing.includes(slot.id)
+              const options = slotMapping.options[slot.id] || []
+              const isExpanded = expandedSlot === slot.id
+
+              return (
+                <div
+                  key={slot.id}
+                  style={{
+                    padding: '10px 20px',
+                    borderBottom: '1px solid var(--border)',
+                    background: isMissing ? 'rgba(245, 158, 11, 0.04)' : 'transparent',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{
+                      width: 8, height: 8, borderRadius: '50%',
+                      background: isFilled ? 'var(--accent)' : '#f59e0b',
+                      flexShrink: 0,
+                    }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
+                        {slot.label}
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+                          {slot.contentType}{slot.isArray ? ' (array)' : ''} · {slot.notes}
+                        </span>
+                      </div>
+                      {isFilled && (
+                        <div style={{
+                          fontSize: 12, color: 'var(--text-secondary)', marginTop: 4,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>
+                          {slotMapping.filled[slot.id].slice(0, 120)}{slotMapping.filled[slot.id].length > 120 ? '...' : ''}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      {options.length > 0 && (
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          style={{ fontSize: 11, padding: '2px 8px' }}
+                          onClick={() => setExpandedSlot(isExpanded ? null : slot.id)}
+                        >
+                          {options.length} option{options.length !== 1 ? 's' : ''} {isExpanded ? '▲' : '▼'}
+                        </button>
+                      )}
+                      {canEdit && isMissing && (
+                        <button
+                          className="btn btn-primary btn-sm"
+                          style={{ fontSize: 11, padding: '2px 8px' }}
+                          onClick={() => handleGenerateForSlot(slot)}
+                          disabled={!!generatingSection}
+                        >
+                          {generatingSection === slot.contentType ? '...' : 'Generate'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Expanded options list */}
+                  {isExpanded && options.length > 0 && (
+                    <div style={{
+                      marginTop: 8, marginLeft: 18,
+                      borderLeft: '2px solid var(--border)',
+                      paddingLeft: 12,
+                    }}>
+                      {options.map((opt, idx) => (
+                        <div
+                          key={opt.id || idx}
+                          style={{
+                            padding: '6px 0',
+                            fontSize: 12,
+                            color: slotMapping.filled[slot.id] === opt.text ? 'var(--accent)' : 'var(--text-secondary)',
+                            borderBottom: idx < options.length - 1 ? '1px solid var(--border)' : 'none',
+                          }}
+                        >
+                          {slotMapping.filled[slot.id] === opt.text && (
+                            <span style={{ marginRight: 6 }}>✓</span>
+                          )}
+                          {opt.text.slice(0, 200)}{opt.text.length > 200 ? '...' : ''}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
+
+      {!selectedTemplate && (
+        <div style={{ padding: '32px 20px', textAlign: 'center' }}>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+            Select a template above to see which copy slots are filled and which need content generated.
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main Funnel Page ────────────────────────────────────────────────────
 export default function FunnelPage() {
   const {
@@ -543,11 +769,12 @@ export default function FunnelPage() {
     }
   }
 
-  async function handleGenerateMore(sectionType: string) {
+  async function handleGenerateMore(sectionType: string, templatePrompt?: string) {
     if (!currentInstance || !client) return
     setGeneratingSection(sectionType)
     try {
       await generateMore(currentInstance.id, sectionType, {
+        userPrompt: templatePrompt,
         angleFilter: angleFilter !== 'all' ? angleFilter : undefined,
       })
       await refreshCopyComponents(client.id)
@@ -650,7 +877,7 @@ export default function FunnelPage() {
       <div>
         <div className="page-header">
           <div>
-            <h1 className="page-title">Funnel</h1>
+            <h1 className="page-title">Copy</h1>
             <p className="page-subtitle">Select Avatar + Offer, then generate your complete campaign asset library</p>
           </div>
         </div>
@@ -975,6 +1202,14 @@ export default function FunnelPage() {
               </div>
             )}
           </div>
+
+          {/* ── Landing Page Copy ─────────────────────────────────── */}
+          <TemplateCopySection
+            instanceComponents={instanceComponents}
+            onGenerateMore={handleGenerateMore}
+            generatingSection={generatingSection}
+            canEdit={canEdit}
+          />
 
           {/* ── Video Ad Generator ────────────────────────────────── */}
           <VideoAdGenerator
