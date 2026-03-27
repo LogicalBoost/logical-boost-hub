@@ -1082,6 +1082,60 @@ export default function LandingPagesPage() {
                 </div>
               </div>
 
+              {/* Saved Images Gallery — always visible when assets exist */}
+              {clientAssets.filter(a => a.asset_type === 'hero_image').length > 0 && (
+                <div style={{
+                  marginBottom: 16,
+                  padding: 12,
+                  borderRadius: 'var(--radius)',
+                  border: '1px solid rgba(139, 92, 246, 0.15)',
+                  background: 'rgba(139, 92, 246, 0.04)',
+                }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#a78bfa', display: 'block', marginBottom: 8 }}>
+                    Your Saved Images <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— click to use</span>
+                  </label>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    {clientAssets.filter(a => a.asset_type === 'hero_image').map(asset => (
+                      <div
+                        key={asset.id}
+                        onClick={() => {
+                          setHeroImageUrl(asset.url)
+                          setCopySlots(prev => ({ ...prev, hero_image: asset.url }))
+                          showToast('Hero image selected')
+                        }}
+                        style={{
+                          width: 100,
+                          height: 72,
+                          borderRadius: 8,
+                          overflow: 'hidden',
+                          border: heroImageUrl === asset.url ? '2px solid #8b5cf6' : '1px solid var(--border)',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          transition: 'all 0.2s',
+                          flexShrink: 0,
+                          boxShadow: heroImageUrl === asset.url ? '0 0 12px rgba(139,92,246,0.3)' : 'none',
+                        }}
+                        title={asset.style ? `${asset.style} style` : 'Uploaded image'}
+                      >
+                        <img
+                          src={asset.url}
+                          alt=""
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        />
+                        {heroImageUrl === asset.url && (
+                          <div style={{
+                            position: 'absolute', inset: 0,
+                            background: 'rgba(139,92,246,0.25)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: '#fff', fontSize: 18, fontWeight: 700,
+                          }}>&#10003;</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Image preview — shown at top when we have one */}
               {heroImageUrl && (
                 <div style={{ marginBottom: 16 }}>
@@ -1299,53 +1353,6 @@ export default function LandingPagesPage() {
               <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.5 }}>
                 The hero image will be placed prominently in the hero section of your landing page.
               </p>
-
-              {/* Saved assets gallery */}
-              {clientAssets.filter(a => a.asset_type === 'hero_image').length > 0 && (
-                <div style={{ marginTop: 14 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
-                    Saved Images <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— click to use</span>
-                  </label>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {clientAssets.filter(a => a.asset_type === 'hero_image').map(asset => (
-                      <div
-                        key={asset.id}
-                        onClick={() => {
-                          setHeroImageUrl(asset.url)
-                          setCopySlots(prev => ({ ...prev, hero_image: asset.url }))
-                          showToast('Hero image selected from saved assets')
-                        }}
-                        style={{
-                          width: 80,
-                          height: 56,
-                          borderRadius: 6,
-                          overflow: 'hidden',
-                          border: heroImageUrl === asset.url ? '2px solid #8b5cf6' : '1px solid var(--border)',
-                          cursor: 'pointer',
-                          position: 'relative',
-                          transition: 'border-color 0.15s',
-                          flexShrink: 0,
-                        }}
-                        title={asset.style ? `${asset.style} style` : 'Uploaded image'}
-                      >
-                        <img
-                          src={asset.url}
-                          alt=""
-                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                        />
-                        {heroImageUrl === asset.url && (
-                          <div style={{
-                            position: 'absolute', inset: 0,
-                            background: 'rgba(139,92,246,0.2)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: '#fff', fontSize: 16, fontWeight: 700,
-                          }}>&#10003;</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
@@ -1369,6 +1376,59 @@ export default function LandingPagesPage() {
                   </p>
                 </div>
               </div>
+
+              {/* Saved Parallax Gallery — always visible when assets exist */}
+              {clientAssets.filter(a => a.asset_type === 'parallax').length > 0 && (
+                <div style={{
+                  marginBottom: 14,
+                  padding: 12,
+                  borderRadius: 'var(--radius)',
+                  border: '1px solid rgba(59, 130, 246, 0.15)',
+                  background: 'rgba(59, 130, 246, 0.04)',
+                }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#60a5fa', display: 'block', marginBottom: 8 }}>
+                    Saved Backgrounds <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— click to use</span>
+                  </label>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    {clientAssets.filter(a => a.asset_type === 'parallax').map(asset => (
+                      <div
+                        key={asset.id}
+                        onClick={() => {
+                          setParallaxImageUrl(asset.url)
+                          setCopySlots(prev => ({ ...prev, parallax_image: asset.url }))
+                          showToast('Parallax background selected')
+                        }}
+                        style={{
+                          width: 120,
+                          height: 56,
+                          borderRadius: 8,
+                          overflow: 'hidden',
+                          border: parallaxImageUrl === asset.url ? '2px solid #3b82f6' : '1px solid var(--border)',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          transition: 'all 0.2s',
+                          flexShrink: 0,
+                          boxShadow: parallaxImageUrl === asset.url ? '0 0 12px rgba(59,130,246,0.3)' : 'none',
+                        }}
+                      >
+                        <img
+                          src={asset.url}
+                          alt=""
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        />
+                        {parallaxImageUrl === asset.url && (
+                          <div style={{
+                            position: 'absolute', inset: 0,
+                            background: 'rgba(59,130,246,0.25)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: '#fff', fontSize: 18, fontWeight: 700,
+                          }}>&#10003;</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Parallax preview */}
               {parallaxImageUrl && (
@@ -1470,51 +1530,6 @@ export default function LandingPagesPage() {
                 />
               </div>
 
-              {/* Saved parallax assets */}
-              {clientAssets.filter(a => a.asset_type === 'parallax').length > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
-                    Saved Backgrounds <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— click to use</span>
-                  </label>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {clientAssets.filter(a => a.asset_type === 'parallax').map(asset => (
-                      <div
-                        key={asset.id}
-                        onClick={() => {
-                          setParallaxImageUrl(asset.url)
-                          setCopySlots(prev => ({ ...prev, parallax_image: asset.url }))
-                          showToast('Parallax background selected')
-                        }}
-                        style={{
-                          width: 100,
-                          height: 48,
-                          borderRadius: 6,
-                          overflow: 'hidden',
-                          border: parallaxImageUrl === asset.url ? '2px solid #3b82f6' : '1px solid var(--border)',
-                          cursor: 'pointer',
-                          position: 'relative',
-                          transition: 'border-color 0.15s',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <img
-                          src={asset.url}
-                          alt=""
-                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                        />
-                        {parallaxImageUrl === asset.url && (
-                          <div style={{
-                            position: 'absolute', inset: 0,
-                            background: 'rgba(59,130,246,0.2)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: '#fff', fontSize: 16, fontWeight: 700,
-                          }}>&#10003;</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
