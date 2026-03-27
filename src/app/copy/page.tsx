@@ -7,8 +7,8 @@ import { showToast } from '@/lib/demo-toast'
 import { ANGLES, getAngleLabel, ANGLE_COLORS, TEMPLATE_INFO } from '@/types/database'
 import type { CopyComponent, CopyComponentType, BrandKit, TemplateId } from '@/types/database'
 import { supabase } from '@/lib/supabase'
-import { TEMPLATE_SLOTS, mapComponentsToSlots } from '@/lib/stitch'
-import type { CopySlotDef } from '@/lib/stitch'
+import { TEMPLATE_SLOTS, mapComponentsToSlots } from '@/lib/template-slots'
+import type { CopySlotDef } from '@/lib/template-slots'
 
 // ── Tab definitions (maps to copy component types) ──────────────────────
 const TABS: { key: string; label: string; types: CopyComponentType[] }[] = [

@@ -6,7 +6,7 @@ import Header from './Header'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const isLoginPage = pathname?.replace('/logical-boost-hub', '').startsWith('/login')
+  const isLoginPage = pathname?.startsWith('/login')
 
   // Login page renders full-screen without shell
   if (isLoginPage) {

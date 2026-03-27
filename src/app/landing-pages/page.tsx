@@ -3,14 +3,10 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useAppStore } from '@/lib/store'
 import {
-  buildLandingPage,
-  iterateLandingPage,
-  deployLandingPage,
-  generateMissingCopySlots,
   generateHeroImage,
 } from '@/lib/api'
-import { TEMPLATE_SLOTS, mapComponentsToSlots, type CopySlotDef } from '@/lib/stitch'
-import { TEMPLATE_INFO, type TemplateId, type LandingPage, type ClientAsset } from '@/types/database'
+import { TEMPLATE_SLOTS, mapComponentsToSlots, type CopySlotDef } from '@/lib/template-slots'
+import { TEMPLATE_INFO, type TemplateId, type LandingPage, type MediaAsset } from '@/types/database'
 import { showToast } from '@/lib/demo-toast'
 import { supabase } from '@/lib/supabase'
 
@@ -112,9 +108,6 @@ const STEPS = [
   { num: 2, label: 'Choose Template' },
   { num: 3, label: 'Review Copy Slots' },
   { num: 4, label: 'Build Page' },
-  { num: 5, label: 'Preview + Iterate' },
-  { num: 6, label: 'Approve' },
-  { num: 7, label: 'Deploy' },
 ]
 
 // ============================================================
@@ -168,22 +161,11 @@ const labelStyle: React.CSSProperties = {
 }
 
 // ============================================================
-// Progress messages for build step
-// ============================================================
-const BUILD_MESSAGES = [
-  'Assembling copy slots and template wireframe...',
-  'Sending to the design engine...',
-  'Rendering your landing page...',
-  'Applying brand styles and polish...',
-  'Almost there, finalizing preview...',
-]
-
-// ============================================================
 // Main Page Component
 // ============================================================
 export default function LandingPagesPage() {
   const store = useAppStore()
-  const { client, avatars, offers, copyComponents, landingPages, clientAssets, canEdit, refreshLandingPages, refreshClientAssets } = store
+  const { client, avatars, offers, copyComponents, landingPages, mediaAssets, canEdit, refreshLandingPages, refreshMediaAssets } = store
 
   // Pipeline state
   const [step, setStep] = useState(1)
@@ -194,23 +176,8 @@ export default function LandingPagesPage() {
   const [missingSlotIds, setMissingSlotIds] = useState<string[]>([])
   const [slotOptions, setSlotOptions] = useState<Record<string, Array<{ id?: string; text: string }>>>({})
 
-  // Build state
-  const [building, setBuilding] = useState(false)
-  const [buildError, setBuildError] = useState<string | null>(null)
-  const [buildMsgIdx, setBuildMsgIdx] = useState(0)
+  // Active page (for resuming existing pages)
   const [activePage, setActivePage] = useState<LandingPage | null>(null)
-
-  // Iterate state
-  const [iteratePrompt, setIteratePrompt] = useState('')
-  const [iterating, setIterating] = useState(false)
-  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop')
-
-  // Approve / Deploy state
-  const [approving, setApproving] = useState(false)
-  const [deploying, setDeploying] = useState(false)
-
-  // Generate missing copy state
-  const [generatingCopy, setGeneratingCopy] = useState(false)
 
   // Hero image generation state
   const [heroImageUrl, setHeroImageUrl] = useState<string | null>(null)
@@ -291,28 +258,6 @@ export default function LandingPagesPage() {
     setMissingSlotIds(prev => value.trim() ? prev.filter(id => id !== slotId) : [...prev, slotId])
   }, [])
 
-  const handleGenerateMissing = useCallback(async () => {
-    if (!client || !selectedAvatarId || !selectedOfferId || !selectedTemplate) return
-    setGeneratingCopy(true)
-    try {
-      const result = await generateMissingCopySlots(
-        client.id,
-        selectedAvatarId,
-        selectedOfferId,
-        selectedTemplate,
-        missingSlotIds
-      )
-      if (result.generated_slots) {
-        setCopySlots(prev => ({ ...prev, ...result.generated_slots }))
-        setMissingSlotIds([])
-        showToast('Missing copy slots generated successfully')
-      }
-    } catch (err) {
-      showToast(`Error generating copy: ${(err as Error).message}`)
-    } finally {
-      setGeneratingCopy(false)
-    }
-  }, [client, selectedAvatarId, selectedOfferId, selectedTemplate, missingSlotIds])
 
   const handleGenerateHeroImage = useCallback(async () => {
     if (!client || !selectedAvatarId) return
@@ -330,7 +275,7 @@ export default function LandingPagesPage() {
         setHeroImageUrl(result.image_url)
         setCopySlots(prev => ({ ...prev, hero_image: result.image_url }))
         showToast('Hero image generated successfully')
-        if (client) refreshClientAssets(client.id)
+        if (client) refreshMediaAssets(client.id)
       } else {
         setImageError('No image was returned. Try again or upload your own.')
       }
@@ -381,16 +326,18 @@ export default function LandingPagesPage() {
         setCopySlots(prev => ({ ...prev, parallax_image: urlData.publicUrl }))
       }
 
-      // Save to client_assets table
-      await supabase.from('client_assets').insert({
+      // Save to media_assets table
+      await supabase.from('media_assets').insert({
         client_id: client.id,
-        asset_type: type === 'hero' ? 'hero_image' : 'parallax',
-        url: urlData.publicUrl,
+        role: type === 'hero' ? 'hero_image' : 'parallax',
+        file_url: urlData.publicUrl,
+        file_type: 'image',
         storage_path: storagePath,
         filename: file.name,
+        display_name: file.name,
         metadata: { source: 'uploaded' },
       })
-      refreshClientAssets(client.id)
+      refreshMediaAssets(client.id)
 
       showToast(`${type === 'hero' ? 'Hero' : 'Parallax'} image uploaded`)
     } catch (err) {
@@ -437,148 +384,6 @@ export default function LandingPagesPage() {
     return requiredCopySlots.every(slot => copySlots[slot.id]?.trim())
   }, [requiredCopySlots, copySlots])
 
-  const handleBuild = useCallback(async () => {
-    if (!client || !selectedAvatarId || !selectedOfferId || !selectedTemplate) {
-      const reasons: string[] = []
-      if (!client) reasons.push('No client selected')
-      if (!selectedAvatarId) reasons.push('No avatar selected')
-      if (!selectedOfferId) reasons.push('No offer selected')
-      if (!selectedTemplate) reasons.push('No template selected')
-      setBuildError(`Missing requirements: ${reasons.join(', ')}. Go back to fix these.`)
-      return
-    }
-    setBuilding(true)
-    setBuildError(null)
-    setBuildMsgIdx(0)
-
-    // Cycle through progress messages
-    const interval = setInterval(() => {
-      setBuildMsgIdx(prev => Math.min(prev + 1, BUILD_MESSAGES.length - 1))
-    }, 3000)
-
-    try {
-      // Include image URLs in the slots
-      const slotsToSend = { ...copySlots }
-      if (heroImageUrl) {
-        slotsToSend.hero_image = heroImageUrl
-      }
-      if (parallaxImageUrl) {
-        slotsToSend.parallax_image = parallaxImageUrl
-      }
-
-      const result = await buildLandingPage(
-        client.id,
-        selectedAvatarId,
-        selectedOfferId,
-        selectedTemplate,
-        slotsToSend
-      )
-      clearInterval(interval)
-      if (result.landing_page) {
-        setActivePage(result.landing_page)
-        showToast('Landing page built successfully')
-        setStep(5)
-        // Refresh store
-        store.refreshLandingPages(client.id)
-      } else {
-        setBuildError('Build completed but no landing page was returned. Check the Stitch API key configuration.')
-      }
-    } catch (err) {
-      clearInterval(interval)
-      const msg = (err as Error).message
-      setBuildError(msg)
-      showToast(`Build error: ${msg}`)
-    } finally {
-      setBuilding(false)
-    }
-  }, [client, selectedAvatarId, selectedOfferId, selectedTemplate, copySlots, heroImageUrl, parallaxImageUrl, store])
-
-  const handleIterate = useCallback(async () => {
-    if (!activePage || !iteratePrompt.trim()) return
-    setIterating(true)
-    try {
-      const result = await iterateLandingPage(activePage.id, iteratePrompt.trim())
-      if (result.landing_page) {
-        setActivePage(result.landing_page)
-        setIteratePrompt('')
-        showToast('Page updated with your changes')
-        if (client) store.refreshLandingPages(client.id)
-      }
-    } catch (err) {
-      showToast(`Iterate error: ${(err as Error).message}`)
-    } finally {
-      setIterating(false)
-    }
-  }, [activePage, iteratePrompt, client, store])
-
-  const handleApprove = useCallback(async () => {
-    if (!activePage || !client) return
-    setApproving(true)
-    try {
-      // Update status directly in database (no edge function needed)
-      const { data, error } = await supabase
-        .from('landing_pages')
-        .update({
-          deploy_status: 'approved',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', activePage.id)
-        .select()
-        .single()
-
-      if (error) throw error
-      setActivePage(data)
-      showToast('Design approved! You can now download the HTML or deploy.')
-      setStep(7)
-      store.refreshLandingPages(client.id)
-    } catch (err) {
-      showToast(`Approve error: ${(err as Error).message}`)
-    } finally {
-      setApproving(false)
-    }
-  }, [activePage, client, store])
-
-  const handleDownloadHtml = useCallback(() => {
-    if (!activePage) return
-    const html = activePage.stitch_output_code || activePage.page_html || ''
-    if (!html) {
-      showToast('No HTML to download')
-      return
-    }
-    const blob = new Blob([html], { type: 'text/html' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    const slug = (client?.name || 'landing-page').toLowerCase().replace(/[^a-z0-9]+/g, '-')
-    a.download = `${slug}-landing-page.html`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    showToast('HTML downloaded! Open it in your browser or edit with Claude Code.')
-  }, [activePage, client])
-
-  const handleDeploy = useCallback(async () => {
-    if (!activePage) return
-    setDeploying(true)
-    try {
-      const result = await deployLandingPage(activePage.id)
-      if (result.landing_page) {
-        setActivePage(result.landing_page)
-        showToast('Page deployed successfully!')
-        if (client) store.refreshLandingPages(client.id)
-      }
-    } catch (err) {
-      showToast(`Deploy error: ${(err as Error).message}`)
-    } finally {
-      setDeploying(false)
-    }
-  }, [activePage, client, store])
-
-  const handleCopyUrl = useCallback((url: string) => {
-    navigator.clipboard.writeText(url).then(() => showToast('URL copied to clipboard'))
-  }, [])
-
   // Resume an existing page into the pipeline
   const handleResumePage = useCallback((page: LandingPage) => {
     setActivePage(page)
@@ -586,16 +391,7 @@ export default function LandingPagesPage() {
     setSelectedOfferId(page.offer_id)
     if (page.template_id) setSelectedTemplate(page.template_id)
     if (page.copy_slots) setCopySlots(page.copy_slots)
-
-    if (page.deploy_status === 'deployed') {
-      setStep(7)
-    } else if (page.deploy_status === 'approved' || page.deploy_status === 'converting') {
-      setStep(7)
-    } else if (page.stitch_preview_url || page.stitch_output_code) {
-      setStep(5)
-    } else {
-      setStep(4)
-    }
+    setStep(3)
   }, [])
 
   // Delete a landing page (with confirmation handled in the component)
@@ -618,6 +414,10 @@ export default function LandingPagesPage() {
       showToast('Delete failed: ' + (err as Error).message)
     }
   }, [client, activePage, refreshLandingPages])
+
+  const handleCopyUrl = useCallback((url: string) => {
+    navigator.clipboard.writeText(url).then(() => showToast('URL copied to clipboard'))
+  }, [])
 
   // ============================================================
   // No client guard
@@ -856,15 +656,6 @@ export default function LandingPagesPage() {
               </p>
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              {missingSlotIds.length > 0 && (
-                <button
-                  style={btn('ghost', generatingCopy)}
-                  disabled={generatingCopy}
-                  onClick={handleGenerateMissing}
-                >
-                  {generatingCopy ? 'Generating...' : 'Generate Missing Copy'}
-                </button>
-              )}
               <button
                 style={btn('primary', !allSlotsFilled)}
                 disabled={!allSlotsFilled}
@@ -1104,7 +895,7 @@ export default function LandingPagesPage() {
               </div>
 
               {/* Saved Images Gallery — always visible when assets exist */}
-              {clientAssets.filter(a => a.asset_type === 'hero_image').length > 0 && (
+              {mediaAssets.filter(a => a.role === 'hero_image').length > 0 && (
                 <div style={{
                   marginBottom: 16,
                   padding: 12,
@@ -1116,12 +907,12 @@ export default function LandingPagesPage() {
                     Your Saved Images <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— click to use</span>
                   </label>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                    {clientAssets.filter(a => a.asset_type === 'hero_image').map(asset => (
+                    {mediaAssets.filter(a => a.role === 'hero_image').map(asset => (
                       <div
                         key={asset.id}
                         onClick={() => {
-                          setHeroImageUrl(asset.url)
-                          setCopySlots(prev => ({ ...prev, hero_image: asset.url }))
+                          setHeroImageUrl(asset.file_url)
+                          setCopySlots(prev => ({ ...prev, hero_image: asset.file_url }))
                           showToast('Hero image selected')
                         }}
                         style={{
@@ -1129,21 +920,21 @@ export default function LandingPagesPage() {
                           height: 72,
                           borderRadius: 8,
                           overflow: 'hidden',
-                          border: heroImageUrl === asset.url ? '2px solid #8b5cf6' : '1px solid var(--border)',
+                          border: heroImageUrl === asset.file_url ? '2px solid #8b5cf6' : '1px solid var(--border)',
                           cursor: 'pointer',
                           position: 'relative',
                           transition: 'all 0.2s',
                           flexShrink: 0,
-                          boxShadow: heroImageUrl === asset.url ? '0 0 12px rgba(139,92,246,0.3)' : 'none',
+                          boxShadow: heroImageUrl === asset.file_url ? '0 0 12px rgba(139,92,246,0.3)' : 'none',
                         }}
                         title={asset.style ? `${asset.style} style` : 'Uploaded image'}
                       >
                         <img
-                          src={asset.url}
+                          src={asset.file_url}
                           alt=""
                           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                         />
-                        {heroImageUrl === asset.url && (
+                        {heroImageUrl === asset.file_url && (
                           <div style={{
                             position: 'absolute', inset: 0,
                             background: 'rgba(139,92,246,0.25)',
@@ -1399,7 +1190,7 @@ export default function LandingPagesPage() {
               </div>
 
               {/* Saved Parallax Gallery — always visible when assets exist */}
-              {clientAssets.filter(a => a.asset_type === 'parallax').length > 0 && (
+              {mediaAssets.filter(a => a.role === 'parallax').length > 0 && (
                 <div style={{
                   marginBottom: 14,
                   padding: 12,
@@ -1411,12 +1202,12 @@ export default function LandingPagesPage() {
                     Saved Backgrounds <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— click to use</span>
                   </label>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                    {clientAssets.filter(a => a.asset_type === 'parallax').map(asset => (
+                    {mediaAssets.filter(a => a.role === 'parallax').map(asset => (
                       <div
                         key={asset.id}
                         onClick={() => {
-                          setParallaxImageUrl(asset.url)
-                          setCopySlots(prev => ({ ...prev, parallax_image: asset.url }))
+                          setParallaxImageUrl(asset.file_url)
+                          setCopySlots(prev => ({ ...prev, parallax_image: asset.file_url }))
                           showToast('Parallax background selected')
                         }}
                         style={{
@@ -1424,20 +1215,20 @@ export default function LandingPagesPage() {
                           height: 56,
                           borderRadius: 8,
                           overflow: 'hidden',
-                          border: parallaxImageUrl === asset.url ? '2px solid #3b82f6' : '1px solid var(--border)',
+                          border: parallaxImageUrl === asset.file_url ? '2px solid #3b82f6' : '1px solid var(--border)',
                           cursor: 'pointer',
                           position: 'relative',
                           transition: 'all 0.2s',
                           flexShrink: 0,
-                          boxShadow: parallaxImageUrl === asset.url ? '0 0 12px rgba(59,130,246,0.3)' : 'none',
+                          boxShadow: parallaxImageUrl === asset.file_url ? '0 0 12px rgba(59,130,246,0.3)' : 'none',
                         }}
                       >
                         <img
-                          src={asset.url}
+                          src={asset.file_url}
                           alt=""
                           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                         />
-                        {parallaxImageUrl === asset.url && (
+                        {parallaxImageUrl === asset.file_url && (
                           <div style={{
                             position: 'absolute', inset: 0,
                             background: 'rgba(59,130,246,0.25)',
@@ -1557,417 +1348,35 @@ export default function LandingPagesPage() {
       )}
 
       {/* ============================================================ */}
-      {/* STEP 4: Build Landing Page */}
+      {/* STEP 4: Build Landing Page (placeholder for new template-based flow) */}
       {/* ============================================================ */}
-      {step === 4 && (() => {
-        // Compute what's missing for clear error messages
-        const missing: string[] = []
-        if (!selectedAvatarId) missing.push('Avatar not selected')
-        if (!selectedOfferId) missing.push('Offer not selected')
-        if (!selectedTemplate) missing.push('Template not selected')
-        const emptySlots = requiredCopySlots.filter(s => !copySlots[s.id]?.trim())
-        if (emptySlots.length > 0) missing.push(`${emptySlots.length} required copy slot${emptySlots.length !== 1 ? 's' : ''} empty (${emptySlots.map(s => s.label).join(', ')})`)
-        const canBuild = missing.length === 0 && canEdit
-
-        return (
-          <div style={{ ...card({ maxWidth: 600, textAlign: 'center' as const, margin: '0 auto' }) }}>
-            <h3 style={{ fontSize: 18, marginBottom: 8 }}>Build Landing Page</h3>
-            <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 16 }}>
-              Your template wireframe and copy slots will be combined into a pixel-perfect landing page.
-            </p>
-
-            {/* Readiness checklist */}
-            <div style={{
-              textAlign: 'left' as const,
-              marginBottom: 20,
-              padding: 16,
-              borderRadius: 'var(--radius)',
-              border: `1px solid ${canBuild ? 'rgba(34,197,94,0.3)' : 'rgba(245,158,11,0.3)'}`,
-              background: canBuild ? 'rgba(34,197,94,0.05)' : 'rgba(245,158,11,0.05)',
-            }}>
-              <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', margin: '0 0 10px' }}>
-                Build Checklist
-              </p>
-              {[
-                { label: 'Avatar selected', ok: !!selectedAvatarId },
-                { label: 'Offer selected', ok: !!selectedOfferId },
-                { label: 'Template chosen', ok: !!selectedTemplate },
-                { label: `Required copy slots filled (${requiredCopySlots.length - emptySlots.length}/${requiredCopySlots.length})`, ok: emptySlots.length === 0 },
-                { label: 'Hero image (optional)', ok: !!heroImageUrl, optional: true },
-                { label: 'Parallax image (optional)', ok: !!parallaxImageUrl, optional: true },
-              ].map((item, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <span style={{
-                    fontSize: 14,
-                    color: item.ok ? '#22c55e' : item.optional ? 'var(--text-muted)' : '#f59e0b',
-                  }}>
-                    {item.ok ? '\u2713' : item.optional ? '\u25cb' : '\u2717'}
-                  </span>
-                  <span style={{
-                    fontSize: 13,
-                    color: item.ok ? 'var(--text-secondary)' : item.optional ? 'var(--text-muted)' : '#f59e0b',
-                  }}>
-                    {item.label}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {building ? (
-              <div>
-                <div style={{
-                  width: 48,
-                  height: 48,
-                  border: '3px solid var(--border)',
-                  borderTopColor: 'var(--accent)',
-                  borderRadius: '50%',
-                  margin: '0 auto 16px',
-                  animation: 'spin 1s linear infinite',
-                }} />
-                <p style={{ fontSize: 14, color: 'var(--accent)', fontWeight: 500 }}>
-                  {BUILD_MESSAGES[buildMsgIdx]}
-                </p>
-                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
-                  This can take 30-60 seconds...
-                </p>
-                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-              </div>
-            ) : (
-              <>
-                <button
-                  style={btn('primary', !canBuild)}
-                  disabled={!canBuild}
-                  onClick={handleBuild}
-                >
-                  Build Landing Page
-                </button>
-                {!canBuild && missing.length > 0 && (
-                  <p style={{ fontSize: 12, color: '#f59e0b', marginTop: 10, lineHeight: 1.6 }}>
-                    &#9888; Cannot build — go back and fix:{' '}
-                    {missing.join('; ')}
-                  </p>
-                )}
-              </>
-            )}
-
-            {/* Build error display */}
-            {buildError && (
-              <div style={{
-                marginTop: 16,
-                padding: 12,
-                borderRadius: 'var(--radius)',
-                border: '1px solid rgba(239,68,68,0.3)',
-                background: 'rgba(239,68,68,0.08)',
-                textAlign: 'left' as const,
-              }}>
-                <p style={{ fontSize: 12, fontWeight: 600, color: '#ef4444', margin: '0 0 6px' }}>
-                  Build Error
-                </p>
-                <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5, wordBreak: 'break-word' as const }}>
-                  {buildError}
-                </p>
-              </div>
-            )}
-          </div>
-        )
-      })()}
-
-      {/* ============================================================ */}
-      {/* STEP 5: Preview + Iterate */}
-      {/* ============================================================ */}
-      {step === 5 && activePage && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
-            <h3 style={{ fontSize: 18 }}>Preview + Iterate</h3>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {(['desktop', 'mobile'] as const).map(mode => (
-                <button
-                  key={mode}
-                  onClick={() => setPreviewMode(mode)}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: 'var(--radius-sm)',
-                    border: previewMode === mode ? '1px solid var(--accent)' : '1px solid var(--border)',
-                    background: previewMode === mode ? 'var(--accent-muted)' : 'transparent',
-                    color: previewMode === mode ? 'var(--accent)' : 'var(--text-secondary)',
-                    fontSize: 13,
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {mode === 'desktop' ? 'Desktop' : 'Mobile'}
-                </button>
-              ))}
-              <button
-                style={btn('ghost')}
-                onClick={handleDownloadHtml}
-                title="Download the HTML file"
-              >
-                Download HTML
-              </button>
-              <button
-                style={btn('primary')}
-                onClick={() => setStep(6)}
-              >
-                Ready to Approve
-              </button>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20 }}>
-            {/* Preview iframe */}
-            <div style={{
-              ...card({ padding: 0, overflow: 'hidden' }),
-              height: 700,
-              display: 'flex',
-              justifyContent: 'center',
-              background: '#111',
-            }}>
-              <iframe
-                srcDoc={activePage.stitch_output_code || '<html><body style="background:#111;color:#888;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif"><p>Preview loading...</p></body></html>'}
-                src={activePage.stitch_preview_url || undefined}
-                style={{
-                  width: previewMode === 'desktop' ? '100%' : 375,
-                  height: '100%',
-                  border: 'none',
-                  transition: 'width 0.3s',
-                }}
-                title="Landing page preview"
-                sandbox="allow-scripts allow-same-origin"
-              />
-            </div>
-
-            {/* Iteration panel */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Iterate input */}
-              <div style={card()}>
-                <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10, color: 'var(--text-primary)' }}>
-                  Request Changes
-                </h4>
-                <textarea
-                  value={iteratePrompt}
-                  onChange={e => setIteratePrompt(e.target.value)}
-                  placeholder="Describe what you want changed... e.g. 'Make the hero headline more urgent' or 'Change CTA color to red'"
-                  rows={4}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-input)',
-                    color: 'var(--text-primary)',
-                    fontSize: 13,
-                    resize: 'vertical',
-                    lineHeight: 1.5,
-                    marginBottom: 10,
-                  }}
-                />
-                <button
-                  style={btn('primary', !iteratePrompt.trim() || iterating)}
-                  disabled={!iteratePrompt.trim() || iterating}
-                  onClick={handleIterate}
-                >
-                  {iterating ? 'Applying changes...' : 'Apply Changes'}
-                </button>
-              </div>
-
-              {/* Version history */}
-              {activePage.iteration_history && activePage.iteration_history.length > 0 && (
-                <div style={card()}>
-                  <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10, color: 'var(--text-primary)' }}>
-                    Version History
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 300, overflowY: 'auto' }}>
-                    {activePage.iteration_history.map((entry, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          padding: '8px 12px',
-                          borderRadius: 'var(--radius-sm)',
-                          background: 'var(--bg-input)',
-                          border: '1px solid var(--border)',
-                        }}
-                      >
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
-                          v{idx + 1} &middot; {new Date(entry.timestamp).toLocaleString()}
-                        </div>
-                        <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                          {entry.prompt}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ============================================================ */}
-      {/* STEP 6: Approve + Convert */}
-      {/* ============================================================ */}
-      {step === 6 && activePage && (
-        <div style={{ ...card({ maxWidth: 600, margin: '0 auto' }) }}>
-          <h3 style={{ fontSize: 18, marginBottom: 8, textAlign: 'center' }}>Approve Design</h3>
-          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20, textAlign: 'center' }}>
-            Approving locks the design. You can then download the HTML to edit locally with Claude Code.
+      {step === 4 && (
+        <div style={{ ...card({ maxWidth: 600, textAlign: 'center' as const, margin: '0 auto' }) }}>
+          <h3 style={{ fontSize: 18, marginBottom: 8 }}>Build Landing Page</h3>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
+            The build pipeline is being upgraded. A new template-based rendering system will be available soon.
           </p>
-
-          {approving ? (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-                width: 48,
-                height: 48,
-                border: '3px solid var(--border)',
-                borderTopColor: 'var(--accent)',
-                borderRadius: '50%',
-                margin: '0 auto 16px',
-                animation: 'spin 1s linear infinite',
-              }} />
-              <p style={{ fontSize: 14, color: 'var(--accent)', fontWeight: 500 }}>
-                Approving design...
-              </p>
-              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                <button style={btn('ghost')} onClick={() => setStep(5)}>
-                  Back to Preview
-                </button>
-                <button
-                  style={btn('primary')}
-                  disabled={!canEdit}
-                  onClick={handleApprove}
-                >
-                  Approve Design
-                </button>
-              </div>
-              {activePage.deploy_status === 'approved' && (
-                <div style={{
-                  background: 'rgba(52,211,153,0.08)',
-                  border: '1px solid rgba(52,211,153,0.25)',
-                  borderRadius: 'var(--radius)',
-                  padding: 16,
-                  textAlign: 'center',
-                }}>
-                  <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)', marginBottom: 12 }}>
-                    Design Approved
-                  </p>
-                  <button
-                    style={{
-                      ...btn('primary'),
-                      width: '100%',
-                      justifyContent: 'center',
-                      marginBottom: 8,
-                    }}
-                    onClick={handleDownloadHtml}
-                  >
-                    Download HTML
-                  </button>
-                  <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                    Download the HTML file, place it in a client directory, and use Claude Code to refine it locally.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
+          <div style={{
+            padding: 16,
+            borderRadius: 'var(--radius)',
+            border: '1px solid var(--border)',
+            background: 'var(--bg-input)',
+            marginBottom: 16,
+          }}>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.6 }}>
+              Your selections are saved:
+              {selectedTemplate && <><br />Template: <strong>{TEMPLATE_INFO[selectedTemplate]?.name}</strong></>}
+              <br />Copy slots: <strong>{Object.keys(copySlots).length} filled</strong>
+              {heroImageUrl && <><br />Hero image: set</>}
+              {parallaxImageUrl && <><br />Parallax image: set</>}
+            </p>
+          </div>
+          <button style={btn('ghost')} onClick={() => setStep(3)}>
+            Back to Copy Slots
+          </button>
         </div>
       )}
 
-      {/* ============================================================ */}
-      {/* STEP 7: Deploy */}
-      {/* ============================================================ */}
-      {step === 7 && activePage && (
-        <div style={{ ...card({ maxWidth: 540, textAlign: 'center' as const, margin: '0 auto' }) }}>
-          <h3 style={{ fontSize: 18, marginBottom: 8 }}>Deploy</h3>
-
-          {activePage.deploy_status === 'deployed' && activePage.deploy_url ? (
-            <div>
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '4px 12px',
-                borderRadius: 20,
-                background: 'var(--success-muted)',
-                color: 'var(--success)',
-                fontSize: 13,
-                fontWeight: 600,
-                marginBottom: 16,
-              }}>
-                LIVE
-              </div>
-              <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 12 }}>
-                Your landing page is live at:
-              </p>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                background: 'var(--bg-input)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '10px 14px',
-                marginBottom: 16,
-              }}>
-                <a
-                  href={activePage.deploy_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                >
-                  {activePage.deploy_url}
-                </a>
-                <button
-                  onClick={() => handleCopyUrl(activePage.deploy_url!)}
-                  style={{
-                    ...btn('ghost'),
-                    padding: '6px 12px',
-                    fontSize: 12,
-                    flexShrink: 0,
-                  }}
-                >
-                  Copy
-                </button>
-              </div>
-              <button style={btn('ghost')} onClick={() => { setStep(1); setActivePage(null) }}>
-                Build Another Page
-              </button>
-            </div>
-          ) : (
-            <div>
-              <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 24 }}>
-                Deploy your approved landing page to a live URL.
-              </p>
-              {deploying ? (
-                <div>
-                  <div style={{
-                    width: 48,
-                    height: 48,
-                    border: '3px solid var(--border)',
-                    borderTopColor: 'var(--accent)',
-                    borderRadius: '50%',
-                    margin: '0 auto 16px',
-                    animation: 'spin 1s linear infinite',
-                  }} />
-                  <p style={{ fontSize: 14, color: 'var(--accent)', fontWeight: 500 }}>Deploying...</p>
-                  <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                </div>
-              ) : (
-                <button
-                  style={btn('primary')}
-                  disabled={!canEdit}
-                  onClick={handleDeploy}
-                >
-                  Deploy Page
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ============================================================ */}
       {/* Existing Landing Pages for this client */}

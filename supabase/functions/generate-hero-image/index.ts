@@ -1,8 +1,8 @@
-// Generate Hero Image — calls Google Imagen 4 via Gemini API
+// Generate Hero Image — calls Google Gemini API
 // to produce a photorealistic hero shot based on the avatar description.
 //
 // The image is uploaded to Supabase Storage (client-assets bucket)
-// and the public URL is returned for use in the landing page Stitch prompt.
+// and the public URL is returned for use in the landing page builder.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, jsonResponse, errorResponse } from '../_shared/ai-client.ts'
@@ -331,19 +331,21 @@ Deno.serve(async (req: Request) => {
 
     const publicUrl = urlData.publicUrl
 
-    // Save to client_assets table for reuse
+    // Save to media_assets table for reuse
     const { data: assetRecord, error: assetError } = await supabase
-      .from('client_assets')
+      .from('media_assets')
       .insert({
         client_id,
-        asset_type: image_style === 'hero' || image_style === 'family' || image_style === 'trust' || image_style === 'lifestyle'
-          ? 'hero_image' : image_style,
-        url: publicUrl,
+        avatar_id,
+        role: 'hero_image',
+        file_url: publicUrl,
+        file_type: 'image',
         storage_path: storagePath,
         filename,
         prompt_used: imagePrompt,
         style: image_style,
-        metadata: { avatar_id, avatar_name: avatar.name, source: 'ai_generated' },
+        display_name: `${avatar.name} - ${image_style}`,
+        metadata: { avatar_name: avatar.name, source: 'ai_generated' },
       })
       .select()
       .single()

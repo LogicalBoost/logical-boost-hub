@@ -9,7 +9,7 @@ import TagInput from '@/components/TagInput'
 import LogoUpload from '@/components/LogoUpload'
 
 export default function BusinessOverviewPage() {
-  const { client, loading, setClient, setLoading, setError, createClient, loadClientData, loadAllClients, canEdit, refreshClient, clientAssets, refreshClientAssets } = useAppStore()
+  const { client, loading, setClient, setLoading, setError, createClient, loadClientData, loadAllClients, canEdit, refreshClient, mediaAssets, refreshMediaAssets } = useAppStore()
 
   // New client setup form state
   const [showNewForm, setShowNewForm] = useState(false)
@@ -756,9 +756,9 @@ export default function BusinessOverviewPage() {
         <div className="card">
           <div className="card-title">Image Assets</div>
           <div style={{ marginTop: 16 }}>
-            {clientAssets.length > 0 ? (
+            {mediaAssets.length > 0 ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
-                {clientAssets.map(asset => (
+                {mediaAssets.map(asset => (
                   <div key={asset.id} style={{
                     borderRadius: 8,
                     overflow: 'hidden',
@@ -767,8 +767,8 @@ export default function BusinessOverviewPage() {
                   }}>
                     <div style={{ height: 120, position: 'relative' }}>
                       <img
-                        src={asset.url}
-                        alt={asset.asset_type}
+                        src={asset.file_url}
+                        alt={asset.role}
                         style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                       />
                     </div>
@@ -778,12 +778,12 @@ export default function BusinessOverviewPage() {
                           fontSize: 10,
                           fontWeight: 600,
                           textTransform: 'uppercase',
-                          color: asset.asset_type === 'hero_image' ? '#8b5cf6' : asset.asset_type === 'parallax' ? '#3b82f6' : 'var(--text-muted)',
-                          background: asset.asset_type === 'hero_image' ? 'rgba(139,92,246,0.12)' : asset.asset_type === 'parallax' ? 'rgba(59,130,246,0.12)' : 'var(--bg-input)',
+                          color: asset.role === 'hero_image' ? '#8b5cf6' : asset.role === 'parallax' ? '#3b82f6' : 'var(--text-muted)',
+                          background: asset.role === 'hero_image' ? 'rgba(139,92,246,0.12)' : asset.role === 'parallax' ? 'rgba(59,130,246,0.12)' : 'var(--bg-input)',
                           padding: '2px 6px',
                           borderRadius: 4,
                         }}>
-                          {asset.asset_type === 'hero_image' ? 'Hero' : asset.asset_type}
+                          {asset.role === 'hero_image' ? 'Hero' : asset.role}
                         </span>
                         <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
                           {asset.style || ((asset.metadata as Record<string, unknown>)?.source === 'uploaded' ? 'Uploaded' : 'AI')}
@@ -796,11 +796,11 @@ export default function BusinessOverviewPage() {
                         <button
                           onClick={async () => {
                             if (!confirm('Delete this asset?')) return
-                            await (await import('@/lib/supabase')).supabase.from('client_assets').delete().eq('id', asset.id)
+                            await (await import('@/lib/supabase')).supabase.from('media_assets').delete().eq('id', asset.id)
                             if (asset.storage_path) {
                               await (await import('@/lib/supabase')).supabase.storage.from('client-assets').remove([asset.storage_path])
                             }
-                            if (client) refreshClientAssets(client.id)
+                            if (client) refreshMediaAssets(client.id)
                           }}
                           style={{
                             marginTop: 6,

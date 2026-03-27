@@ -208,7 +208,7 @@ export interface Creative {
   updated_at: string
 }
 
-// 8 wireframe templates for the Stitch-powered landing page builder
+// 8 wireframe templates for the landing page builder
 export type TemplateId =
   | 'template_1'  // Conditional Funnel / Quiz-Led
   | 'template_2'  // Problem/Solution + Category Segmentation
@@ -230,9 +230,9 @@ export const TEMPLATE_INFO: Record<TemplateId, { name: string; bestFor: string }
   template_8: { name: 'Urgency / Event-Driven', bestFor: 'Storm damage, seasonal, deadline-sensitive offers' },
 }
 
-export interface StitchIterationEntry {
+export interface IterationEntry {
   prompt: string
-  stitch_preview_url: string | null
+  preview_url: string | null
   timestamp: string
 }
 
@@ -248,17 +248,14 @@ export interface LandingPage {
   headline: string
   subheadline: string
   cta: string
-  // Stitch pipeline fields
-  stitch_job_id: string | null
-  stitch_preview_url: string | null
-  stitch_output_code: string | null
-  iteration_history: StitchIterationEntry[] | null
+  // Build pipeline fields
+  page_html: string | null
+  iteration_history: IterationEntry[] | null
   react_output: string | null
   // Deploy fields
   deploy_status: 'draft' | 'pending_approval' | 'approved' | 'converting' | 'deployed' | 'failed'
   deploy_url: string | null
   // Legacy fields (kept for backward compat)
-  page_html: string | null
   section_data: Record<string, unknown>[] | null
   brand_kit_snapshot: Record<string, unknown> | null
   preview_image_url: string | null
@@ -331,19 +328,86 @@ export interface CompetitorIntel {
   created_at: string
 }
 
-export type AssetType = 'hero_image' | 'parallax' | 'logo' | 'photo' | 'other'
+// Media asset roles (controlled values)
+export type MediaAssetRole =
+  | 'hero_image' | 'hero_video' | 'testimonial_photo' | 'team_photo'
+  | 'background_texture' | 'before_after' | 'process_step'
+  | 'certification_badge' | 'company_logo' | 'gallery' | 'icon_custom'
+  | 'parallax' | 'photo' | 'other'
 
-export interface ClientAsset {
+export interface MediaAsset {
   id: string
   client_id: string
-  asset_type: AssetType
-  url: string
+  avatar_id: string | null
+  file_url: string
+  file_type: 'image' | 'video'
+  role: MediaAssetRole
+  alt_text: string | null
+  display_name: string | null
   storage_path: string | null
   filename: string | null
   prompt_used: string | null
   style: string | null
+  sort_order: number
+  status: 'approved' | 'denied'
   metadata: Record<string, unknown>
   created_at: string
+  updated_at: string
+}
+
+// Legacy alias for backward compat during transition
+export type AssetType = MediaAssetRole
+export type ClientAsset = MediaAsset
+
+// Brand kit record (from brand_kits table)
+export interface BrandKitRecord {
+  id: string
+  client_id: string
+  primary_color: string
+  secondary_color: string
+  accent_color: string | null
+  background_color: string
+  text_color: string
+  heading_font: string
+  body_font: string
+  logo_url: string | null
+  logo_dark_url: string | null
+  button_style: { borderRadius?: string; textTransform?: string }
+  custom_css: string | null
+  created_at: string
+  updated_at: string
+}
+
+// Page template record (from page_templates table)
+export interface PageTemplate {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  template_type: string
+  section_schema: { sections: string[] }
+  slot_schema: Record<string, { slots: { name: string; role: MediaAssetRole; required: boolean; max?: number }[] }>
+  preview_image_url: string | null
+  is_active: boolean
+  created_at: string
+}
+
+// Published page record (from published_pages table)
+export interface PublishedPage {
+  id: string
+  client_id: string
+  landing_page_id: string
+  template_id: string
+  avatar_id: string
+  offer_id: string
+  slug: string
+  custom_domain: string | null
+  media_mapping: Record<string, string | string[]> | null
+  page_file_path: string | null
+  status: 'draft' | 'published' | 'archived'
+  published_at: string | null
+  created_at: string
+  updated_at: string
 }
 
 // Angle definitions

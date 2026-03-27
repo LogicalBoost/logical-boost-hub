@@ -120,65 +120,6 @@ export async function generateConcepts(clientId: string) {
   return callEdgeFunction('generate-concepts', { client_id: clientId })
 }
 
-// Workflow 7: Build landing page via design engine pipeline
-export async function buildLandingPage(
-  clientId: string,
-  avatarId: string,
-  offerId: string,
-  templateId: string,
-  copySlots: Record<string, string>
-) {
-  return callEdgeFunction('build-landing-page', {
-    client_id: clientId,
-    avatar_id: avatarId,
-    offer_id: offerId,
-    template_id: templateId,
-    copy_slots: copySlots,
-  })
-}
-
-// Iterate on a landing page with a change prompt
-export async function iterateLandingPage(
-  landingPageId: string,
-  userPrompt: string
-) {
-  return callEdgeFunction('iterate-landing-page', {
-    landing_page_id: landingPageId,
-    user_prompt: userPrompt,
-  })
-}
-
-// Approve a landing page and convert to React
-export async function approveLandingPage(landingPageId: string) {
-  return callEdgeFunction('approve-landing-page', {
-    landing_page_id: landingPageId,
-  })
-}
-
-// Deploy an approved landing page
-export async function deployLandingPage(landingPageId: string) {
-  return callEdgeFunction('deploy-landing-page', {
-    landing_page_id: landingPageId,
-  })
-}
-
-// Generate missing copy slots for a template
-export async function generateMissingCopySlots(
-  clientId: string,
-  avatarId: string,
-  offerId: string,
-  templateId: string,
-  missingSlotIds: string[]
-) {
-  return callEdgeFunction('generate-missing-copy', {
-    client_id: clientId,
-    avatar_id: avatarId,
-    offer_id: offerId,
-    template_id: templateId,
-    missing_slot_ids: missingSlotIds,
-  })
-}
-
 // Generate hero image via AI image generation
 export async function generateHeroImage(
   clientId: string,

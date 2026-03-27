@@ -74,17 +74,17 @@ export default function Sidebar() {
         <div className="sidebar-logo">
           {!collapsed && (
             <>
-              <img src="/logical-boost-hub/images/logow.png" alt="LogicalBoost" className="sidebar-logo-img" />
+              <img src="/images/logow.png" alt="LogicalBoost" className="sidebar-logo-img" />
               <span className="beta-badge">BETA</span>
             </>
           )}
           {collapsed && (
-            <img src="/logical-boost-hub/images/icon.png" alt="LB" className="sidebar-logo-icon" style={{ height: 28, width: 28, objectFit: 'contain' }} />
+            <img src="/images/icon.png" alt="LB" className="sidebar-logo-icon" style={{ height: 28, width: 28, objectFit: 'contain' }} />
           )}
         </div>
         <nav className="sidebar-nav">
           {navItems.map((item) => {
-            const isActive = pathname?.startsWith(`/logical-boost-hub${item.href}`.replace(/\/$/, '')) || false
+            const isActive = pathname?.startsWith(item.href.replace(/\/$/, '')) || false
             return (
               <Link
                 key={item.href}

@@ -6,7 +6,7 @@ Multi-tenant marketing platform where an agency team builds and manages AI-power
 - **Frontend**: Next.js 16 (App Router), React 19, TypeScript
 - **Backend**: Supabase (Auth, PostgreSQL, Edge Functions)
 - **AI**: Anthropic Claude API (called from Supabase Edge Functions)
-- **Landing Pages**: Google Stitch API (`@google/stitch-sdk`) for design generation. STITCH_API_KEY set as Supabase secret.
+- **Landing Pages**: Template-based system. Pre-built React templates in separate repo (`LogicalBoost/landing-pages`), rendered with brand kit + copy + media assets. Deployed via Vercel.
 - **Hero Images**: Google Gemini 3.1 Flash (image preview) via Generative Language API for AI-generated photorealistic hero shots. Uses `generateContent` with `responseModalities: ["IMAGE"]`. GOOGLE_AI_API_KEY set as Supabase secret.
 - **Hosting**: GitHub Pages (static export) + Supabase cloud
 - **Deployment**: GitHub Actions auto-deploys to GitHub Pages on push to `master`
@@ -29,7 +29,7 @@ src/
     dashboard/page.tsx     — Main dashboard with getting started checklist
     funnel/page.tsx        — Legacy route (renamed to /copy/)
     intake/page.tsx        — AI-generated intake questionnaire
-    landing-pages/page.tsx — Landing page builder (7-step pipeline, design engine powered)
+    landing-pages/page.tsx — Landing page builder (template-based pipeline)
     login/page.tsx         — Login page
     offers/page.tsx        — Offer management (approve/deny)
     settings/page.tsx      — Settings and user management
@@ -43,7 +43,7 @@ src/
     LogoUpload.tsx         — Logo upload component
   lib/
     api.ts                 — Edge function caller (all AI workflow API calls + landing page pipeline). Errors parse response body for detailed messages.
-    stitch.ts              — Landing page integration: template slot definitions, serialization, copy mapping
+    template-slots.ts      — Template copy slot definitions, serialization, copy mapping
     store.tsx              — React Context state management (AppProvider/useAppStore)
     supabase.ts            — Supabase client + auth helpers + role-based client access
     demo-toast.ts          — Toast notification utility
@@ -71,8 +71,8 @@ supabase/
     analyze-business/      — Workflow 1: Analyze business → generate avatars/offers
     analyze-brand-kit/     — Workflow 9: Extract brand colors, fonts, visual identity (legacy)
     analyze-competitor-pages/ — Workflow 11: Analyze competitor landing pages
-    build-landing-page/    — Workflow 7: Assemble master prompt + call Stitch API → get designed HTML
-    iterate-landing-page/  — Workflow 7b: Append change request to original prompt → Stitch redesign
+    # build-landing-page/  — REMOVED (Stitch pipeline killed)
+    # iterate-landing-page/ — REMOVED (Stitch pipeline killed)
     discover-competitors/  — Workflow 10: AI-powered competitor discovery
     generate-avatars/      — Generate additional avatars via AI prompter
     generate-funnel/       — Workflow 4: Generate full campaign (3 parallel batches: ads, persuasion, video)
@@ -150,109 +150,87 @@ Defined in `src/types/database.ts` with `ANGLES` constant, `ANGLE_COLORS` map, a
 
 ## Landing Page Builder
 
-The Landing Pages page implements a 7-step pipeline. The design engine is Google Stitch API (`@google/stitch-sdk`). **Never mention "Stitch" in user-facing UI.**
+**Architecture change (March 2026):** Stitch API has been removed. Landing pages are now built with a **template-based system** — pre-built React templates + brand kit + AI-generated copy + uploaded media assets. See `/docs/` for full specs.
 
-### The 3-Step Process (How It Actually Works)
-1. **Gather copy + business info** — Frontend collects avatar, offer, template, copy slots, business assets
-2. **Send to Stitch API** — Edge function assembles the master prompt (6 parts) and sends it to Stitch with the client's website URL. Stitch visits the URL, extracts the brand, and returns designed HTML.
-3. **Convert to React** — Take the Stitch HTML output, convert it to a React site, save it in a client directory, provide a preview link. User can then edit locally with Claude Code.
+### How It Works
+1. **AI generates copy** (sections JSON) via existing Workflow 7 — unchanged
+2. **Agency sets up brand kit** — colors, fonts, logo (once per client)
+3. **Agency uploads media** — hero images, testimonial photos, badges, parallax backgrounds
+4. **Agency picks template** — one of 4 templates from `page_templates` table
+5. **Platform assembles the page** — duplicates template into client directory, rebrands with brand kit, injects copy and media
+6. **Deployed via Vercel** — separate repo `LogicalBoost/landing-pages`, dynamic `[slug]` routing
 
-### Master Prompt Assembly (build-landing-page edge function)
-The edge function assembles a 6-part prompt before sending to Stitch:
-1. **Part 1: Brand Extraction** — Tells Stitch to visit `clients.website` and extract colors, fonts, spacing, button styles. The client's website IS the brand kit.
-2. **Part 2: Global Design Rules** — Static rules: soft gradients, design accents, mobile-first responsive (320/768/1024), image/video placeholders, hard rules (no nav links, no generic fonts, etc.)
-3. **Part 3: Page Purpose** — Client name, avatar name+description, offer name+description, primary CTA, conversion type
-4. **Part 4: Template Layout Spec** — One of 8 template-specific section-by-section specs with `{{slot_id}}` placeholders
-5. **Part 5: Copy** — All copy slots serialized as `slot_id: value` lines using `serializeCopySlots()`
-6. **Part 6: Final Instructions** — "Build this page now" with output format rules
+### New Database Tables (migration 016)
+- **`brand_kits`** — per-client colors, fonts, logo, button styles (one per client)
+- **`media_assets`** — uploaded images/videos tagged with role + avatar (replaces old `client_assets`)
+- **`page_templates`** — 4 template definitions with section_schema and slot_schema
+- **`published_pages`** — tracks every live landing page (slug, domain, status)
 
-### Iteration Prompt Pattern
-Change requests append to the ORIGINAL full prompt (not just the HTML):
-```
-[original 6-part prompt] + "---" + [iteration instruction with change request]
-```
-This preserves brand context, copy, and template spec for every iteration.
+### 4 Templates (stored in `page_templates` table)
+| Slug | Name | Best For |
+|------|------|----------|
+| `lead-capture-classic` | Lead Capture Classic | Standard lead gen — inspections, quotes, consultations |
+| `bold-split` | Bold Split | High-urgency, fear/risk, storm damage, emergency |
+| `social-proof-heavy` | Social Proof Heavy | Trust-first industries, credibility barriers |
+| `minimal-direct` | Minimal Direct | Simple offers, call-only pages, clean look |
 
-### Copy Slot Sources
-Each slot has a `source` field:
-- `'copy'` — AI-generatable. Auto-filled from `copy_components` via `mapComponentsToSlots()`.
-- `'business'` — Business assets (testimonials, ratings, badges, disclaimers). Manual entry only. AI cannot generate these.
-- `'media'` — Video URLs, images. User provides manually.
+### Media Asset Roles (controlled values)
+`hero_image`, `hero_video`, `testimonial_photo`, `team_photo`, `background_texture`, `before_after`, `process_step`, `certification_badge`, `company_logo`, `gallery`, `icon_custom`, `parallax`, `photo`, `other`
 
 ### AI Hero Image Generation
-Step 3 includes a hero image generator powered by Google Gemini 3.1 Flash:
-- **4 styles**: Hero Shot (waist-up portrait), Family/Group (lifestyle), Trust Portrait (headshot), Lifestyle (editorial)
-- **Avatar-aware prompts** — person appearance derived from avatar description (gig worker → casual clothes, nurse → scrubs, executive → suit, etc.). Clothing, posture, and vibe must match the actual avatar.
-- **Offer-aware icons** — optional floating icons are gated to avatar+offer context (e.g. car/phone for rideshare driver, receipt/calculator for tax offer). "If in doubt, use NO icons."
-- **Transparent background** — all styles enforce blank/transparent background, person isolated, no environment/room/scenery
-- Optional custom prompt override for full control
-- Image uploaded to Supabase Storage (`client-assets/{client_id}/hero-*.png`)
-- Image URL auto-inserted into `hero_image` copy slot → included in Stitch prompt
-- `generate-hero-image` edge function: calls Gemini 3.1 Flash via `generateContent` with `responseModalities: ["IMAGE"]` → uploads to storage → saves to `client_assets` table → returns public URL
-- **Auth**: `GOOGLE_AI_API_KEY` (Google AI Studio key, free tier)
-- **Model**: `gemini-3.1-flash-image-preview` — standard Gemini models (gemini-2.0-flash etc) do NOT support image output. Imagen models require paid plans.
-- **Never mention "Gemini", "AI-generated", or model names in user-facing UI** — just "Hero Image"
-- **Upload**: Drag-and-drop or file picker to upload your own hero image (stored in Supabase Storage)
+- Powered by Google Gemini 3.1 Flash (`gemini-3.1-flash-image-preview`)
+- **4 styles**: Hero Shot, Family/Group, Trust Portrait, Lifestyle
+- **Avatar-aware prompts** — clothing, posture, vibe match avatar description
+- **Offer-aware icons** — gated to avatar+offer context. "If in doubt, use NO icons."
+- **Transparent background** — all styles enforce blank/transparent background
+- Saved to `media_assets` table with `avatar_id` for reuse
+- `generate-hero-image` edge function: Gemini API → Supabase Storage → `media_assets` record
+- **Auth**: `GOOGLE_AI_API_KEY` (Google AI Studio, free tier)
+- **Never mention "Gemini" or "AI-generated" in UI** — just "Hero Image"
 
-### Client Assets (Persistent Image Storage)
-- All generated and uploaded images are saved to the `client_assets` table for reuse
-- **Business Overview** page shows an Image Assets grid with thumbnails, type badges, dates
-- **Landing Page Builder** Step 3 shows saved image galleries at the top of both Hero Image and Parallax sections
-- Click any saved thumbnail to select it for the current landing page
-- Asset types: `hero_image`, `parallax`, `logo`, `photo`, `other`
-- Table: `client_assets` (migration 014) with anon RLS policies (migration 015)
-
-### Parallax Background Image
-- Upload a full-width background image for a parallax scrolling section
-- Placed between social proof and final CTA in all templates
-- Uses `background-attachment: fixed` with iOS Safari fallback
-- Dark overlay + centered stat/headline text
-- If no image provided, a dark gradient placeholder section is still included (parallax-ready)
-- Upload via drag-and-drop on Step 3, stored in Supabase Storage as `parallax_image` slot
-
-### Frontend Pipeline (7 UI Steps)
+### Frontend Pipeline (4 UI Steps — currently)
 1. **Select Avatar + Offer** — Two dropdowns, approved only, avatars sorted by priority
-2. **Select Template** — 8 template cards with name and "Best for" description
-3. **Review Copy Slots** — Auto-fills copy slots from approved components; business/media slots shown separately for manual entry; optional slots (quiz questions) don't block build; **AI Hero Image** generator panel with style picker and preview; **Saved images gallery** at top of hero/parallax sections for reuse; **Parallax background** upload
-4. **Build Page** — Shows readiness checklist (avatar, offer, template, slots, optional images) with clear ✓/✗ status. Assembles master prompt (including hero image URL if generated), sends to Stitch API, receives designed HTML. Build errors displayed inline with full error details.
-5. **Preview + Iterate** — Interactive preview in iframe, change request panel, version history
-6. **Approve** — Approve the design for React conversion
-7. **Deploy** — Convert to React, save to client directory, provide preview link
-
-### 8 Wireframe Templates
-| ID | Name | Best For |
-|----|------|----------|
-| `template_1` | Conditional Funnel / Quiz-Led | Lead gen, high volume, financial/legal/home services |
-| `template_2` | Problem/Solution + Category Segmentation | Multiple damage types, law, financial products |
-| `template_3` | Feature-Dense Authority Page | SaaS, B2B platforms, complex products |
-| `template_4` | Possibility Showcase / Output Gallery | Agencies, AI tools, creative services |
-| `template_5` | Video + Social Proof Wall | Coaching, courses, personal brands |
-| `template_6` | VSL / Long-Form Direct Response | High-ticket, cold traffic, skeptical audiences |
-| `template_7` | Comparison / Us vs. Them | Challenger brands, switching markets |
-| `template_8` | Urgency / Event-Driven | Storm damage, seasonal, deadline-sensitive offers |
+2. **Select Template** — Template cards from `page_templates` table
+3. **Review Copy + Media** — Copy slots auto-filled from components; hero image generator; saved image galleries; parallax background upload
+4. **Build Page** — Placeholder (template assembly pipeline not yet built)
 
 ### Key Files
-- **`supabase/functions/build-landing-page/index.ts`** — Master prompt assembly + Stitch API call. Contains all 6 global rules, all 8 template specs with `{{slot_id}}` placeholders, `serializeCopySlots()`, `assembleStitchPrompt()`.
-- **`supabase/functions/iterate-landing-page/index.ts`** — Appends change request to original prompt, calls Stitch for redesign.
-- **`supabase/functions/_shared/stitch-client.ts`** — Stitch SDK wrapper (`generateWithStitch()`).
-- **`src/lib/stitch.ts`** — Frontend: `TEMPLATE_SLOTS` (slot definitions per template with `source` field), `mapComponentsToSlots()`, `serializeCopySlots()`.
-- **`src/lib/api.ts`** — `buildLandingPage()`, `iterateLandingPage()`, `approveLandingPage()`, `deployLandingPage()`, `generateMissingCopySlots()`.
+- **`src/lib/template-slots.ts`** — Template copy slot definitions, `mapComponentsToSlots()`, `serializeCopySlots()`
+- **`src/lib/api.ts`** — `generateHeroImage()` and other AI workflow API calls
+- **`supabase/functions/generate-hero-image/index.ts`** — Gemini image generation edge function
+- **`docs/landing_page_operational_workflow.md`** — Full workflow spec
+- **`docs/claude_code_instructions_landing_pages.md`** — Implementation instructions
+- **`docs/landing_page_templates_build_guide.md`** — Template build guide for separate repo
 
-### Variable Names: Edge Function vs Database
-The edge function receives `copy_slots` from the request body (snake_case) but the `assembleStitchPrompt()` function parameter is `copySlots` (camelCase). Always pass as `copySlots: copy_slots`.
+### Landing Page Repo Architecture (One Repo Per Client)
+- **`LogicalBoost/landing-page-templates`** — Master template library. GitHub Template Repository. Never deployed directly. Contains 4 templates, shared components, ThemeProvider, TemplateRenderer, `[slug]` catch-all route.
+- **`LogicalBoost/[client-slug]-pages`** — One repo per client. Generated from template repo via GitHub API when first landing page is built. Brand kit baked in, `CLIENT_ID` env var scopes queries. All client pages are routes within this one repo.
+- **Vercel project per client** — Created via Vercel API, linked to client repo. Custom domain attached. Auto-deploys on push.
+- **Claude Code refinement** — Team opens client repo, makes changes, previews locally, pushes → Vercel auto-deploys. Static overrides at `/pages/overrides/[slug].jsx`.
+- See `docs/vercel_deployment_guide.md` for full Vercel API integration details.
+
+### Client Deployment Fields (migration 017)
+Added to `clients` table: `github_repo`, `vercel_project_id`, `vercel_url`, `custom_domain`, `domain_verified`
 
 ### Deploy Status Flow
-`draft` → `pending_approval` → `approved` → `converting` → `deployed` (or `failed`)
+`draft` → `published` → `archived`
 
 ### A/B Testing
-Create two `landing_page` records with same `funnel_instance_id` but different `template_id`. Both deployed to separate URLs.
+Create two `published_pages` records with same avatar+offer but different `template_id`. Both get separate slugs/URLs.
+
+### Required Secrets for Deployment
+- `VERCEL_TOKEN` — Vercel API token (Pro plan required)
+- `VERCEL_TEAM_ID` — Vercel Team ID
+- `GITHUB_TOKEN` — GitHub PAT with repo scope (for creating client repos from template)
 
 ### Remaining TODO
-- `approve-landing-page` edge function — Convert Stitch HTML to React component, save to client directory
-- `deploy-landing-page` edge function — Deploy to live URL
-- `generate-missing-copy` edge function — AI fills gaps in template slots
-- React conversion pipeline: Stitch HTML → React component in `/clients/{client-slug}/` directory
-- Preview link served via dev server or static hosting
+- Build the `LogicalBoost/landing-page-templates` repo (4 templates, shared components, ThemeProvider, TemplateRenderer, catch-all route)
+- Brand Kit editor UI (Business Overview page)
+- Media Assets manager UI (upload, tag with role + avatar)
+- Template picker UI with media slot mapper
+- Hub-side automation: GitHub API (create client repo) + Vercel API (create project, add domain)
+- Published Pages manager (URLs, domains, status)
+- "Export for Editing" feature (render page to static .jsx override file)
 
 ## Competitor Intel (3-Tab Hub)
 
@@ -292,7 +270,6 @@ The `_shared/copywriter-prompts.ts` contains the comprehensive copywriting syste
 
 ### Edge Functions (Supabase Secrets)
 - `ANTHROPIC_API_KEY` — Claude API key for AI generation
-- `STITCH_API_KEY` — Google Stitch API key for landing page design (from stitch.withgoogle.com → Settings)
 - `GOOGLE_AI_API_KEY` — Google AI Studio API key for Gemini Flash hero image generation (from aistudio.google.com, free tier)
 
 ## Deployment
@@ -325,7 +302,8 @@ The `_shared/copywriter-prompts.ts` contains the comprehensive copywriting syste
 | angle | Angle | Psychological messaging approach (15 canonical) |
 | copy_component | (not shown) | Atomic building block of messaging |
 | funnel_instance | (internal) | Avatar + Offer + Angle combo record |
-| landing_page | Landing Page | Built via design engine pipeline |
-| wireframe_template | Template | 1 of 8 structural layouts |
-| master_prompt | (internal) | 6-part assembled prompt sent to Stitch API |
-| stitch | (internal only) | Google Stitch API — NEVER mention in user-facing UI |
+| landing_page | Landing Page | Copy + sections JSON for a page |
+| page_template | Template | 1 of 4 pre-built React layouts (in `page_templates` table) |
+| published_page | (internal) | Live page with slug, domain, deploy status |
+| brand_kit | Brand Kit | Client visual identity (colors, fonts, logo) |
+| media_asset | Media Asset | Uploaded image/video tagged with role + avatar |

@@ -116,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (loading) return
 
     // Normalize pathname for basePath comparison
-    const normalizedPath = pathname?.replace('/logical-boost-hub', '') || '/'
+    const normalizedPath = pathname || '/'
     const isPublicPage = PUBLIC_PATHS.some(p => normalizedPath.startsWith(p))
 
     if (!user && !isPublicPage) {
