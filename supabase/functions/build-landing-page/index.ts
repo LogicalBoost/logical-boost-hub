@@ -800,6 +800,60 @@ Deno.serve(async (req: Request) => {
       cleanHtml = cleanHtml.replace(/^```(?:html)?\s*\n?/, '').replace(/\n?```\s*$/, '')
     }
 
+    // ── Post-process: replace Stitch-generated images with our actual URLs ──
+    // Stitch generates its own images (lh3.googleusercontent.com/aida-public/...)
+    // and ignores external URLs in the prompt. We fix that here.
+
+    // Replace logo: find the first <img> in the <header> and swap its src
+    if (client.logo_url) {
+      cleanHtml = cleanHtml.replace(
+        /(<header[\s\S]*?<img[^>]*?)src="[^"]*"([^>]*?>)/i,
+        `$1src="${client.logo_url}"$2`
+      )
+    }
+
+    // Replace hero image: find the first large <img> after the header (hero section)
+    // and swap it with our hero image if provided
+    const heroImageUrl = copy_slots.hero_image as string | undefined
+    if (heroImageUrl) {
+      // Find the hero section's main image — usually the first <img> with a large/hero class
+      // or the first <img> after the header that isn't the logo
+      let heroReplaced = false
+
+      // Strategy 1: Replace first img in hero section/div
+      cleanHtml = cleanHtml.replace(
+        /(<(?:section|div)[^>]*(?:hero|Hero)[^>]*>[\s\S]*?<img[^>]*?)src="[^"]*"([^>]*?>)/i,
+        (match, before, after) => {
+          heroReplaced = true
+          return `${before}src="${heroImageUrl}"${after}`
+        }
+      )
+
+      // Strategy 2: If no hero section found, replace the first non-logo <img> after </header>
+      if (!heroReplaced) {
+        const headerEnd = cleanHtml.indexOf('</header>')
+        if (headerEnd > -1) {
+          const afterHeader = cleanHtml.substring(headerEnd)
+          const replaced = afterHeader.replace(
+            /(<img[^>]*?)src="[^"]*"([^>]*?>)/i,
+            `$1src="${heroImageUrl}"$2`
+          )
+          cleanHtml = cleanHtml.substring(0, headerEnd) + replaced
+        }
+      }
+    }
+
+    // Fix form inputs: ensure they have visible borders
+    // Stitch often generates border-0 or border-none on inputs
+    cleanHtml = cleanHtml.replace(
+      /(<input[^>]*class="[^"]*?)border-0([^"]*")/gi,
+      '$1border border-gray-300$2'
+    )
+    cleanHtml = cleanHtml.replace(
+      /(<input[^>]*class="[^"]*?)border-none([^"]*")/gi,
+      '$1border border-gray-300$2'
+    )
+
     // Extract headline for the record
     const headline = copy_slots[`${template_id.replace('template_', 't')}_headline`] ||
       copy_slots.t1_headline || copy_slots.t2_headline || copy_slots.t3_headline ||
