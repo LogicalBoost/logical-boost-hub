@@ -7,6 +7,7 @@ Multi-tenant marketing platform where an agency team builds and manages AI-power
 - **Backend**: Supabase (Auth, PostgreSQL, Edge Functions)
 - **AI**: Anthropic Claude API (called from Supabase Edge Functions)
 - **Landing Pages**: Google Stitch API (`@google/stitch-sdk`) for design generation. STITCH_API_KEY set as Supabase secret.
+- **Hero Images**: Google Imagen 3 via Generative Language API for AI-generated photorealistic hero shots. GOOGLE_AI_API_KEY set as Supabase secret.
 - **Hosting**: GitHub Pages (static export) + Supabase cloud
 - **Deployment**: GitHub Actions auto-deploys to GitHub Pages on push to `master`
 
@@ -73,6 +74,7 @@ supabase/
     discover-competitors/  — Workflow 10: AI-powered competitor discovery
     generate-avatars/      — Generate additional avatars via AI prompter
     generate-funnel/       — Workflow 4: Generate full campaign (3 parallel batches: ads, persuasion, video)
+    generate-hero-image/   — Workflow 8: AI hero image generation (Google Imagen 3) for landing pages
     generate-intake/       — Workflow 2: Generate intake questions
     generate-more/         — Workflow 5: Generate more items per section with AI prompter
     generate-landing-page/ — Legacy: Generate landing page with custom renderer
@@ -175,11 +177,31 @@ Each slot has a `source` field:
 - `'business'` — Business assets (testimonials, ratings, badges, disclaimers). Manual entry only. AI cannot generate these.
 - `'media'` — Video URLs, images. User provides manually.
 
+### AI Hero Image Generation
+Step 3 includes a hero image generator powered by Google Imagen 3:
+- **4 styles**: Hero Shot (waist-up portrait), Family/Group (lifestyle), Trust Portrait (headshot), Lifestyle (editorial)
+- Prompt auto-built from avatar description — detects setting context, emotional expression
+- Optional custom prompt override for full control
+- Image uploaded to Supabase Storage (`client-assets/{client_id}/hero-*.png`)
+- Image URL auto-inserted into `hero_image` copy slot → included in Stitch prompt
+- `generate-hero-image` edge function: calls Imagen 3 API → uploads to storage → returns public URL
+- **Auth**: `GOOGLE_AI_API_KEY` (Google AI Studio key), falls back to Vertex AI if `GCP_PROJECT_ID` + `GCP_ACCESS_TOKEN` set
+- **Never mention "Imagen" or "AI-generated" in user-facing UI** — just "Hero Image"
+- **Upload**: Drag-and-drop or file picker to upload your own hero image (stored in Supabase Storage)
+
+### Parallax Background Image
+- Upload a full-width background image for a parallax scrolling section
+- Placed between social proof and final CTA in all templates
+- Uses `background-attachment: fixed` with iOS Safari fallback
+- Dark overlay + centered stat/headline text
+- If no image provided, a dark gradient placeholder section is still included (parallax-ready)
+- Upload via drag-and-drop on Step 3, stored in Supabase Storage as `parallax_image` slot
+
 ### Frontend Pipeline (7 UI Steps)
 1. **Select Avatar + Offer** — Two dropdowns, approved only, avatars sorted by priority
 2. **Select Template** — 8 template cards with name and "Best for" description
-3. **Review Copy Slots** — Auto-fills copy slots from approved components; business/media slots shown separately for manual entry; optional slots (quiz questions) don't block build
-4. **Build Page** — Assembles master prompt, sends to Stitch API, receives designed HTML
+3. **Review Copy Slots** — Auto-fills copy slots from approved components; business/media slots shown separately for manual entry; optional slots (quiz questions) don't block build; **AI Hero Image** generator panel with style picker and preview
+4. **Build Page** — Assembles master prompt (including hero image URL if generated), sends to Stitch API, receives designed HTML
 5. **Preview + Iterate** — Interactive preview in iframe, change request panel, version history
 6. **Approve** — Approve the design for React conversion
 7. **Deploy** — Convert to React, save to client directory, provide preview link
@@ -258,6 +280,7 @@ The `_shared/copywriter-prompts.ts` contains the comprehensive copywriting syste
 ### Edge Functions (Supabase Secrets)
 - `ANTHROPIC_API_KEY` — Claude API key for AI generation
 - `STITCH_API_KEY` — Google Stitch API key for landing page design (from stitch.withgoogle.com → Settings)
+- `GOOGLE_AI_API_KEY` — Google AI Studio API key for Imagen 3 hero image generation (from aistudio.google.com)
 
 ## Deployment
 

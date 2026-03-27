@@ -171,6 +171,21 @@ export async function generateMissingCopySlots(
   })
 }
 
+// Generate hero image via AI image generation
+export async function generateHeroImage(
+  clientId: string,
+  avatarId: string,
+  imageStyle: 'hero' | 'family' | 'trust' | 'lifestyle' = 'hero',
+  customPrompt?: string
+) {
+  return callEdgeFunction('generate-hero-image', {
+    client_id: clientId,
+    avatar_id: avatarId,
+    image_style: imageStyle,
+    custom_prompt: customPrompt,
+  })
+}
+
 // Legacy: Generate a landing page (old pipeline - kept for backward compat)
 export async function generateLandingPage(
   clientId: string,

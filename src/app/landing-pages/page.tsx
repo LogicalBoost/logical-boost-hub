@@ -7,6 +7,7 @@ import {
   iterateLandingPage,
   deployLandingPage,
   generateMissingCopySlots,
+  generateHeroImage,
 } from '@/lib/api'
 import { TEMPLATE_SLOTS, mapComponentsToSlots, type CopySlotDef } from '@/lib/stitch'
 import { TEMPLATE_INFO, type TemplateId, type LandingPage } from '@/types/database'
@@ -210,6 +211,17 @@ export default function LandingPagesPage() {
   // Generate missing copy state
   const [generatingCopy, setGeneratingCopy] = useState(false)
 
+  // Hero image generation state
+  const [heroImageUrl, setHeroImageUrl] = useState<string | null>(null)
+  const [generatingImage, setGeneratingImage] = useState(false)
+  const [imageStyle, setImageStyle] = useState<'hero' | 'family' | 'trust' | 'lifestyle'>('hero')
+  const [customImagePrompt, setCustomImagePrompt] = useState('')
+  const [imageError, setImageError] = useState<string | null>(null)
+
+  // Parallax background image state
+  const [parallaxImageUrl, setParallaxImageUrl] = useState<string | null>(null)
+  const [uploadingParallax, setUploadingParallax] = useState(false)
+
   // Derived data
   const approvedAvatars = useMemo(
     () => [...avatars].filter(a => a.status === 'approved').sort((a, b) => a.priority - b.priority),
@@ -298,6 +310,102 @@ export default function LandingPagesPage() {
     }
   }, [client, selectedAvatarId, selectedOfferId, selectedTemplate, missingSlotIds])
 
+  const handleGenerateHeroImage = useCallback(async () => {
+    if (!client || !selectedAvatarId) return
+    setGeneratingImage(true)
+    setImageError(null)
+    try {
+      const result = await generateHeroImage(
+        client.id,
+        selectedAvatarId,
+        imageStyle,
+        customImagePrompt.trim() || undefined
+      )
+      if (result.image_url) {
+        setHeroImageUrl(result.image_url)
+        setCopySlots(prev => ({ ...prev, hero_image: result.image_url }))
+        showToast('Hero image generated successfully')
+      } else {
+        setImageError('No image was returned. Try again or upload your own.')
+      }
+    } catch (err) {
+      const msg = (err as Error).message
+      setImageError(msg)
+      showToast(`Image generation error: ${msg}`)
+    } finally {
+      setGeneratingImage(false)
+    }
+  }, [client, selectedAvatarId, imageStyle, customImagePrompt])
+
+  // Upload an image file to Supabase storage (for hero or parallax)
+  const handleImageUpload = useCallback(async (
+    file: File,
+    type: 'hero' | 'parallax'
+  ) => {
+    if (!client) return
+    const setter = type === 'hero' ? setHeroImageUrl : setParallaxImageUrl
+    const loadingSetter = type === 'hero' ? setGeneratingImage : setUploadingParallax
+
+    loadingSetter(true)
+    try {
+      const ext = file.name.split('.').pop() || 'png'
+      const filename = `${type}-upload-${Date.now()}.${ext}`
+      const storagePath = `${client.id}/${filename}`
+
+      const { error: uploadError } = await supabase
+        .storage
+        .from('client-assets')
+        .upload(storagePath, file, {
+          contentType: file.type,
+          upsert: true,
+        })
+
+      if (uploadError) throw new Error(uploadError.message)
+
+      const { data: urlData } = supabase
+        .storage
+        .from('client-assets')
+        .getPublicUrl(storagePath)
+
+      setter(urlData.publicUrl)
+
+      if (type === 'hero') {
+        setCopySlots(prev => ({ ...prev, hero_image: urlData.publicUrl }))
+      } else {
+        setCopySlots(prev => ({ ...prev, parallax_image: urlData.publicUrl }))
+      }
+
+      showToast(`${type === 'hero' ? 'Hero' : 'Parallax'} image uploaded`)
+    } catch (err) {
+      showToast(`Upload error: ${(err as Error).message}`)
+    } finally {
+      loadingSetter(false)
+    }
+  }, [client])
+
+  // Handle drag & drop / file input for images
+  const handleImageDrop = useCallback((
+    e: React.DragEvent<HTMLDivElement>,
+    type: 'hero' | 'parallax'
+  ) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const file = e.dataTransfer.files[0]
+    if (file && file.type.startsWith('image/')) {
+      handleImageUpload(file, type)
+    } else {
+      showToast('Please drop an image file (PNG, JPG, WebP)')
+    }
+  }, [handleImageUpload])
+
+  const handleImageFileSelect = useCallback((
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: 'hero' | 'parallax'
+  ) => {
+    const file = e.target.files?.[0]
+    if (file) handleImageUpload(file, type)
+  }, [handleImageUpload])
+
   // Only required copy slots need to be filled to proceed
   const copyOnlySlots = useMemo(
     () => templateSlots.filter(s => s.source === 'copy'),
@@ -323,12 +431,21 @@ export default function LandingPagesPage() {
     }, 3000)
 
     try {
+      // Include image URLs in the slots
+      const slotsToSend = { ...copySlots }
+      if (heroImageUrl) {
+        slotsToSend.hero_image = heroImageUrl
+      }
+      if (parallaxImageUrl) {
+        slotsToSend.parallax_image = parallaxImageUrl
+      }
+
       const result = await buildLandingPage(
         client.id,
         selectedAvatarId,
         selectedOfferId,
         selectedTemplate,
-        copySlots
+        slotsToSend
       )
       clearInterval(interval)
       if (result.landing_page) {
@@ -928,6 +1045,342 @@ export default function LandingPagesPage() {
               </div>
             </div>
           )}
+
+          {/* ============================================================ */}
+          {/* Hero Image — Generate or Upload */}
+          {/* ============================================================ */}
+          <div style={{ marginTop: 24 }}>
+            <div style={{
+              ...card(),
+              border: '1px solid rgba(139, 92, 246, 0.3)',
+              background: 'linear-gradient(135deg, var(--bg-card) 0%, rgba(139, 92, 246, 0.04) 100%)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                <span style={{ fontSize: 20 }}>&#128247;</span>
+                <div>
+                  <h4 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                    Hero Image
+                  </h4>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
+                    Generate an AI hero shot or upload your own image
+                  </p>
+                </div>
+              </div>
+
+              {/* Image preview — shown at top when we have one */}
+              {heroImageUrl && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{
+                    borderRadius: 'var(--radius)',
+                    overflow: 'hidden',
+                    border: '1px solid var(--border)',
+                    position: 'relative',
+                  }}>
+                    <img
+                      src={heroImageUrl}
+                      alt="Hero image"
+                      style={{
+                        width: '100%',
+                        maxHeight: 300,
+                        objectFit: 'cover',
+                        display: 'block',
+                      }}
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      padding: '8px 12px',
+                      background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>
+                        Hero image set
+                      </span>
+                      <button
+                        onClick={() => { setHeroImageUrl(null); setCopySlots(prev => { const n = { ...prev }; delete n.hero_image; return n }) }}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid rgba(255,255,255,0.3)',
+                          background: 'rgba(0,0,0,0.4)',
+                          color: '#fff',
+                          fontSize: 11,
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Two columns: Upload | Generate */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                {/* Upload / Drop zone */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
+                    Upload Image
+                  </label>
+                  <div
+                    onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#8b5cf6' }}
+                    onDragLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+                    onDrop={e => { e.currentTarget.style.borderColor = 'var(--border)'; handleImageDrop(e, 'hero') }}
+                    onClick={() => document.getElementById('hero-image-input')?.click()}
+                    style={{
+                      border: '2px dashed var(--border)',
+                      borderRadius: 'var(--radius)',
+                      padding: '28px 16px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'border-color 0.2s',
+                      background: 'rgba(139, 92, 246, 0.02)',
+                    }}
+                  >
+                    {generatingImage ? (
+                      <div>
+                        <div style={{
+                          width: 32, height: 32,
+                          border: '3px solid var(--border)', borderTopColor: '#8b5cf6',
+                          borderRadius: '50%', margin: '0 auto 8px',
+                          animation: 'spin 1s linear infinite',
+                        }} />
+                        <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Uploading...</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 28, marginBottom: 6, opacity: 0.5 }}>&#128193;</div>
+                        <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 4px' }}>
+                          Drop an image here
+                        </p>
+                        <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>
+                          or click to browse (PNG, JPG, WebP)
+                        </p>
+                      </>
+                    )}
+                    <input
+                      id="hero-image-input"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      style={{ display: 'none' }}
+                      onChange={e => handleImageFileSelect(e, 'hero')}
+                    />
+                  </div>
+                </div>
+
+                {/* AI Generate */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
+                    AI Generate
+                  </label>
+
+                  {/* Style pills */}
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+                    {([
+                      { id: 'hero' as const, label: 'Hero' },
+                      { id: 'family' as const, label: 'Family' },
+                      { id: 'trust' as const, label: 'Portrait' },
+                      { id: 'lifestyle' as const, label: 'Lifestyle' },
+                    ]).map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => setImageStyle(s.id)}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: 12,
+                          border: imageStyle === s.id ? '1px solid rgba(139, 92, 246, 0.6)' : '1px solid var(--border)',
+                          background: imageStyle === s.id ? 'rgba(139, 92, 246, 0.15)' : 'transparent',
+                          color: imageStyle === s.id ? '#a78bfa' : 'var(--text-muted)',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Custom prompt */}
+                  <textarea
+                    value={customImagePrompt}
+                    onChange={e => setCustomImagePrompt(e.target.value)}
+                    placeholder="Optional: describe the person you want..."
+                    rows={2}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-input)',
+                      color: 'var(--text-primary)',
+                      fontSize: 12,
+                      resize: 'vertical',
+                      lineHeight: 1.5,
+                      marginBottom: 8,
+                    }}
+                  />
+
+                  <button
+                    style={{
+                      ...btn('primary', generatingImage),
+                      background: generatingImage ? 'var(--bg-input)' : 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                      width: '100%',
+                      justifyContent: 'center',
+                    }}
+                    disabled={generatingImage || !selectedAvatarId}
+                    onClick={handleGenerateHeroImage}
+                  >
+                    {generatingImage ? (
+                      <>
+                        <span style={{
+                          width: 14, height: 14,
+                          border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff',
+                          borderRadius: '50%', display: 'inline-block',
+                          animation: 'spin 1s linear infinite',
+                        }} />
+                        Generating...
+                      </>
+                    ) : 'Generate with AI'}
+                  </button>
+
+                  {imageError && (
+                    <p style={{ fontSize: 11, color: 'var(--danger)', marginTop: 6 }}>
+                      {imageError}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.5 }}>
+                The hero image will be placed prominently in the hero section of your landing page.
+              </p>
+            </div>
+          </div>
+
+          {/* ============================================================ */}
+          {/* Parallax Background Image */}
+          {/* ============================================================ */}
+          <div style={{ marginTop: 16 }}>
+            <div style={{
+              ...card(),
+              border: '1px solid rgba(59, 130, 246, 0.25)',
+              background: 'linear-gradient(135deg, var(--bg-card) 0%, rgba(59, 130, 246, 0.03) 100%)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                <span style={{ fontSize: 20 }}>&#127748;</span>
+                <div>
+                  <h4 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                    Parallax Background Image
+                  </h4>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
+                    A full-width background that scrolls at a different speed for depth effect
+                  </p>
+                </div>
+              </div>
+
+              {/* Parallax preview */}
+              {parallaxImageUrl && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{
+                    borderRadius: 'var(--radius)',
+                    overflow: 'hidden',
+                    border: '1px solid var(--border)',
+                    position: 'relative',
+                    height: 140,
+                  }}>
+                    <img
+                      src={parallaxImageUrl}
+                      alt="Parallax background"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        display: 'block',
+                      }}
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'rgba(0,0,0,0.35)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexDirection: 'column',
+                      gap: 4,
+                    }}>
+                      <span style={{ fontSize: 13, color: '#fff', fontWeight: 600 }}>Parallax Background Set</span>
+                      <button
+                        onClick={() => { setParallaxImageUrl(null); setCopySlots(prev => { const n = { ...prev }; delete n.parallax_image; return n }) }}
+                        style={{
+                          padding: '4px 12px',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid rgba(255,255,255,0.3)',
+                          background: 'rgba(0,0,0,0.4)',
+                          color: '#fff',
+                          fontSize: 11,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Upload zone */}
+              <div
+                onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#3b82f6' }}
+                onDragLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+                onDrop={e => { e.currentTarget.style.borderColor = 'var(--border)'; handleImageDrop(e, 'parallax') }}
+                onClick={() => document.getElementById('parallax-image-input')?.click()}
+                style={{
+                  border: '2px dashed var(--border)',
+                  borderRadius: 'var(--radius)',
+                  padding: '20px 16px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  transition: 'border-color 0.2s',
+                  background: 'rgba(59, 130, 246, 0.02)',
+                }}
+              >
+                {uploadingParallax ? (
+                  <div>
+                    <div style={{
+                      width: 28, height: 28,
+                      border: '3px solid var(--border)', borderTopColor: '#3b82f6',
+                      borderRadius: '50%', margin: '0 auto 6px',
+                      animation: 'spin 1s linear infinite',
+                    }} />
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Uploading...</p>
+                  </div>
+                ) : (
+                  <>
+                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 4px' }}>
+                      {parallaxImageUrl ? 'Drop a new image to replace' : 'Drop an image here or click to browse'}
+                    </p>
+                    <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>
+                      Best: wide landscape photos, cityscapes, textures, nature scenes (1920px+ width)
+                    </p>
+                  </>
+                )}
+                <input
+                  id="parallax-image-input"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  style={{ display: 'none' }}
+                  onChange={e => handleImageFileSelect(e, 'parallax')}
+                />
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

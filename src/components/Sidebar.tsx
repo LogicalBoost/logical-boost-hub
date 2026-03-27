@@ -79,7 +79,7 @@ export default function Sidebar() {
             </>
           )}
           {collapsed && (
-            <img src="/logical-boost-hub/images/logow.png" alt="LB" className="sidebar-logo-img" style={{ height: 22 }} />
+            <img src="/logical-boost-hub/images/icon.png" alt="LB" className="sidebar-logo-icon" style={{ height: 28, width: 28, objectFit: 'contain' }} />
           )}
         </div>
         <nav className="sidebar-nav">

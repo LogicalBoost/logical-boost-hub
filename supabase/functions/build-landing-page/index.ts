@@ -654,9 +654,41 @@ The page must feel like it belongs on ${clientWebsiteUrl} -- same visual family 
 
 ${serializeCopySlots(copySlots)}`.trim()
 
+  // Check if hero image was provided in slots
+  const heroImageUrl = copySlots.hero_image as string | undefined
+  const parallaxImageUrl = copySlots.parallax_image as string | undefined
+
+  const heroImageInstruction = heroImageUrl
+    ? `\n\nHERO IMAGE: Use this image as the primary hero visual: ${heroImageUrl}
+Display it prominently in the hero section as an <img> tag. Style it with:
+- Subtle border-radius (8-12px)
+- Optional soft drop shadow for depth
+- Position it as the visual anchor of the hero — either as a large side element (40-50% of hero width on desktop) or as a centered focal point
+- On mobile, stack it above or below the hero copy at full width
+- Do NOT use it as a background image — render it as a visible foreground element`
+    : ''
+
+  const parallaxInstruction = parallaxImageUrl
+    ? `\n\nPARALLAX BACKGROUND SECTION: Include a full-width parallax scrolling section using this image: ${parallaxImageUrl}
+Place it between the social proof section and the final CTA section. Implementation:
+- The section should be 400px tall on desktop, 280px on mobile
+- Use background-attachment: fixed (with scroll fallback for iOS Safari)
+- background-size: cover; background-position: center
+- Add a dark semi-transparent overlay (rgba(0,0,0,0.45)) for readability
+- Center a compelling stat, quote, or key benefit headline on top of the parallax image in large white text
+- Use the copy from the proof/stat slots if available, otherwise use the main offer headline
+- Add a subtle top/bottom inner shadow for depth
+- CSS: .parallax-section { background-attachment: fixed; } @supports (-webkit-touch-callout: none) { .parallax-section { background-attachment: scroll; } }`
+    : `\n\nPARALLAX-READY SECTION: Include one full-width parallax-ready section between social proof and final CTA.
+Use a dark gradient background (from the brand's dark color family) as a placeholder.
+Make it 400px tall on desktop, 280px on mobile.
+Add background-attachment: fixed to the section CSS.
+Center a key stat or benefit headline in large white text.
+This section acts as a visual break and can be upgraded with a real background image later.`
+
   const part6 = `Build this page now.
 
-Produce complete, self-contained, production-ready code.
+Produce complete, self-contained, production-ready code.${heroImageInstruction}${parallaxInstruction}
 
 Output format: HTML file with all CSS and JavaScript inline. No external dependencies except Google Fonts and any icon library via CDN.
 
