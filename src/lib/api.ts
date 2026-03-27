@@ -13,8 +13,16 @@ async function callEdgeFunction(name: string, body: Record<string, unknown>) {
     body: JSON.stringify(body),
   })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.error || `Edge function ${name} failed`)
+    const text = await res.text()
+    let errorMsg = `Edge function ${name} failed (${res.status})`
+    try {
+      const parsed = JSON.parse(text)
+      errorMsg = parsed.error || parsed.message || parsed.msg || errorMsg
+    } catch {
+      // Response wasn't JSON — use raw text
+      if (text.trim()) errorMsg = text.substring(0, 500)
+    }
+    throw new Error(errorMsg)
   }
   return res.json()
 }
