@@ -331,6 +331,21 @@ export interface CompetitorIntel {
   created_at: string
 }
 
+export type AssetType = 'hero_image' | 'parallax' | 'logo' | 'photo' | 'other'
+
+export interface ClientAsset {
+  id: string
+  client_id: string
+  asset_type: AssetType
+  url: string
+  storage_path: string | null
+  filename: string | null
+  prompt_used: string | null
+  style: string | null
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
 // Angle definitions
 export interface Angle {
   slug: string

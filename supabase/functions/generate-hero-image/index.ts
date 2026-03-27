@@ -20,8 +20,8 @@ function buildImagePrompt(
   customPrompt?: string
 ): string {
   if (customPrompt?.trim()) {
-    // User provided their own prompt — wrap with quality instructions
-    return `${customPrompt.trim()}. Professional commercial photography, studio lighting, clean modern background, high resolution, shallow depth of field. The person should look confident, approachable, and genuine.`
+    // User provided their own prompt — wrap with quality + transparent background instructions
+    return `${customPrompt.trim()}. TRANSPARENT BACKGROUND — no environment, no room, no scenery behind the person. The person is completely isolated on a blank/transparent background. Optional: a few small subtle icons or graphic elements can float around them. Professional commercial photography, studio lighting, high resolution, shallow depth of field. The person should look confident, approachable, and genuine.`
   }
 
   // Extract demographic hints from avatar description
@@ -54,11 +54,14 @@ function buildImagePrompt(
     emotionalExpression = 'looking thoughtful and assured, with a warm natural expression'
   }
 
+  // IMPORTANT: All styles use transparent/no background.
+  // The person is isolated — no environment, no room, no scenery behind them.
+  // Optional: subtle icons, graphic elements, or abstract shapes can float around/behind the person.
   const styleVariants: Record<string, string> = {
-    hero: `Professional photograph of a person, ${emotionalExpression}, in ${settingContext}. Waist-up portrait composition. Clean modern background with subtle depth, soft diffused natural lighting. Commercial advertising photography style, high resolution, shallow depth of field, 85mm lens look. The person is the clear focal point.`,
-    family: `Professional photograph of a small diverse family (2-3 people), looking happy and connected, in ${settingContext}. Natural candid moment with genuine expressions. Warm soft lighting, medium shot composition. Commercial lifestyle photography style, high resolution, shallow depth of field. Authentic and relatable.`,
-    trust: `Professional headshot-style photograph of a person, ${emotionalExpression}, clean solid-color background with subtle gradient. Shoulders-up composition, direct eye contact with camera. Studio lighting with soft key light. Executive portrait photography style, high resolution. Trustworthy and professional.`,
-    lifestyle: `Professional lifestyle photograph of a person in ${settingContext}, ${emotionalExpression}. Environmental portrait with context clues of their world. Natural light, medium-wide composition. Editorial photography style, high resolution, cinematic color grading. Authentic and aspirational.`,
+    hero: `Professional photograph of a person, ${emotionalExpression}. Waist-up portrait composition. TRANSPARENT BACKGROUND — no environment, no room, no scenery. The person is completely isolated on a blank/transparent background. A few small, subtle flat icons or simple graphic elements (related to ${settingContext}) can float around or behind the person for visual interest, but the background itself must be clean and empty. Studio lighting, soft diffused light. Commercial advertising photography style, high resolution, 85mm lens look. The person is the clear focal point with nothing behind them.`,
+    family: `Professional photograph of a small diverse family (2-3 people), looking happy and connected. Natural candid moment with genuine expressions. TRANSPARENT BACKGROUND — no environment, no room. The people are completely isolated on a blank/transparent background. Optional: a few small illustrated icons or simple graphic accents can float around them. Warm soft studio lighting, medium shot composition. High resolution. Authentic and relatable.`,
+    trust: `Professional headshot-style photograph of a person, ${emotionalExpression}. TRANSPARENT BACKGROUND — completely blank behind the person. Shoulders-up composition, direct eye contact with camera. Studio lighting with soft key light. No environment, no wall, no gradient background. The person is isolated. Optional: 1-2 very subtle graphic accents or icons near the edges. Executive portrait photography style, high resolution. Trustworthy and professional.`,
+    lifestyle: `Professional photograph of a person, ${emotionalExpression}. TRANSPARENT BACKGROUND — no environment, no scenery. The person is isolated on a blank/transparent background. A few small flat icons or simple illustrated elements related to ${settingContext} can float around the person for context. Natural-looking studio light, medium-wide composition. Editorial photography style, high resolution. Authentic and aspirational.`,
   }
 
   return styleVariants[imageStyle] || styleVariants.hero
@@ -212,12 +215,34 @@ Deno.serve(async (req: Request) => {
 
     const publicUrl = urlData.publicUrl
 
+    // Save to client_assets table for reuse
+    const { data: assetRecord, error: assetError } = await supabase
+      .from('client_assets')
+      .insert({
+        client_id,
+        asset_type: image_style === 'hero' || image_style === 'family' || image_style === 'trust' || image_style === 'lifestyle'
+          ? 'hero_image' : image_style,
+        url: publicUrl,
+        storage_path: storagePath,
+        filename,
+        prompt_used: imagePrompt,
+        style: image_style,
+        metadata: { avatar_id, avatar_name: avatar.name, source: 'ai_generated' },
+      })
+      .select()
+      .single()
+
+    if (assetError) {
+      console.warn(`Failed to save asset record: ${assetError.message}`)
+    }
+
     return jsonResponse({
       success: true,
       image_url: publicUrl,
       storage_path: storagePath,
       prompt_used: imagePrompt,
       style: image_style,
+      asset: assetRecord || null,
     })
   } catch (err) {
     return errorResponse((err as Error).message, 500)

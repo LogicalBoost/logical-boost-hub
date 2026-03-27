@@ -10,7 +10,7 @@ import {
   generateHeroImage,
 } from '@/lib/api'
 import { TEMPLATE_SLOTS, mapComponentsToSlots, type CopySlotDef } from '@/lib/stitch'
-import { TEMPLATE_INFO, type TemplateId, type LandingPage } from '@/types/database'
+import { TEMPLATE_INFO, type TemplateId, type LandingPage, type ClientAsset } from '@/types/database'
 import { showToast } from '@/lib/demo-toast'
 import { supabase } from '@/lib/supabase'
 
@@ -183,7 +183,7 @@ const BUILD_MESSAGES = [
 // ============================================================
 export default function LandingPagesPage() {
   const store = useAppStore()
-  const { client, avatars, offers, copyComponents, landingPages, canEdit, refreshLandingPages } = store
+  const { client, avatars, offers, copyComponents, landingPages, clientAssets, canEdit, refreshLandingPages, refreshClientAssets } = store
 
   // Pipeline state
   const [step, setStep] = useState(1)
@@ -328,6 +328,7 @@ export default function LandingPagesPage() {
         setHeroImageUrl(result.image_url)
         setCopySlots(prev => ({ ...prev, hero_image: result.image_url }))
         showToast('Hero image generated successfully')
+        if (client) refreshClientAssets(client.id)
       } else {
         setImageError('No image was returned. Try again or upload your own.')
       }
@@ -377,6 +378,17 @@ export default function LandingPagesPage() {
       } else {
         setCopySlots(prev => ({ ...prev, parallax_image: urlData.publicUrl }))
       }
+
+      // Save to client_assets table
+      await supabase.from('client_assets').insert({
+        client_id: client.id,
+        asset_type: type === 'hero' ? 'hero_image' : 'parallax',
+        url: urlData.publicUrl,
+        storage_path: storagePath,
+        filename: file.name,
+        metadata: { source: 'uploaded' },
+      })
+      refreshClientAssets(client.id)
 
       showToast(`${type === 'hero' ? 'Hero' : 'Parallax'} image uploaded`)
     } catch (err) {
@@ -1287,6 +1299,53 @@ export default function LandingPagesPage() {
               <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.5 }}>
                 The hero image will be placed prominently in the hero section of your landing page.
               </p>
+
+              {/* Saved assets gallery */}
+              {clientAssets.filter(a => a.asset_type === 'hero_image').length > 0 && (
+                <div style={{ marginTop: 14 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
+                    Saved Images <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— click to use</span>
+                  </label>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {clientAssets.filter(a => a.asset_type === 'hero_image').map(asset => (
+                      <div
+                        key={asset.id}
+                        onClick={() => {
+                          setHeroImageUrl(asset.url)
+                          setCopySlots(prev => ({ ...prev, hero_image: asset.url }))
+                          showToast('Hero image selected from saved assets')
+                        }}
+                        style={{
+                          width: 80,
+                          height: 56,
+                          borderRadius: 6,
+                          overflow: 'hidden',
+                          border: heroImageUrl === asset.url ? '2px solid #8b5cf6' : '1px solid var(--border)',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          transition: 'border-color 0.15s',
+                          flexShrink: 0,
+                        }}
+                        title={asset.style ? `${asset.style} style` : 'Uploaded image'}
+                      >
+                        <img
+                          src={asset.url}
+                          alt=""
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        />
+                        {heroImageUrl === asset.url && (
+                          <div style={{
+                            position: 'absolute', inset: 0,
+                            background: 'rgba(139,92,246,0.2)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: '#fff', fontSize: 16, fontWeight: 700,
+                          }}>&#10003;</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1410,6 +1469,52 @@ export default function LandingPagesPage() {
                   onChange={e => handleImageFileSelect(e, 'parallax')}
                 />
               </div>
+
+              {/* Saved parallax assets */}
+              {clientAssets.filter(a => a.asset_type === 'parallax').length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
+                    Saved Backgrounds <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— click to use</span>
+                  </label>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {clientAssets.filter(a => a.asset_type === 'parallax').map(asset => (
+                      <div
+                        key={asset.id}
+                        onClick={() => {
+                          setParallaxImageUrl(asset.url)
+                          setCopySlots(prev => ({ ...prev, parallax_image: asset.url }))
+                          showToast('Parallax background selected')
+                        }}
+                        style={{
+                          width: 100,
+                          height: 48,
+                          borderRadius: 6,
+                          overflow: 'hidden',
+                          border: parallaxImageUrl === asset.url ? '2px solid #3b82f6' : '1px solid var(--border)',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          transition: 'border-color 0.15s',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <img
+                          src={asset.url}
+                          alt=""
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        />
+                        {parallaxImageUrl === asset.url && (
+                          <div style={{
+                            position: 'absolute', inset: 0,
+                            background: 'rgba(59,130,246,0.2)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: '#fff', fontSize: 16, fontWeight: 700,
+                          }}>&#10003;</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
