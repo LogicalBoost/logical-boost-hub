@@ -7,7 +7,7 @@ Multi-tenant marketing platform where an agency team builds and manages AI-power
 - **Backend**: Supabase (Auth, PostgreSQL, Edge Functions)
 - **AI**: Anthropic Claude API (called from Supabase Edge Functions)
 - **Landing Pages**: Google Stitch API (`@google/stitch-sdk`) for design generation. STITCH_API_KEY set as Supabase secret.
-- **Hero Images**: Google Imagen 3 via Generative Language API for AI-generated photorealistic hero shots. GOOGLE_AI_API_KEY set as Supabase secret.
+- **Hero Images**: Google Gemini 3.1 Flash (image preview) via Generative Language API for AI-generated photorealistic hero shots. Uses `generateContent` with `responseModalities: ["IMAGE"]`. GOOGLE_AI_API_KEY set as Supabase secret.
 - **Hosting**: GitHub Pages (static export) + Supabase cloud
 - **Deployment**: GitHub Actions auto-deploys to GitHub Pages on push to `master`
 
@@ -39,10 +39,10 @@ src/
   components/
     AppShell.tsx           — Layout shell (sidebar + header + content)
     Header.tsx             — Top bar with client switcher dropdown
-    Sidebar.tsx            — Navigation sidebar (9 nav items)
+    Sidebar.tsx            — Navigation sidebar (9 nav items, collapsed state shows icon.png not full logo)
     LogoUpload.tsx         — Logo upload component
   lib/
-    api.ts                 — Edge function caller (all AI workflow API calls + landing page pipeline)
+    api.ts                 — Edge function caller (all AI workflow API calls + landing page pipeline). Errors parse response body for detailed messages.
     stitch.ts              — Landing page integration: template slot definitions, serialization, copy mapping
     store.tsx              — React Context state management (AppProvider/useAppStore)
     supabase.ts            — Supabase client + auth helpers + role-based client access
@@ -60,6 +60,8 @@ supabase/
     011_landing_page_builder.sql — template_id, page_html, section_data, brand_kit_snapshot, deploy_status
     012_storage_html_support.sql — HTML MIME type for client-assets bucket
     013_stitch_landing_pages.sql — Stitch fields (stitch_job_id, copy_slots, iteration_history, react_output, deploy_url) + competitor_intel updates + funnel_instances angle tracking
+    014_client_assets.sql   — client_assets table for persistent image storage (hero, parallax, logo, photo)
+    015_client_assets_anon_policies.sql — Anon RLS policies for client_assets (temporary, pre-auth)
   functions/
     _shared/
       ai-client.ts         — Shared Claude API wrapper (callClaude, parseJsonResponse, CORS helpers)
@@ -74,7 +76,7 @@ supabase/
     discover-competitors/  — Workflow 10: AI-powered competitor discovery
     generate-avatars/      — Generate additional avatars via AI prompter
     generate-funnel/       — Workflow 4: Generate full campaign (3 parallel batches: ads, persuasion, video)
-    generate-hero-image/   — Workflow 8: AI hero image generation (Google Imagen 3) for landing pages
+    generate-hero-image/   — Workflow 8: AI hero image generation (Gemini 3.1 Flash) for landing pages
     generate-intake/       — Workflow 2: Generate intake questions
     generate-more/         — Workflow 5: Generate more items per section with AI prompter
     generate-landing-page/ — Legacy: Generate landing page with custom renderer
@@ -129,7 +131,7 @@ Defined in `src/types/database.ts` with `ANGLES` constant, `ANGLE_COLORS` map, a
 - **Business Overview** → "+ Add New Client" button
 - **Dashboard** → Shows "Add Your First Client" when none selected
 - Clients stored in `clients` table, loaded via `loadAllClients()`
-- Switching clients loads all related data (avatars, offers, copy, intake, competitors, landing pages)
+- Switching clients loads all related data (avatars, offers, copy, intake, competitors, landing pages, client assets)
 - `brand_reference_url` field on clients — alternative URL for brand extraction if website doesn't reflect brand
 
 ## AI Workflow Pipeline
@@ -178,16 +180,27 @@ Each slot has a `source` field:
 - `'media'` — Video URLs, images. User provides manually.
 
 ### AI Hero Image Generation
-Step 3 includes a hero image generator powered by Google Imagen 3:
+Step 3 includes a hero image generator powered by Google Gemini 3.1 Flash:
 - **4 styles**: Hero Shot (waist-up portrait), Family/Group (lifestyle), Trust Portrait (headshot), Lifestyle (editorial)
-- Prompt auto-built from avatar description — detects setting context, emotional expression
+- **Avatar-aware prompts** — person appearance derived from avatar description (gig worker → casual clothes, nurse → scrubs, executive → suit, etc.). Clothing, posture, and vibe must match the actual avatar.
+- **Offer-aware icons** — optional floating icons are gated to avatar+offer context (e.g. car/phone for rideshare driver, receipt/calculator for tax offer). "If in doubt, use NO icons."
+- **Transparent background** — all styles enforce blank/transparent background, person isolated, no environment/room/scenery
 - Optional custom prompt override for full control
 - Image uploaded to Supabase Storage (`client-assets/{client_id}/hero-*.png`)
 - Image URL auto-inserted into `hero_image` copy slot → included in Stitch prompt
-- `generate-hero-image` edge function: calls Imagen 3 API → uploads to storage → returns public URL
-- **Auth**: `GOOGLE_AI_API_KEY` (Google AI Studio key), falls back to Vertex AI if `GCP_PROJECT_ID` + `GCP_ACCESS_TOKEN` set
-- **Never mention "Imagen" or "AI-generated" in user-facing UI** — just "Hero Image"
+- `generate-hero-image` edge function: calls Gemini 3.1 Flash via `generateContent` with `responseModalities: ["IMAGE"]` → uploads to storage → saves to `client_assets` table → returns public URL
+- **Auth**: `GOOGLE_AI_API_KEY` (Google AI Studio key, free tier)
+- **Model**: `gemini-3.1-flash-image-preview` — standard Gemini models (gemini-2.0-flash etc) do NOT support image output. Imagen models require paid plans.
+- **Never mention "Gemini", "AI-generated", or model names in user-facing UI** — just "Hero Image"
 - **Upload**: Drag-and-drop or file picker to upload your own hero image (stored in Supabase Storage)
+
+### Client Assets (Persistent Image Storage)
+- All generated and uploaded images are saved to the `client_assets` table for reuse
+- **Business Overview** page shows an Image Assets grid with thumbnails, type badges, dates
+- **Landing Page Builder** Step 3 shows saved image galleries at the top of both Hero Image and Parallax sections
+- Click any saved thumbnail to select it for the current landing page
+- Asset types: `hero_image`, `parallax`, `logo`, `photo`, `other`
+- Table: `client_assets` (migration 014) with anon RLS policies (migration 015)
 
 ### Parallax Background Image
 - Upload a full-width background image for a parallax scrolling section
@@ -200,8 +213,8 @@ Step 3 includes a hero image generator powered by Google Imagen 3:
 ### Frontend Pipeline (7 UI Steps)
 1. **Select Avatar + Offer** — Two dropdowns, approved only, avatars sorted by priority
 2. **Select Template** — 8 template cards with name and "Best for" description
-3. **Review Copy Slots** — Auto-fills copy slots from approved components; business/media slots shown separately for manual entry; optional slots (quiz questions) don't block build; **AI Hero Image** generator panel with style picker and preview
-4. **Build Page** — Assembles master prompt (including hero image URL if generated), sends to Stitch API, receives designed HTML
+3. **Review Copy Slots** — Auto-fills copy slots from approved components; business/media slots shown separately for manual entry; optional slots (quiz questions) don't block build; **AI Hero Image** generator panel with style picker and preview; **Saved images gallery** at top of hero/parallax sections for reuse; **Parallax background** upload
+4. **Build Page** — Shows readiness checklist (avatar, offer, template, slots, optional images) with clear ✓/✗ status. Assembles master prompt (including hero image URL if generated), sends to Stitch API, receives designed HTML. Build errors displayed inline with full error details.
 5. **Preview + Iterate** — Interactive preview in iframe, change request panel, version history
 6. **Approve** — Approve the design for React conversion
 7. **Deploy** — Convert to React, save to client directory, provide preview link
@@ -280,7 +293,7 @@ The `_shared/copywriter-prompts.ts` contains the comprehensive copywriting syste
 ### Edge Functions (Supabase Secrets)
 - `ANTHROPIC_API_KEY` — Claude API key for AI generation
 - `STITCH_API_KEY` — Google Stitch API key for landing page design (from stitch.withgoogle.com → Settings)
-- `GOOGLE_AI_API_KEY` — Google AI Studio API key for Imagen 3 hero image generation (from aistudio.google.com)
+- `GOOGLE_AI_API_KEY` — Google AI Studio API key for Gemini Flash hero image generation (from aistudio.google.com, free tier)
 
 ## Deployment
 
