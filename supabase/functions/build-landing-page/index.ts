@@ -605,6 +605,7 @@ function assembleStitchPrompt({
   clientName,
   clientWebsiteUrl,
   clientBrandReferenceUrl,
+  clientLogoUrl,
   avatarName,
   avatarDescription,
   offerName,
@@ -617,6 +618,7 @@ function assembleStitchPrompt({
   clientName: string
   clientWebsiteUrl: string
   clientBrandReferenceUrl?: string
+  clientLogoUrl?: string
   avatarName: string
   avatarDescription: string
   offerName: string
@@ -635,7 +637,12 @@ Also visit ${clientWebsiteUrl} and pull any real customer testimonials, proof st
 
 ${clientBrandReferenceUrl ? `Additionally visit ${clientBrandReferenceUrl} to supplement your understanding of the brand's visual identity.` : ''}
 
-The client's website IS the brand kit. Build this landing page so it feels like a natural, polished extension of ${clientWebsiteUrl} -- same color family, same typographic personality, same visual weight and spacing rhythm.`.trim()
+The client's website IS the brand kit. Build this landing page so it feels like a natural, polished extension of ${clientWebsiteUrl} -- same color family, same typographic personality, same visual weight and spacing rhythm.
+
+CRITICAL BRAND NAME RULE: The company name is "${clientName}". Use ONLY "${clientName}" everywhere on the page -- in the header, title tag, alt text, headings, footer, and any place a brand name appears. NEVER make up a different name. NEVER use a placeholder name. The brand is "${clientName}" and nothing else.
+
+${clientLogoUrl ? `LOGO: Use this exact image as the logo in the header: ${clientLogoUrl}
+Render it as an <img> tag with alt="${clientName} logo". Do not use text as a logo. Use this image.` : `LOGO: Display "${clientName}" as text in the header since no logo image is provided.`}`.trim()
 
   const part2 = GLOBAL_DESIGN_RULES
 
@@ -646,7 +653,9 @@ Offer: ${offerName} -- ${offerDescription}
 Primary conversion action: ${offerPrimaryCta}
 Conversion type: ${offerConversionType}
 
-The page must feel like it belongs on ${clientWebsiteUrl} -- same visual family -- while being specifically crafted for ${avatarName} and the ${offerName} offer.`.trim()
+The page must feel like it belongs on ${clientWebsiteUrl} -- same visual family -- while being specifically crafted for ${avatarName} and the ${offerName} offer.
+
+REMINDER: The brand name is "${clientName}". The <title> tag must include "${clientName}". The header must show the ${clientLogoUrl ? 'logo image from the URL above' : `"${clientName}" text`}. Do not invent any other brand name.`.trim()
 
   const part4 = templateSpec
 
@@ -659,13 +668,15 @@ ${serializeCopySlots(copySlots)}`.trim()
   const parallaxImageUrl = copySlots.parallax_image as string | undefined
 
   const heroImageInstruction = heroImageUrl
-    ? `\n\nHERO IMAGE: Use this image as the primary hero visual: ${heroImageUrl}
-Display it prominently in the hero section as an <img> tag. Style it with:
-- Subtle border-radius (8-12px)
-- Optional soft drop shadow for depth
-- Position it as the visual anchor of the hero — either as a large side element (40-50% of hero width on desktop) or as a centered focal point
-- On mobile, stack it above or below the hero copy at full width
-- Do NOT use it as a background image — render it as a visible foreground element`
+    ? `\n\nHERO IMAGE -- MANDATORY: You MUST use this exact image URL as the hero visual: ${heroImageUrl}
+Add an <img> tag with src="${heroImageUrl}" in the hero section. This is NOT optional. Do NOT generate or use any other image. Do NOT use a placeholder. Use THIS URL exactly.
+Style the hero image with:
+- border-radius: 12px
+- Soft drop shadow for depth
+- Position it as the visual anchor of the hero — large side element (40-50% of hero width on desktop) or centered focal point
+- On mobile, stack it below the hero copy at full width
+- Render it as a visible foreground <img> element, NOT as a background-image
+- alt="${avatarName}"`
     : ''
 
   const parallaxInstruction = parallaxImageUrl
@@ -694,7 +705,15 @@ Output format: HTML file with all CSS and JavaScript inline. No external depende
 
 The page must render correctly at 320px, 768px, and 1024px. Zero horizontal scroll. All interactive elements working. Brand colors from ${clientWebsiteUrl}. Premium crafted feel -- not AI-generated template.
 
-Do not add placeholder text, lorem ipsum, or generic filler. Every section must contain the exact copy provided above.`.trim()
+Do not add placeholder text, lorem ipsum, or generic filler. Every section must contain the exact copy provided above.
+
+FINAL CHECKLIST -- VERIFY BEFORE OUTPUT:
+1. Brand name "${clientName}" appears in the <title> tag, header, and footer. No other brand name anywhere.
+${clientLogoUrl ? `2. Header contains <img src="${clientLogoUrl}" alt="${clientName} logo"> -- not text.` : `2. Header contains "${clientName}" as text.`}
+${heroImageUrl ? `3. Hero section contains <img src="${heroImageUrl}"> -- the exact URL, not a generated image.` : '3. Hero section uses a styled placeholder or illustration.'}
+4. All form inputs have visible borders, backgrounds, and proper contrast. Forms must look like real forms with clear input fields.
+5. CTA buttons are prominent with the extracted brand accent color.
+6. The copy from Part 5 above is used exactly as provided. Not rewritten.`.trim()
 
   return [part1, part2, part3, part4, part5, part6].join('\n\n---\n\n')
 }
@@ -758,6 +777,7 @@ Deno.serve(async (req: Request) => {
       clientName: client.name,
       clientWebsiteUrl,
       clientBrandReferenceUrl: client.brand_reference_url || undefined,
+      clientLogoUrl: client.logo_url || undefined,
       avatarName: avatar.name,
       avatarDescription: avatar.description || '',
       offerName: offer.name,
