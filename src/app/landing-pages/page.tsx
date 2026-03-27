@@ -222,6 +222,9 @@ export default function LandingPagesPage() {
   const [parallaxImageUrl, setParallaxImageUrl] = useState<string | null>(null)
   const [uploadingParallax, setUploadingParallax] = useState(false)
 
+  // Lightbox state for full image preview
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+
   // Derived data
   const approvedAvatars = useMemo(
     () => [...avatars].filter(a => a.status === 'approved').sort((a, b) => a.priority - b.priority),
@@ -1070,12 +1073,17 @@ export default function LandingPagesPage() {
               {/* Image preview — shown at top when we have one */}
               {heroImageUrl && (
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{
-                    borderRadius: 'var(--radius)',
-                    overflow: 'hidden',
-                    border: '1px solid var(--border)',
-                    position: 'relative',
-                  }}>
+                  <div
+                    style={{
+                      borderRadius: 'var(--radius)',
+                      overflow: 'hidden',
+                      border: '1px solid var(--border)',
+                      position: 'relative',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setLightboxUrl(heroImageUrl)}
+                    title="Click to view full size"
+                  >
                     <img
                       src={heroImageUrl}
                       alt="Hero image"
@@ -1086,6 +1094,24 @@ export default function LandingPagesPage() {
                         display: 'block',
                       }}
                     />
+                    {/* Expand icon */}
+                    <div style={{
+                      position: 'absolute',
+                      top: 8,
+                      right: 8,
+                      width: 28,
+                      height: 28,
+                      borderRadius: 6,
+                      background: 'rgba(0,0,0,0.5)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                      fontSize: 14,
+                      pointerEvents: 'none',
+                    }}>
+                      &#x26F6;
+                    </div>
                     <div style={{
                       position: 'absolute',
                       bottom: 0,
@@ -1098,10 +1124,10 @@ export default function LandingPagesPage() {
                       alignItems: 'center',
                     }}>
                       <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>
-                        Hero image set
+                        Click to preview full size
                       </span>
                       <button
-                        onClick={() => { setHeroImageUrl(null); setCopySlots(prev => { const n = { ...prev }; delete n.hero_image; return n }) }}
+                        onClick={(e) => { e.stopPropagation(); setHeroImageUrl(null); setCopySlots(prev => { const n = { ...prev }; delete n.hero_image; return n }) }}
                         style={{
                           padding: '4px 10px',
                           borderRadius: 'var(--radius-sm)',
@@ -1288,13 +1314,18 @@ export default function LandingPagesPage() {
               {/* Parallax preview */}
               {parallaxImageUrl && (
                 <div style={{ marginBottom: 12 }}>
-                  <div style={{
-                    borderRadius: 'var(--radius)',
-                    overflow: 'hidden',
-                    border: '1px solid var(--border)',
-                    position: 'relative',
-                    height: 140,
-                  }}>
+                  <div
+                    style={{
+                      borderRadius: 'var(--radius)',
+                      overflow: 'hidden',
+                      border: '1px solid var(--border)',
+                      position: 'relative',
+                      height: 140,
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setLightboxUrl(parallaxImageUrl)}
+                    title="Click to view full size"
+                  >
                     <img
                       src={parallaxImageUrl}
                       alt="Parallax background"
@@ -1315,9 +1346,9 @@ export default function LandingPagesPage() {
                       flexDirection: 'column',
                       gap: 4,
                     }}>
-                      <span style={{ fontSize: 13, color: '#fff', fontWeight: 600 }}>Parallax Background Set</span>
+                      <span style={{ fontSize: 13, color: '#fff', fontWeight: 600 }}>Parallax Background Set — click to preview</span>
                       <button
-                        onClick={() => { setParallaxImageUrl(null); setCopySlots(prev => { const n = { ...prev }; delete n.parallax_image; return n }) }}
+                        onClick={(e) => { e.stopPropagation(); setParallaxImageUrl(null); setCopySlots(prev => { const n = { ...prev }; delete n.parallax_image; return n }) }}
                         style={{
                           padding: '4px 12px',
                           borderRadius: 'var(--radius-sm)',
@@ -1742,6 +1773,61 @@ export default function LandingPagesPage() {
               />
             ))}
           </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* Lightbox / Full Image Preview Modal */}
+      {/* ============================================================ */}
+      {lightboxUrl && (
+        <div
+          onClick={() => setLightboxUrl(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0, 0, 0, 0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'zoom-out',
+            padding: 24,
+          }}
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            style={{
+              position: 'absolute',
+              top: 16,
+              right: 16,
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              border: '1px solid rgba(255,255,255,0.3)',
+              background: 'rgba(0,0,0,0.5)',
+              color: '#fff',
+              fontSize: 22,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            &times;
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Full size preview"
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              objectFit: 'contain',
+              borderRadius: 8,
+              cursor: 'default',
+              boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
+            }}
+          />
         </div>
       )}
     </div>
