@@ -196,6 +196,7 @@ export default function LandingPagesPage() {
 
   // Build state
   const [building, setBuilding] = useState(false)
+  const [buildError, setBuildError] = useState<string | null>(null)
   const [buildMsgIdx, setBuildMsgIdx] = useState(0)
   const [activePage, setActivePage] = useState<LandingPage | null>(null)
 
@@ -437,8 +438,17 @@ export default function LandingPagesPage() {
   }, [requiredCopySlots, copySlots])
 
   const handleBuild = useCallback(async () => {
-    if (!client || !selectedAvatarId || !selectedOfferId || !selectedTemplate) return
+    if (!client || !selectedAvatarId || !selectedOfferId || !selectedTemplate) {
+      const reasons: string[] = []
+      if (!client) reasons.push('No client selected')
+      if (!selectedAvatarId) reasons.push('No avatar selected')
+      if (!selectedOfferId) reasons.push('No offer selected')
+      if (!selectedTemplate) reasons.push('No template selected')
+      setBuildError(`Missing requirements: ${reasons.join(', ')}. Go back to fix these.`)
+      return
+    }
     setBuilding(true)
+    setBuildError(null)
     setBuildMsgIdx(0)
 
     // Cycle through progress messages
@@ -470,14 +480,18 @@ export default function LandingPagesPage() {
         setStep(5)
         // Refresh store
         store.refreshLandingPages(client.id)
+      } else {
+        setBuildError('Build completed but no landing page was returned. Check the Stitch API key configuration.')
       }
     } catch (err) {
       clearInterval(interval)
-      showToast(`Build error: ${(err as Error).message}`)
+      const msg = (err as Error).message
+      setBuildError(msg)
+      showToast(`Build error: ${msg}`)
     } finally {
       setBuilding(false)
     }
-  }, [client, selectedAvatarId, selectedOfferId, selectedTemplate, copySlots, store])
+  }, [client, selectedAvatarId, selectedOfferId, selectedTemplate, copySlots, heroImageUrl, parallaxImageUrl, store])
 
   const handleIterate = useCallback(async () => {
     if (!activePage || !iteratePrompt.trim()) return
@@ -858,6 +872,12 @@ export default function LandingPagesPage() {
               >
                 Proceed to Build
               </button>
+              {!allSlotsFilled && requiredCopySlots.length > 0 && (
+                <p style={{ fontSize: 11, color: 'var(--warning, #f59e0b)', margin: '6px 0 0', width: '100%' }}>
+                  &#9888; {requiredCopySlots.filter(s => !copySlots[s.id]?.trim()).length} required slot{requiredCopySlots.filter(s => !copySlots[s.id]?.trim()).length !== 1 ? 's' : ''} still empty:{' '}
+                  {requiredCopySlots.filter(s => !copySlots[s.id]?.trim()).map(s => s.label).join(', ')}
+                </p>
+              )}
             </div>
           </div>
 
@@ -1539,40 +1559,118 @@ export default function LandingPagesPage() {
       {/* ============================================================ */}
       {/* STEP 4: Build Landing Page */}
       {/* ============================================================ */}
-      {step === 4 && (
-        <div style={{ ...card({ maxWidth: 540, textAlign: 'center' as const, margin: '0 auto' }) }}>
-          <h3 style={{ fontSize: 18, marginBottom: 8 }}>Build Landing Page</h3>
-          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 24 }}>
-            Your template wireframe and copy slots will be combined into a pixel-perfect landing page.
-          </p>
+      {step === 4 && (() => {
+        // Compute what's missing for clear error messages
+        const missing: string[] = []
+        if (!selectedAvatarId) missing.push('Avatar not selected')
+        if (!selectedOfferId) missing.push('Offer not selected')
+        if (!selectedTemplate) missing.push('Template not selected')
+        const emptySlots = requiredCopySlots.filter(s => !copySlots[s.id]?.trim())
+        if (emptySlots.length > 0) missing.push(`${emptySlots.length} required copy slot${emptySlots.length !== 1 ? 's' : ''} empty (${emptySlots.map(s => s.label).join(', ')})`)
+        const canBuild = missing.length === 0 && canEdit
 
-          {building ? (
-            <div>
-              <div style={{
-                width: 48,
-                height: 48,
-                border: '3px solid var(--border)',
-                borderTopColor: 'var(--accent)',
-                borderRadius: '50%',
-                margin: '0 auto 16px',
-                animation: 'spin 1s linear infinite',
-              }} />
-              <p style={{ fontSize: 14, color: 'var(--accent)', fontWeight: 500 }}>
-                {BUILD_MESSAGES[buildMsgIdx]}
+        return (
+          <div style={{ ...card({ maxWidth: 600, textAlign: 'center' as const, margin: '0 auto' }) }}>
+            <h3 style={{ fontSize: 18, marginBottom: 8 }}>Build Landing Page</h3>
+            <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 16 }}>
+              Your template wireframe and copy slots will be combined into a pixel-perfect landing page.
+            </p>
+
+            {/* Readiness checklist */}
+            <div style={{
+              textAlign: 'left' as const,
+              marginBottom: 20,
+              padding: 16,
+              borderRadius: 'var(--radius)',
+              border: `1px solid ${canBuild ? 'rgba(34,197,94,0.3)' : 'rgba(245,158,11,0.3)'}`,
+              background: canBuild ? 'rgba(34,197,94,0.05)' : 'rgba(245,158,11,0.05)',
+            }}>
+              <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', margin: '0 0 10px' }}>
+                Build Checklist
               </p>
-              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+              {[
+                { label: 'Avatar selected', ok: !!selectedAvatarId },
+                { label: 'Offer selected', ok: !!selectedOfferId },
+                { label: 'Template chosen', ok: !!selectedTemplate },
+                { label: `Required copy slots filled (${requiredCopySlots.length - emptySlots.length}/${requiredCopySlots.length})`, ok: emptySlots.length === 0 },
+                { label: 'Hero image (optional)', ok: !!heroImageUrl, optional: true },
+                { label: 'Parallax image (optional)', ok: !!parallaxImageUrl, optional: true },
+              ].map((item, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{
+                    fontSize: 14,
+                    color: item.ok ? '#22c55e' : item.optional ? 'var(--text-muted)' : '#f59e0b',
+                  }}>
+                    {item.ok ? '\u2713' : item.optional ? '\u25cb' : '\u2717'}
+                  </span>
+                  <span style={{
+                    fontSize: 13,
+                    color: item.ok ? 'var(--text-secondary)' : item.optional ? 'var(--text-muted)' : '#f59e0b',
+                  }}>
+                    {item.label}
+                  </span>
+                </div>
+              ))}
             </div>
-          ) : (
-            <button
-              style={btn('primary', !allSlotsFilled)}
-              disabled={!allSlotsFilled || !canEdit}
-              onClick={handleBuild}
-            >
-              Build Landing Page
-            </button>
-          )}
-        </div>
-      )}
+
+            {building ? (
+              <div>
+                <div style={{
+                  width: 48,
+                  height: 48,
+                  border: '3px solid var(--border)',
+                  borderTopColor: 'var(--accent)',
+                  borderRadius: '50%',
+                  margin: '0 auto 16px',
+                  animation: 'spin 1s linear infinite',
+                }} />
+                <p style={{ fontSize: 14, color: 'var(--accent)', fontWeight: 500 }}>
+                  {BUILD_MESSAGES[buildMsgIdx]}
+                </p>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+                  This can take 30-60 seconds...
+                </p>
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+              </div>
+            ) : (
+              <>
+                <button
+                  style={btn('primary', !canBuild)}
+                  disabled={!canBuild}
+                  onClick={handleBuild}
+                >
+                  Build Landing Page
+                </button>
+                {!canBuild && missing.length > 0 && (
+                  <p style={{ fontSize: 12, color: '#f59e0b', marginTop: 10, lineHeight: 1.6 }}>
+                    &#9888; Cannot build — go back and fix:{' '}
+                    {missing.join('; ')}
+                  </p>
+                )}
+              </>
+            )}
+
+            {/* Build error display */}
+            {buildError && (
+              <div style={{
+                marginTop: 16,
+                padding: 12,
+                borderRadius: 'var(--radius)',
+                border: '1px solid rgba(239,68,68,0.3)',
+                background: 'rgba(239,68,68,0.08)',
+                textAlign: 'left' as const,
+              }}>
+                <p style={{ fontSize: 12, fontWeight: 600, color: '#ef4444', margin: '0 0 6px' }}>
+                  Build Error
+                </p>
+                <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5, wordBreak: 'break-word' as const }}>
+                  {buildError}
+                </p>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* ============================================================ */}
       {/* STEP 5: Preview + Iterate */}
