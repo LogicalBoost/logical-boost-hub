@@ -79,7 +79,9 @@ async function generateImage(prompt: string): Promise<Uint8Array> {
     )
   }
 
-  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
+  // Image-capable models: gemini-3.1-flash-image-preview, gemini-3-pro-image-preview, gemini-2.5-flash-image
+  // Standard models (gemini-2.0-flash etc) do NOT support image output
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent'
 
   const body = {
     contents: [{
