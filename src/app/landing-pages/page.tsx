@@ -322,7 +322,8 @@ export default function LandingPagesPage() {
         client.id,
         selectedAvatarId,
         imageStyle,
-        customImagePrompt.trim() || undefined
+        customImagePrompt.trim() || undefined,
+        selectedOfferId || undefined
       )
       if (result.image_url) {
         setHeroImageUrl(result.image_url)

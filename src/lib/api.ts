@@ -176,11 +176,13 @@ export async function generateHeroImage(
   clientId: string,
   avatarId: string,
   imageStyle: 'hero' | 'family' | 'trust' | 'lifestyle' = 'hero',
-  customPrompt?: string
+  customPrompt?: string,
+  offerId?: string
 ) {
   return callEdgeFunction('generate-hero-image', {
     client_id: clientId,
     avatar_id: avatarId,
+    offer_id: offerId || undefined,
     image_style: imageStyle,
     custom_prompt: customPrompt,
   })
