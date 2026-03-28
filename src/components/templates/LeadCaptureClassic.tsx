@@ -163,9 +163,9 @@ function HeroBlock({ section, media }: { section: Section; media: MediaAssets })
             >
               <AH text={section.headline || ''} word={section.accent_word} />
             </h1>
-            {section.content && (
+            {(section.subheadline || section.content) && (
               <p className="text-base md:text-lg text-gray-500 leading-relaxed mb-8 max-w-lg mx-auto md:mx-0">
-                {section.content}
+                {section.subheadline || section.content}
               </p>
             )}
             <a
@@ -188,24 +188,26 @@ function HeroBlock({ section, media }: { section: Section; media: MediaAssets })
           <div className="flex-shrink-0 md:max-w-[45%] flex justify-center">
             {img ? (
               <div className="relative w-[320px] md:w-[400px] lg:w-[460px] aspect-square">
-                {/* Organic blob bg */}
+                {/* Organic blob bg — fills behind transparent areas of PNG */}
                 <div
-                  className="absolute inset-0 bg-[var(--color-accent)]/15"
+                  className="absolute inset-0 bg-gradient-to-br from-[var(--color-accent)]/20 to-[var(--color-accent)]/8"
                   style={{ borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%' }}
                 />
                 <div
-                  className="absolute inset-[3%] bg-[var(--color-accent)]/10"
+                  className="absolute inset-[3%] bg-gradient-to-br from-[var(--color-accent)]/15 to-[var(--color-accent)]/5"
                   style={{ borderRadius: '40% 60% 55% 45% / 40% 45% 55% 60%' }}
                 />
+                {/* Image with mix-blend to composite transparent PNGs cleanly */}
                 <img
                   src={img}
                   alt=""
                   className="absolute inset-0 w-full h-full object-contain drop-shadow-2xl z-10"
+                  style={{ background: 'transparent' }}
                 />
               </div>
             ) : (
               <div
-                className="w-[320px] h-[320px] bg-white/5 border border-white/10"
+                className="w-[320px] h-[320px] bg-[var(--color-accent)]/5 border border-[var(--color-accent)]/10"
                 style={{ borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%' }}
               />
             )}

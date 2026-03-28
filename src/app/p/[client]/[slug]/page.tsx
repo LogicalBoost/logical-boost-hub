@@ -19,93 +19,113 @@ interface PageRecord {
 
 /**
  * Convert flat copy_slots (Record<string, string>) into Section[] for template rendering.
- * Maps t1_* keys into the section structure the LeadCaptureClassic template expects.
+ *
+ * LeadCaptureClassic expects these section types:
+ *   hero, feature_cards, two_column_info, steps, trust_bar, benefits_grid, testimonials, faq, footer
+ *
+ * When slots are sparse (only hero data), we still emit all sections with placeholder
+ * content so the template renders a full page rather than just a hero + footer.
  */
-function copySlotsToSections(slots: Record<string, string>): Section[] {
+function copySlotsToSections(slots: Record<string, string>, headline: string, cta: string): Section[] {
   const sections: Section[] = []
 
-  // Hero section
+  // ─── Hero ───
   sections.push({
     type: 'hero',
-    headline: slots.t1_headline || slots.hero_headline || 'Welcome',
+    headline: slots.t1_headline || slots.hero_headline || headline || 'Welcome',
     subheadline: slots.t1_subheadline || slots.hero_subheadline || '',
-    cta: slots.t1_cta || slots.hero_cta || 'Get Started',
+    cta: slots.t1_cta || slots.hero_cta || cta || 'Get Started',
     sub_cta: slots.t1_trust_line || slots.trust_line || '',
+    sub_cta_icon: 'shield',
     show_form: true,
   })
 
-  // Feature cards — look for category/benefit slots
+  // ─── Feature Cards Bar ───
   const featureItems: Array<{ icon?: string; title?: string; text?: string }> = []
-  // Try t2 categories or t1 options as feature cards
   for (let i = 1; i <= 6; i++) {
     const title = slots[`feature_${i}_title`] || slots[`t2_categories_${i}`]
     const text = slots[`feature_${i}_text`] || slots[`t2_categories_${i}_desc`]
-    if (title) featureItems.push({ title, text: text || '' })
+    if (title) featureItems.push({ icon: slots[`feature_${i}_icon`] || 'check', title, text: text || '' })
   }
-  if (featureItems.length > 0) {
-    sections.push({
-      type: 'features',
-      headline: slots.features_headline || slots.t2_category_headline || 'Why Choose Us',
-      items: featureItems,
-    })
-  }
+  // Always emit feature_cards — use placeholders if empty
+  sections.push({
+    type: 'feature_cards',
+    headline: slots.features_headline || slots.t2_category_headline || '',
+    items: featureItems.length > 0 ? featureItems : [
+      { icon: 'zap', title: 'Fast Approval', text: 'Quick and easy process' },
+      { icon: 'shield', title: 'Trusted Service', text: 'Industry-leading standards' },
+      { icon: 'dollar', title: 'Great Rates', text: 'Competitive pricing' },
+      { icon: 'check', title: 'Proven Results', text: 'Thousands of happy clients' },
+    ],
+  })
 
-  // Info / Problem-Solution section
-  if (slots.t2_benefits_headline || slots.info_headline || slots.problem_headline) {
-    const infoItems: Array<{ title?: string; text?: string }> = []
-    for (let i = 1; i <= 4; i++) {
-      const title = slots[`benefit_${i}_title`] || slots[`t2_benefits_${i}`]
-      const text = slots[`benefit_${i}_text`] || slots[`t2_benefits_${i}_desc`]
-      if (title) infoItems.push({ title, text: text || '' })
-    }
-    sections.push({
-      type: 'info',
-      headline: slots.info_headline || slots.t2_benefits_headline || slots.problem_headline || '',
-      content: slots.info_content || slots.problem_content || '',
-      items: infoItems.length > 0 ? infoItems : undefined,
-    })
+  // ─── Two Column Info ───
+  const infoItems: Array<{ title?: string; text?: string }> = []
+  for (let i = 1; i <= 4; i++) {
+    const title = slots[`benefit_${i}_title`] || slots[`t2_benefits_${i}`]
+    const text = slots[`benefit_${i}_text`] || slots[`t2_benefits_${i}_desc`]
+    if (title) infoItems.push({ title, text: text || '' })
   }
+  sections.push({
+    type: 'two_column_info',
+    headline: slots.info_headline || slots.t2_benefits_headline || slots.problem_headline || 'Why It Matters',
+    content: slots.info_content || slots.problem_content || slots.t1_subheadline || '',
+    items: infoItems.length > 0 ? infoItems : [
+      { title: 'Expert Guidance', text: 'Our team helps you every step of the way' },
+      { title: 'Tailored Solutions', text: 'Customized to fit your unique situation' },
+    ],
+  })
 
-  // Steps section
+  // ─── Steps ───
   const stepItems: Array<{ title?: string; text?: string }> = []
   for (let i = 1; i <= 5; i++) {
     const title = slots[`step_${i}_title`]
     const text = slots[`step_${i}_text`]
     if (title) stepItems.push({ title, text: text || '' })
   }
-  if (stepItems.length > 0) {
-    sections.push({
-      type: 'steps',
-      headline: slots.steps_headline || 'How It Works',
-      items: stepItems,
-    })
-  }
+  sections.push({
+    type: 'steps',
+    headline: slots.steps_headline || 'How It Works',
+    items: stepItems.length > 0 ? stepItems : [
+      { title: 'Apply Online', text: 'Fill out our simple form in minutes' },
+      { title: 'Get Matched', text: 'We find the best option for you' },
+      { title: 'Get Funded', text: 'Receive your funds quickly' },
+    ],
+  })
 
-  // Trust bar / parallax section
-  if (slots.trust_headline || slots.t1_trust_line) {
-    sections.push({
-      type: 'trust',
-      headline: slots.trust_headline || '',
-      content: slots.trust_content || slots.t1_trust_line || '',
-    })
-  }
+  // ─── Trust Bar (parallax) ───
+  sections.push({
+    type: 'trust_bar',
+    headline: slots.trust_headline || '',
+    content: slots.trust_content || slots.t1_trust_line || '',
+    items: [
+      { stat: slots.trust_stat_1 || '1000+', label: slots.trust_label_1 || 'Happy Clients' },
+      { stat: slots.trust_stat_2 || '12+', label: slots.trust_label_2 || 'Years Experience' },
+      { stat: slots.trust_stat_3 || '4.9', label: slots.trust_label_3 || 'Star Rating' },
+    ],
+  })
 
-  // Benefits grid
+  // ─── Benefits Grid ───
   const benefitGridItems: Array<{ icon?: string; title?: string; text?: string }> = []
   for (let i = 1; i <= 8; i++) {
     const title = slots[`grid_benefit_${i}_title`]
     const text = slots[`grid_benefit_${i}_text`]
-    if (title) benefitGridItems.push({ title, text: text || '' })
+    if (title) benefitGridItems.push({ icon: slots[`grid_benefit_${i}_icon`], title, text: text || '' })
   }
-  if (benefitGridItems.length > 0) {
-    sections.push({
-      type: 'benefits',
-      headline: slots.benefits_headline || 'Benefits',
-      items: benefitGridItems,
-    })
-  }
+  sections.push({
+    type: 'benefits_grid',
+    headline: slots.benefits_headline || 'Benefits',
+    items: benefitGridItems.length > 0 ? benefitGridItems : [
+      { icon: 'check', title: 'No Hidden Fees', text: 'Transparent pricing from start to finish' },
+      { icon: 'clock', title: 'Quick Process', text: 'Get approved in as little as one day' },
+      { icon: 'shield', title: 'Secure & Private', text: 'Your information is always protected' },
+      { icon: 'star', title: 'Top Rated', text: 'Thousands of 5-star reviews' },
+      { icon: 'users', title: 'Dedicated Support', text: 'A real person to help you every step' },
+      { icon: 'dollar', title: 'Competitive Rates', text: 'Fair terms designed for your situation' },
+    ],
+  })
 
-  // Testimonials
+  // ─── Testimonials ───
   const testimonialItems: Array<{ name?: string; quote?: string; role?: string; rating?: number }> = []
   for (let i = 1; i <= 6; i++) {
     const name = slots[`testimonial_${i}_name`] || slots[`t1_testimonials_${i}_name`]
@@ -127,7 +147,7 @@ function copySlotsToSections(slots: Record<string, string>): Section[] {
     })
   }
 
-  // FAQ
+  // ─── FAQ ───
   const faqItems: Array<{ question?: string; answer?: string }> = []
   for (let i = 1; i <= 8; i++) {
     const question = slots[`faq_${i}_question`] || slots[`faq_${i}_q`]
@@ -142,11 +162,11 @@ function copySlotsToSections(slots: Record<string, string>): Section[] {
     })
   }
 
-  // Final CTA / Footer
+  // ─── Footer ───
   sections.push({
     type: 'footer',
-    headline: slots.t2_final_headline || slots.final_headline || slots.t1_headline || 'Get Started Today',
-    cta: slots.t2_final_cta || slots.final_cta || slots.t1_cta || 'Get Started',
+    headline: slots.t2_final_headline || slots.final_headline || slots.t1_headline || headline || 'Get Started Today',
+    cta: slots.t2_final_cta || slots.final_cta || slots.t1_cta || cta || 'Get Started',
     content: slots.t1_disclaimer || slots.disclaimer || '',
     phone: slots.t2_phone_cta || slots.phone || '',
   })
@@ -281,7 +301,9 @@ export default function LandingPage() {
 
   // Convert flat copy_slots to Section[] for the template
   const copySlots = page.copy_slots || {}
-  const sections: Section[] = copySlotsToSections(copySlots)
+  const mainHeadline = copySlots.t1_headline || copySlots.hero_headline || 'Welcome'
+  const mainCta = copySlots.t1_cta || copySlots.hero_cta || 'Get Started'
+  const sections: Section[] = copySlotsToSections(copySlots, mainHeadline, mainCta)
 
   // Build media assets
   const media: MediaAssets = {
