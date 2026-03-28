@@ -4,14 +4,16 @@ import { useState, useMemo } from 'react'
 import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import { generateAvatars } from '@/lib/api'
-import type { Avatar } from '@/types/database'
+import type { Avatar, PublishedPage } from '@/types/database'
 import { getAngleLabel, ANGLE_COLORS } from '@/types/database'
 import { showToast } from '@/lib/demo-toast'
+
+const HUB_URL = 'https://hub.logicalboost.com'
 
 type StatusFilter = 'all' | 'approved' | 'denied'
 
 export default function AvatarsPage() {
-  const { client, avatars, updateAvatar, refreshAvatars, canEdit } = useAppStore()
+  const { client, avatars, offers, publishedPages, updateAvatar, refreshAvatars, canEdit } = useAppStore()
   const [filter, setFilter] = useState<StatusFilter>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [selectedAvatar, setSelectedAvatar] = useState<Avatar | null>(null)
@@ -122,13 +124,32 @@ export default function AvatarsPage() {
     }
   }
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
+
   async function handleDelete(id: string) {
-    if (!confirm('Delete this avatar? This cannot be undone.')) return
     if (!client) return
+    // Check if avatar has published pages
+    const avatarPages = publishedPages.filter(p => p.avatar_id === id)
+    if (avatarPages.length > 0) {
+      showToast(`Cannot delete: ${avatarPages.length} landing page(s) use this avatar. Archive or remove them first.`)
+      setShowDeleteConfirm(null)
+      return
+    }
     await supabase.from('avatars').delete().eq('id', id)
     setSelectedAvatar(null)
+    setShowDeleteConfirm(null)
     await refreshAvatars(client.id)
     showToast('Avatar deleted')
+  }
+
+  function getAvatarPages(avatarId: string): PublishedPage[] {
+    return publishedPages.filter(p => p.avatar_id === avatarId && p.status === 'published')
+  }
+
+  function getOfferName(offerId: string | null): string {
+    if (!offerId) return 'Unknown Offer'
+    const offer = offers.find(o => o.id === offerId)
+    return offer?.name || 'Unknown Offer'
   }
 
   return (
@@ -265,6 +286,38 @@ export default function AvatarsPage() {
                   })}
                 </div>
               )}
+              {/* Landing pages for this avatar */}
+              {getAvatarPages(avatar.id).length > 0 && (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Landing Pages
+                  </div>
+                  {getAvatarPages(avatar.id).map(page => (
+                    <a
+                      key={page.id}
+                      href={`${HUB_URL}/p/${page.client_slug}/${page.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        fontSize: 12, color: 'var(--accent)', textDecoration: 'none',
+                        padding: '3px 0',
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                        <polyline points="15 3 21 3 21 9" />
+                        <line x1="10" y1="14" x2="21" y2="3" />
+                      </svg>
+                      /{page.slug}
+                      <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                        &middot; {getOfferName(page.offer_id)}
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -391,6 +444,45 @@ export default function AvatarsPage() {
                     )}
                   </div>
                 </div>
+
+                {/* Landing Pages for this avatar */}
+                {getAvatarPages(selectedAvatar.id).length > 0 && (
+                  <div className="detail-item">
+                    <div className="detail-label">Landing Pages</div>
+                    <div className="detail-value">
+                      {getAvatarPages(selectedAvatar.id).map(page => {
+                        const pageUrl = `${HUB_URL}/p/${page.client_slug}/${page.slug}`
+                        return (
+                          <div key={page.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 12px', borderRadius: 8, background: 'var(--bg-secondary)' }}>
+                            {/* Preview thumbnail from hero image */}
+                            {page.media_assets?.hero_image && (
+                              <img
+                                src={page.media_assets.hero_image}
+                                alt={page.slug}
+                                style={{ width: 48, height: 36, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }}
+                              />
+                            )}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <a href={pageUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
+                                /{page.slug}
+                              </a>
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                                {getOfferName(page.offer_id)} &middot; {page.template_slug || 'Template'}
+                              </div>
+                            </div>
+                            <a href={pageUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                                <polyline points="15 3 21 3 21 9" />
+                                <line x1="10" y1="14" x2="21" y2="3" />
+                              </svg>
+                            </a>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="modal-footer" style={{ flexDirection: 'column', gap: 12 }}>
@@ -430,14 +522,46 @@ export default function AvatarsPage() {
                   )}
                 </div>
               )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                 {canEdit && (
-                  <button
-                    className="btn btn-danger btn-sm"
-                    onClick={() => handleDelete(selectedAvatar.id)}
-                  >
-                    Delete
-                  </button>
+                  <div style={{ position: 'relative' }}>
+                    {showDeleteConfirm === selectedAvatar.id ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 8, background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                        <span style={{ fontSize: 12, color: '#ef4444' }}>Delete this avatar?</span>
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => handleDelete(selectedAvatar.id)}
+                          style={{ background: '#ef4444', color: '#fff', fontSize: 11, padding: '3px 10px', border: 'none' }}
+                        >
+                          Yes, Delete
+                        </button>
+                        <button
+                          className="btn btn-sm btn-secondary"
+                          onClick={() => setShowDeleteConfirm(null)}
+                          style={{ fontSize: 11, padding: '3px 10px' }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowDeleteConfirm(selectedAvatar.id)}
+                        title="Delete avatar"
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: 'var(--text-muted)', padding: 6, borderRadius: 6,
+                          display: 'flex', alignItems: 'center',
+                        }}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                          <line x1="10" y1="11" x2="10" y2="17" />
+                          <line x1="14" y1="11" x2="14" y2="17" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 )}
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button

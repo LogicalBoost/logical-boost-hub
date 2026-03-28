@@ -7,7 +7,7 @@ import {
   deployLandingPage,
 } from '@/lib/api'
 import { TEMPLATE_SLOTS, mapComponentsToSlots, type CopySlotDef } from '@/lib/template-slots'
-import { TEMPLATE_INFO, AVAILABLE_TEMPLATES, type TemplateId, type LandingPage, type MediaAsset } from '@/types/database'
+import { TEMPLATE_INFO, AVAILABLE_TEMPLATES, type TemplateId, type LandingPage, type MediaAsset, type PublishedPage } from '@/types/database'
 import { showToast } from '@/lib/demo-toast'
 import { supabase } from '@/lib/supabase'
 
@@ -166,7 +166,8 @@ const labelStyle: React.CSSProperties = {
 // ============================================================
 export default function LandingPagesPage() {
   const store = useAppStore()
-  const { client, avatars, offers, copyComponents, landingPages, mediaAssets, canEdit, refreshLandingPages, refreshMediaAssets } = store
+  const { client, avatars, offers, copyComponents, landingPages, publishedPages, mediaAssets, canEdit, isClientRole, refreshLandingPages, refreshPublishedPages, refreshMediaAssets } = store
+  const HUB_URL = 'https://hub.logicalboost.com'
 
   // Pipeline state
   const [step, setStep] = useState(1)
@@ -444,6 +445,143 @@ export default function LandingPagesPage() {
           Build, preview, and deploy high-converting landing pages
         </p>
       </div>
+
+      {/* ============================================================ */}
+      {/* Published Pages List — grouped by avatar + offer */}
+      {/* ============================================================ */}
+      {publishedPages.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <h3 style={{ fontSize: 16, marginBottom: 12, color: 'var(--text-primary)' }}>
+            Published Pages
+            <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8 }}>
+              ({publishedPages.filter(p => p.status === 'published').length} live)
+            </span>
+          </h3>
+          {(() => {
+            // Group pages by avatar_id + offer_id
+            const groups: Record<string, PublishedPage[]> = {}
+            publishedPages.filter(p => p.status === 'published').forEach(p => {
+              const key = `${p.avatar_id || 'none'}_${p.offer_id || 'none'}`
+              if (!groups[key]) groups[key] = []
+              groups[key].push(p)
+            })
+            return Object.entries(groups).map(([key, pages]) => {
+              const firstPage = pages[0]
+              const avatar = avatars.find(a => a.id === firstPage.avatar_id)
+              const offer = offers.find(o => o.id === firstPage.offer_id)
+              return (
+                <div key={key} style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ color: 'var(--accent)' }}>{avatar?.name || 'Unknown Avatar'}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>&times;</span>
+                    <span>{offer?.name || 'Unknown Offer'}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {pages.map(page => {
+                      const pageUrl = `${HUB_URL}/p/${page.client_slug}/${page.slug}`
+                      const heroImg = page.media_assets?.hero_image
+                      return (
+                        <div key={page.id} style={{
+                          display: 'flex', alignItems: 'center', gap: 12,
+                          padding: '10px 14px', borderRadius: 'var(--radius-sm)',
+                          background: 'var(--bg-card)', border: '1px solid var(--border)',
+                        }}>
+                          {/* Preview thumbnail */}
+                          {heroImg ? (
+                            <img src={heroImg} alt={page.slug} style={{
+                              width: 56, height: 42, objectFit: 'cover', borderRadius: 4, flexShrink: 0,
+                              border: '1px solid var(--border)',
+                            }} />
+                          ) : (
+                            <div style={{
+                              width: 56, height: 42, borderRadius: 4, flexShrink: 0,
+                              background: 'var(--bg-input)', border: '1px solid var(--border)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 18, color: 'var(--text-muted)',
+                            }}>&#128196;</div>
+                          )}
+
+                          {/* Page info */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <a
+                              href={pageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600, fontSize: 13 }}
+                            >
+                              /{page.slug}
+                            </a>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                              {page.template_slug || 'lead-capture-classic'}
+                              {page.published_at && (
+                                <> &middot; Published {new Date(page.published_at).toLocaleDateString()}</>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Agency-only info: GitHub */}
+                          {!isClientRole && client?.github_repo && (
+                            <a
+                              href={`https://github.com/${client.github_repo}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Open in GitHub"
+                              style={{ color: 'var(--text-muted)', flexShrink: 0 }}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                              </svg>
+                            </a>
+                          )}
+
+                          {/* Actions */}
+                          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                            <button
+                              onClick={() => navigator.clipboard.writeText(pageUrl).then(() => showToast('URL copied'))}
+                              title="Copy URL"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                              </svg>
+                            </button>
+                            <a
+                              href={pageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center' }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                                <polyline points="15 3 21 3 21 9" />
+                                <line x1="10" y1="14" x2="21" y2="3" />
+                              </svg>
+                            </a>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })
+          })()}
+
+          {/* Agency-only: Claude Code instructions */}
+          {!isClientRole && client?.github_repo && (
+            <div style={{
+              marginTop: 8, padding: '10px 14px', borderRadius: 'var(--radius-sm)',
+              background: 'var(--bg-input)', border: '1px solid var(--border)', fontSize: 12,
+            }}>
+              <span style={{ color: 'var(--text-muted)' }}>Edit with Claude Code: </span>
+              <code style={{ color: 'var(--accent)', fontSize: 11 }}>
+                git clone https://github.com/{client.github_repo}.git && cd {client.github_repo.split('/')[1]} && claude
+              </code>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Step indicator */}
       <div style={{
@@ -1370,6 +1508,7 @@ export default function LandingPagesPage() {
           selectedAvatar={selectedAvatarId || ''}
           selectedOffer={selectedOfferId || ''}
           onBack={() => setStep(3)}
+          onPublished={() => { if (client?.id) refreshPublishedPages(client.id) }}
         />
       )}
 
@@ -1471,6 +1610,7 @@ function BuildStep({
   selectedAvatar,
   selectedOffer,
   onBack,
+  onPublished,
 }: {
   clientId: string
   clientName: string
@@ -1481,6 +1621,7 @@ function BuildStep({
   selectedAvatar: string
   selectedOffer: string
   onBack: () => void
+  onPublished?: () => void
 }) {
   const [building, setBuilding] = useState(false)
   const [pageSlug, setPageSlug] = useState('')
@@ -1537,6 +1678,7 @@ function BuildStep({
       })
       setBuildResult(result)
       showToast('Landing page published!')
+      if (onPublished) onPublished()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Build failed'
       setBuildResult({ success: false, error: msg })

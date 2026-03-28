@@ -28,6 +28,8 @@ export interface Client {
   landing_page_playbook: Record<string, unknown> | null
   landing_page_concepts: Record<string, unknown>[] | null
   intake_status: 'pending' | 'completed'
+  github_repo: string | null
+  custom_domain: string | null
   created_at: string
   updated_at: string
 }
@@ -425,12 +427,17 @@ export interface PageTemplate {
 export interface PublishedPage {
   id: string
   client_id: string
-  landing_page_id: string
-  template_id: string
-  avatar_id: string
-  offer_id: string
+  client_slug: string | null
+  landing_page_id: string | null
+  template_id: string | null
+  template_slug: string | null
+  avatar_id: string | null
+  offer_id: string | null
   slug: string
   custom_domain: string | null
+  copy_slots: Record<string, string> | null
+  media_assets: Record<string, string> | null
+  brand_kit_snapshot: Record<string, unknown> | null
   media_mapping: Record<string, string | string[]> | null
   page_file_path: string | null
   status: 'draft' | 'published' | 'archived'

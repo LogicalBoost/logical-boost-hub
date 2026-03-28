@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { supabase } from './supabase'
-import type { Client, Avatar, Offer, IntakeQuestion, CopyComponent, FunnelInstance, CompetitorIntel, LandingPage, MediaAsset, BrandKitRecord, PageTemplate, UserRole } from '@/types/database'
+import type { Client, Avatar, Offer, IntakeQuestion, CopyComponent, FunnelInstance, CompetitorIntel, LandingPage, MediaAsset, BrandKitRecord, PageTemplate, PublishedPage, UserRole } from '@/types/database'
 
 interface AppState {
   client: Client | null
@@ -13,6 +13,7 @@ interface AppState {
   copyComponents: CopyComponent[]
   competitors: CompetitorIntel[]
   landingPages: LandingPage[]
+  publishedPages: PublishedPage[]
   mediaAssets: MediaAsset[]
   brandKit: BrandKitRecord | null
   pageTemplates: PageTemplate[]
@@ -35,6 +36,7 @@ interface AppStore extends AppState {
   setFunnelInstances: (instances: FunnelInstance[]) => void
   setCompetitors: (competitors: CompetitorIntel[]) => void
   setLandingPages: (pages: LandingPage[]) => void
+  setPublishedPages: (pages: PublishedPage[]) => void
   setMediaAssets: (assets: MediaAsset[]) => void
   setBrandKit: (kit: BrandKitRecord | null) => void
   setLoading: (loading: boolean) => void
@@ -51,6 +53,7 @@ interface AppStore extends AppState {
   refreshCopyComponents: (clientId: string) => Promise<void>
   refreshFunnelInstances: (clientId: string) => Promise<void>
   refreshLandingPages: (clientId: string) => Promise<void>
+  refreshPublishedPages: (clientId: string) => Promise<void>
   refreshMediaAssets: (clientId: string) => Promise<void>
   refreshBrandKit: (clientId: string) => Promise<void>
   /** Refresh just the client record from DB (e.g. after logo upload or brand kit analysis) */
@@ -70,6 +73,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [copyComponents, setCopyComponents] = useState<CopyComponent[]>([])
   const [competitors, setCompetitors] = useState<CompetitorIntel[]>([])
   const [landingPages, setLandingPages] = useState<LandingPage[]>([])
+  const [publishedPages, setPublishedPages] = useState<PublishedPage[]>([])
   const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([])
   const [brandKit, setBrandKit] = useState<BrandKitRecord | null>(null)
   const [pageTemplates, setPageTemplates] = useState<PageTemplate[]>([])
@@ -119,6 +123,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         { data: copyData },
         { data: competitorData },
         { data: landingPageData },
+        { data: publishedPageData },
         { data: assetData },
         { data: brandKitData },
         { data: templateData },
@@ -131,6 +136,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         supabase.from('copy_components').select('*').eq('client_id', clientId).order('created_at'),
         supabase.from('competitor_intel').select('*').eq('client_id', clientId).order('captured_at'),
         supabase.from('landing_pages').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+        supabase.from('published_pages').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
         supabase.from('media_assets').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
         supabase.from('brand_kits').select('*').eq('client_id', clientId).single(),
         supabase.from('page_templates').select('*').eq('is_active', true).order('created_at'),
@@ -143,6 +149,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setCopyComponents(copyData || [])
       setCompetitors(competitorData || [])
       setLandingPages(landingPageData || [])
+      setPublishedPages(publishedPageData || [])
       setMediaAssets(assetData || [])
       setBrandKit(brandKitData || null)
       setPageTemplates(templateData || [])
@@ -166,6 +173,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         { data: copyData },
         { data: competitorData },
         { data: landingPageData },
+        { data: publishedPageData },
         { data: assetData },
         { data: brandKitData },
         { data: templateData },
@@ -178,6 +186,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         supabase.from('copy_components').select('*').eq('client_id', clientId).order('created_at'),
         supabase.from('competitor_intel').select('*').eq('client_id', clientId).order('captured_at'),
         supabase.from('landing_pages').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+        supabase.from('published_pages').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
         supabase.from('media_assets').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
         supabase.from('brand_kits').select('*').eq('client_id', clientId).single(),
         supabase.from('page_templates').select('*').eq('is_active', true).order('created_at'),
@@ -193,6 +202,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setCopyComponents(copyData || [])
       setCompetitors(competitorData || [])
       setLandingPages(landingPageData || [])
+      setPublishedPages(publishedPageData || [])
       setMediaAssets(assetData || [])
       setBrandKit(brandKitData || null)
       setPageTemplates(templateData || [])
@@ -259,6 +269,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLandingPages(data || [])
   }, [])
 
+  const refreshPublishedPages = useCallback(async (clientId: string) => {
+    const { data } = await supabase.from('published_pages').select('*').eq('client_id', clientId).order('created_at', { ascending: false })
+    setPublishedPages(data || [])
+  }, [])
+
   const refreshMediaAssets = useCallback(async (clientId: string) => {
     const { data } = await supabase.from('media_assets').select('*').eq('client_id', clientId).order('created_at', { ascending: false })
     setMediaAssets(data || [])
@@ -280,12 +295,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      allClients, client, avatars, offers, intakeQuestions, funnelInstances, copyComponents, competitors, landingPages, mediaAssets, brandKit, pageTemplates, loading, error,
+      allClients, client, avatars, offers, intakeQuestions, funnelInstances, copyComponents, competitors, landingPages, publishedPages, mediaAssets, brandKit, pageTemplates, loading, error,
       userRole, canEdit, isClientRole,
-      setClient, setAvatars, setOffers, setIntakeQuestions, setCopyComponents, setFunnelInstances, setCompetitors, setLandingPages, setMediaAssets, setBrandKit,
+      setClient, setAvatars, setOffers, setIntakeQuestions, setCopyComponents, setFunnelInstances, setCompetitors, setLandingPages, setPublishedPages, setMediaAssets, setBrandKit,
       setLoading, setError, loadAllClients, loadClientData, switchClient, createClient: createNewClient,
       updateAvatar, updateOffer, refreshAvatars, refreshOffers, refreshIntake,
-      refreshCopyComponents, refreshFunnelInstances, refreshLandingPages, refreshMediaAssets, refreshBrandKit, refreshClient, setUserRole,
+      refreshCopyComponents, refreshFunnelInstances, refreshLandingPages, refreshPublishedPages, refreshMediaAssets, refreshBrandKit, refreshClient, setUserRole,
     }}>
       {children}
     </AppContext.Provider>
