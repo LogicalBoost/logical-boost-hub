@@ -1459,7 +1459,7 @@ export default function LandingPagesPage() {
 }
 
 // ============================================================
-// Build Step — Deploy landing page to client repo + Vercel
+// Build Step — Publish landing page to Hub + create GitHub repo for editing
 // ============================================================
 function BuildStep({
   clientId,
@@ -1483,12 +1483,14 @@ function BuildStep({
   onBack: () => void
 }) {
   const [building, setBuilding] = useState(false)
+  const [pageSlug, setPageSlug] = useState('')
+  const [slugError, setSlugError] = useState('')
   const [buildResult, setBuildResult] = useState<{
     success: boolean
     preview_url?: string
     github_url?: string
     github_repo?: string
-    vercel_url?: string
+    slug?: string
     message?: string
     error?: string
   } | null>(null)
@@ -1497,10 +1499,26 @@ function BuildStep({
   const templateName = selectedTemplate ? (TEMPLATE_INFO[selectedTemplate as TemplateId]?.name || selectedTemplate) : ''
   const filledSlots = Object.keys(copySlots).filter(k => copySlots[k]?.trim()).length
 
+  function validateSlug(s: string): string {
+    if (!s.trim()) return 'Slug is required (e.g., "gig", "homeowner", "storm-damage")'
+    if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(s) && s.length > 1) return 'Slug must be lowercase letters, numbers, and hyphens only'
+    if (s.length === 1 && !/^[a-z0-9]$/.test(s)) return 'Slug must be lowercase letters, numbers, and hyphens only'
+    return ''
+  }
+
   async function handleBuild() {
     if (!clientId || !selectedTemplate) return
+
+    const normalizedSlug = pageSlug.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '')
+    const err = validateSlug(normalizedSlug)
+    if (err) {
+      setSlugError(err)
+      return
+    }
+
     setBuilding(true)
     setBuildResult(null)
+    setSlugError('')
 
     try {
       const result = await deployLandingPage({
@@ -1508,6 +1526,7 @@ function BuildStep({
         client_slug: clientSlug,
         client_name: clientName || clientSlug,
         template_id: selectedTemplate,
+        slug: normalizedSlug,
         copy_slots: copySlots,
         media_assets: {
           hero_image: heroImageUrl || undefined,
@@ -1517,7 +1536,7 @@ function BuildStep({
         offer_id: selectedOffer || undefined,
       })
       setBuildResult(result)
-      showToast('Landing page deployed!')
+      showToast('Landing page published!')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Build failed'
       setBuildResult({ success: false, error: msg })
@@ -1562,9 +1581,41 @@ function BuildStep({
             </div>
           </div>
 
+          {/* Slug input */}
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, display: 'block' }}>
+              Page Slug (URL path)
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                hub.logicalboost.com/p/{clientSlug}/
+              </span>
+              <input
+                type="text"
+                value={pageSlug}
+                onChange={e => { setPageSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')); setSlugError('') }}
+                placeholder="e.g. gig, homeowner, storm-damage"
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius)',
+                  border: slugError ? '1px solid #ef4444' : '1px solid var(--border)',
+                  background: 'var(--bg-input)',
+                  color: 'var(--text-primary)',
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              />
+            </div>
+            {slugError && (
+              <div style={{ fontSize: 12, color: '#ef4444', marginTop: 4 }}>{slugError}</div>
+            )}
+          </div>
+
           <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20, lineHeight: 1.5 }}>
-            This will create a <strong>{clientSlug}-pages</strong> repo (if it doesn&apos;t exist),
-            inject your copy and media, and deploy to Vercel. The first deploy takes ~60 seconds.
+            This will publish your landing page to the Hub. It will be immediately live
+            at the URL above. A GitHub repo (<strong>{clientSlug}-pages</strong>) will also be
+            created for editing with Claude Code.
           </p>
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
@@ -1574,14 +1625,14 @@ function BuildStep({
               onClick={handleBuild}
               disabled={building}
             >
-              {building ? 'Deploying...' : 'Deploy Landing Page'}
+              {building ? 'Publishing...' : 'Publish Landing Page'}
             </button>
           </div>
 
           {building && (
             <div style={{ marginTop: 16, textAlign: 'center' }}>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                Creating repo, pushing page data, setting up Vercel...
+                Publishing page and creating GitHub repo...
               </div>
               <div style={{
                 marginTop: 8,
@@ -1616,7 +1667,7 @@ function BuildStep({
             <>
               <div style={{ textAlign: 'center', marginBottom: 20 }}>
                 <div style={{ fontSize: 40, marginBottom: 8 }}>&#9989;</div>
-                <h3 style={{ fontSize: 18, marginBottom: 4 }}>Deployed Successfully</h3>
+                <h3 style={{ fontSize: 18, marginBottom: 4 }}>Published Successfully</h3>
                 <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{buildResult.message}</p>
               </div>
 
@@ -1629,7 +1680,7 @@ function BuildStep({
                   background: 'rgba(var(--accent-rgb, 0, 200, 150), 0.05)',
                   marginBottom: 12,
                 }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Preview URL</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Live URL</div>
                   <a
                     href={buildResult.preview_url}
                     target="_blank"
@@ -1637,27 +1688,6 @@ function BuildStep({
                     style={{ color: 'var(--accent)', fontSize: 14, fontWeight: 600, wordBreak: 'break-all' }}
                   >
                     {buildResult.preview_url}
-                  </a>
-                </div>
-              )}
-
-              {/* Vercel Dashboard */}
-              {buildResult.vercel_url && (
-                <div style={{
-                  padding: 16,
-                  borderRadius: 'var(--radius)',
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg-input)',
-                  marginBottom: 12,
-                }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Vercel Dashboard</div>
-                  <a
-                    href={buildResult.vercel_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: 'var(--text-primary)', fontSize: 14, wordBreak: 'break-all' }}
-                  >
-                    {buildResult.vercel_url}
                   </a>
                 </div>
               )}
@@ -1707,7 +1737,7 @@ function BuildStep({
                     {`git clone https://github.com/${buildResult.github_repo}.git\ncd ${buildResult.github_repo.split('/')[1]}\nclaude`}
                   </code>
                   <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8, marginBottom: 0 }}>
-                    Clone the repo, make changes, push — Vercel auto-deploys.
+                    Clone the repo, make changes with Claude Code, push to update.
                   </p>
                 </div>
               )}
@@ -1730,7 +1760,7 @@ function BuildStep({
             <>
               <div style={{ textAlign: 'center', marginBottom: 16 }}>
                 <div style={{ fontSize: 40, marginBottom: 8 }}>&#10060;</div>
-                <h3 style={{ fontSize: 18, marginBottom: 4 }}>Deploy Failed</h3>
+                <h3 style={{ fontSize: 18, marginBottom: 4 }}>Publish Failed</h3>
                 <p style={{
                   fontSize: 13,
                   color: '#ef4444',

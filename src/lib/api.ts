@@ -160,6 +160,7 @@ export async function deployLandingPage(params: {
   client_slug: string
   client_name: string
   template_id: string
+  slug: string
   copy_slots: Record<string, string>
   brand_kit?: Record<string, unknown>
   media_assets?: Record<string, unknown>

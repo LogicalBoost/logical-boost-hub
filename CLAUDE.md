@@ -6,10 +6,10 @@ Multi-tenant marketing platform where an agency team builds and manages AI-power
 - **Frontend**: Next.js 16 (App Router), React 19, TypeScript
 - **Backend**: Supabase (Auth, PostgreSQL, Edge Functions)
 - **AI**: Anthropic Claude API (called from Supabase Edge Functions)
-- **Landing Pages**: Template-based system. Pre-built React templates in separate repo (`LogicalBoost/landing-pages`), rendered with brand kit + copy + media assets. Deployed via Vercel.
+- **Landing Pages**: Template-based system. Pre-built React templates rendered inside the Hub itself with brand kit + copy + media assets. All pages served from the Hub — NO separate deployments per client.
 - **Hero Images**: Google Gemini 3.1 Flash (image preview) via Generative Language API for AI-generated photorealistic hero shots. Uses `generateContent` with `responseModalities: ["IMAGE"]`. GOOGLE_AI_API_KEY set as Supabase secret.
-- **Hosting**: GitHub Pages (static export) + Supabase cloud
-- **Deployment**: GitHub Actions auto-deploys to GitHub Pages on push to `master`
+- **Hosting**: Vercel (SSR) + Supabase cloud
+- **Deployment**: Vercel auto-deploys on push to `master`. Hub lives at `hub.logicalboost.com`.
 
 ## Core Pipeline
 ```
@@ -23,32 +23,38 @@ src/
     avatars/page.tsx       — Avatar management (approve/deny AI-generated personas)
     business-overview/     — Client setup + AI business analysis
     competitor-intel/      — Unified competitor intelligence hub (3 tabs: Ads, Analysis, Playbook)
-    competitor-ads/        — Competitor ads analysis (legacy, merged into competitor-intel)
-    competitive-intel/     — Legacy route (replaced by competitor-intel)
     copy/page.tsx          — Copy page (formerly "Funnel") — all copy components for Avatar+Offer+Angle
     dashboard/page.tsx     — Main dashboard with getting started checklist
-    funnel/page.tsx        — Legacy route (renamed to /copy/)
     intake/page.tsx        — AI-generated intake questionnaire
     landing-pages/page.tsx — Landing page builder (template-based pipeline)
-    login/page.tsx         — Login page
+    login/page.tsx         — Login page with forgot password / password reset flow
     offers/page.tsx        — Offer management (approve/deny)
+    p/                     — Landing page rendering (no Hub chrome)
+      layout.tsx           — Clean layout for public landing pages (Tailwind CSS)
+      landing-page.css     — Tailwind imports + button texture styles
+      [client]/[slug]/page.tsx — Dynamic route: renders landing page from published_pages
     settings/page.tsx      — Settings and user management
     stats/page.tsx         — Campaign stats overview (placeholder)
     layout.tsx             — Root layout (AppProvider + AppShell)
     globals.css            — All styles (dark theme, CSS custom properties, 3 responsive breakpoints)
   components/
-    AppShell.tsx           — Layout shell (sidebar + header + content)
+    AppShell.tsx           — Layout shell (sidebar + header + content). Bypasses shell for /p/ and /login routes.
     Header.tsx             — Top bar with client switcher dropdown
     Sidebar.tsx            — Navigation sidebar (9 nav items, collapsed state shows icon.png not full logo)
     LogoUpload.tsx         — Logo upload component
+    templates/
+      LeadCaptureClassic.tsx — Lead Capture Classic template (white hero, animated bg, feature cards, parallax, FAQ, etc.)
+      types.ts             — TypeScript interfaces: Section, SectionItem, MediaAssets, BrandKit
+    shared/
+      AnimatedBackground.tsx — Floating geometric shapes and gradient orbs for hero sections
   lib/
-    api.ts                 — Edge function caller (all AI workflow API calls + landing page pipeline). Errors parse response body for detailed messages.
+    api.ts                 — Edge function caller (all AI workflow API calls + deployLandingPage). Errors parse response body for detailed messages.
     template-slots.ts      — Template copy slot definitions, serialization, copy mapping
     store.tsx              — React Context state management (AppProvider/useAppStore)
     supabase.ts            — Supabase client + auth helpers + role-based client access
     demo-toast.ts          — Toast notification utility
   types/
-    database.ts            — All TypeScript interfaces + ANGLES (15) + ANGLE_COLORS + TEMPLATE_INFO (8)
+    database.ts            — All TypeScript interfaces + ANGLES (15) + ANGLE_COLORS + AVAILABLE_TEMPLATES + TemplateId
   hooks/
     useSupabase.ts         — Supabase hook
 supabase/
@@ -59,20 +65,17 @@ supabase/
     010_landing_page_playbook.sql — landing_page_playbook + landing_page_concepts on clients
     011_landing_page_builder.sql — template_id, page_html, section_data, brand_kit_snapshot, deploy_status
     012_storage_html_support.sql — HTML MIME type for client-assets bucket
-    013_stitch_landing_pages.sql — Stitch fields (stitch_job_id, copy_slots, iteration_history, react_output, deploy_url) + competitor_intel updates + funnel_instances angle tracking
+    013_stitch_landing_pages.sql — Legacy Stitch fields + competitor_intel updates + funnel_instances angle tracking
     014_client_assets.sql   — client_assets table for persistent image storage (hero, parallax, logo, photo)
     015_client_assets_anon_policies.sql — Anon RLS policies for client_assets (temporary, pre-auth)
   functions/
     _shared/
       ai-client.ts         — Shared Claude API wrapper (callClaude, parseJsonResponse, CORS helpers)
-      stitch-client.ts     — Google Stitch SDK wrapper (generateWithStitch, editWithStitch)
       copywriter-prompts.ts — Comprehensive copywriting agent prompts (quality rules, batch configs, section guidance)
-      template-renderer.ts — Legacy HTML renderer (replaced by Stitch pipeline)
     analyze-business/      — Workflow 1: Analyze business → generate avatars/offers
-    analyze-brand-kit/     — Workflow 9: Extract brand colors, fonts, visual identity (legacy)
+    analyze-brand-kit/     — Workflow 9: Extract brand colors, fonts, visual identity
     analyze-competitor-pages/ — Workflow 11: Analyze competitor landing pages
-    # build-landing-page/  — REMOVED (Stitch pipeline killed)
-    # iterate-landing-page/ — REMOVED (Stitch pipeline killed)
+    deploy-landing-page/   — Creates client GitHub repo from template, pushes page data, saves to landing_pages table
     discover-competitors/  — Workflow 10: AI-powered competitor discovery
     generate-avatars/      — Generate additional avatars via AI prompter
     generate-funnel/       — Workflow 4: Generate full campaign (3 parallel batches: ads, persuasion, video)
@@ -116,7 +119,7 @@ Key helper functions in the database:
 The `users` table extends `auth.users` with: role, client_id, status.
 The `client_assignments` table maps team members to clients (many-to-many).
 
-**Current state**: Auth pages exist but the frontend does not yet enforce login or role-based routing. RLS is active on all tables, so queries will fail without an authenticated session.
+**Current state**: Auth is enforced. Login page has password reset flow. AuthProvider redirects unauthenticated users to `/login/`. RLS is active on all tables.
 
 ## The 15 Marketing Angles
 
@@ -146,33 +149,53 @@ Defined in `src/types/database.ts` with `ANGLES` constant, `ANGLE_COLORS` map, a
    - Generates ~130-180 copy components across 15 canonical types
    - Per-section "Generate More" with AI prompter
    - Video Ad Generator with hooks, scripts, CTAs
-5. **Landing Pages** → Design engine pipeline (see below)
+5. **Landing Pages** → Template-based builder (see below)
 
 ## Landing Page Builder
 
-**Architecture change (March 2026):** Stitch API has been removed. Landing pages are now built with a **template-based system** — pre-built React templates + brand kit + AI-generated copy + uploaded media assets. See `/docs/` for full specs.
+### Architecture: Hub-Served Pages
+
+All landing pages are served directly from the Hub at `hub.logicalboost.com/p/[client-slug]/[page-slug]`. There are NO separate Vercel projects or deployments per client. The Hub's Next.js app has a dynamic catch-all route that renders pages using pre-built React templates.
+
+### URL Structure
+```
+hub.logicalboost.com/p/[client-slug]/[page-slug]
+```
+Examples:
+- `hub.logicalboost.com/p/upstart/gig` — Upstart's gig worker landing page
+- `hub.logicalboost.com/p/summit-roofing/storm` — Summit Roofing's storm damage page
+
+Custom domains: Client points DNS to Vercel → Hub middleware detects domain → rewrites to correct client slug.
 
 ### How It Works
-1. **AI generates copy** (sections JSON) via existing Workflow 7 — unchanged
+1. **AI generates copy** (sections JSON) via existing copy pipeline
 2. **Agency sets up brand kit** — colors, fonts, logo (once per client)
-3. **Agency uploads media** — hero images, testimonial photos, badges, parallax backgrounds
-4. **Agency picks template** — one of 4 templates from `page_templates` table
-5. **Platform assembles the page** — duplicates template into client directory, rebrands with brand kit, injects copy and media
-6. **Deployed via Vercel** — separate repo `LogicalBoost/landing-pages`, dynamic `[slug]` routing
+3. **Agency uploads media** — hero images, parallax backgrounds, testimonial photos
+4. **Agency picks template** — from available built templates (currently: Lead Capture Classic)
+5. **Agency assigns slug** — e.g., `gig`, `homeowner`, `storm-damage`
+6. **Page data saved** to `published_pages` table in Supabase
+7. **Page is immediately live** at `hub.logicalboost.com/p/[client-slug]/[slug]`
+8. **GitHub repo created** for client (`LogicalBoost/[client-slug]-pages`) so team can open Claude Code to refine
 
-### New Database Tables (migration 016)
-- **`brand_kits`** — per-client colors, fonts, logo, button styles (one per client)
-- **`media_assets`** — uploaded images/videos tagged with role + avatar (replaces old `client_assets`)
-- **`page_templates`** — 4 template definitions with section_schema and slot_schema
-- **`published_pages`** — tracks every live landing page (slug, domain, status)
+### How Pages Are Rendered
+The Hub has a dynamic route: `src/app/p/[client]/[slug]/page.tsx`
 
-### 4 Templates (stored in `page_templates` table)
-| Slug | Name | Best For |
-|------|------|----------|
-| `lead-capture-classic` | Lead Capture Classic | Standard lead gen — inspections, quotes, consultations |
-| `bold-split` | Bold Split | High-urgency, fear/risk, storm damage, emergency |
-| `social-proof-heavy` | Social Proof Heavy | Trust-first industries, credibility barriers |
-| `minimal-direct` | Minimal Direct | Simple offers, call-only pages, clean look |
+This route:
+1. Looks up the `published_pages` record by client slug + page slug
+2. Loads the brand kit, copy slots, media assets
+3. Injects brand kit as CSS custom properties
+4. Renders the appropriate template component (e.g., LeadCaptureClassic)
+5. Returns a fully rendered landing page — no Hub chrome (no sidebar, no header)
+
+### Templates (Built)
+| Slug | Name | Status |
+|------|------|--------|
+| `lead-capture-classic` | Lead Capture Classic | Built — white hero, animated bg, feature cards, two-column info, steps, parallax trust bar, benefits grid, testimonials, FAQ, footer |
+| `bold-split` | Bold Split | Coming soon |
+| `social-proof-heavy` | Social Proof Heavy | Coming soon |
+| `minimal-direct` | Minimal Direct | Coming soon |
+
+Template components live in `src/components/templates/`. Types in `src/components/templates/types.ts`.
 
 ### Media Asset Roles (controlled values)
 `hero_image`, `hero_video`, `testimonial_photo`, `team_photo`, `background_texture`, `before_after`, `process_step`, `certification_badge`, `company_logo`, `gallery`, `icon_custom`, `parallax`, `photo`, `other`
@@ -188,29 +211,31 @@ Defined in `src/types/database.ts` with `ANGLES` constant, `ANGLE_COLORS` map, a
 - **Auth**: `GOOGLE_AI_API_KEY` (Google AI Studio, free tier)
 - **Never mention "Gemini" or "AI-generated" in UI** — just "Hero Image"
 
-### Frontend Pipeline (4 UI Steps — currently)
+### Frontend Pipeline (4 UI Steps)
 1. **Select Avatar + Offer** — Two dropdowns, approved only, avatars sorted by priority
-2. **Select Template** — Template cards from `page_templates` table
+2. **Select Template** — Template cards (only built templates selectable, others show "Coming Soon")
 3. **Review Copy + Media** — Copy slots auto-filled from components; hero image generator; saved image galleries; parallax background upload
-4. **Build Page** — Placeholder (template assembly pipeline not yet built)
+4. **Build Page** — Assign slug, deploy button, shows preview URL + GitHub repo link on success
 
-### Key Files
-- **`src/lib/template-slots.ts`** — Template copy slot definitions, `mapComponentsToSlots()`, `serializeCopySlots()`
-- **`src/lib/api.ts`** — `generateHeroImage()` and other AI workflow API calls
-- **`supabase/functions/generate-hero-image/index.ts`** — Gemini image generation edge function
-- **`docs/landing_page_operational_workflow.md`** — Full workflow spec
-- **`docs/claude_code_instructions_landing_pages.md`** — Implementation instructions
-- **`docs/landing_page_templates_build_guide.md`** — Template build guide for separate repo
+### GitHub Repos (For Editing Only)
+Each client gets a GitHub repo: `LogicalBoost/[client-slug]-pages`
 
-### Landing Page Repo Architecture (One Repo Per Client)
-- **`LogicalBoost/landing-page-templates`** — Master template library. GitHub Template Repository. Never deployed directly. Contains 4 templates, shared components, ThemeProvider, TemplateRenderer, `[slug]` catch-all route.
-- **`LogicalBoost/[client-slug]-pages`** — One repo per client. Generated from template repo via GitHub API when first landing page is built. Brand kit baked in, `CLIENT_ID` env var scopes queries. All client pages are routes within this one repo.
-- **Vercel project per client** — Created via Vercel API, linked to client repo. Custom domain attached. Auto-deploys on push.
-- **Claude Code refinement** — Team opens client repo, makes changes, previews locally, pushes → Vercel auto-deploys. Static overrides at `/pages/overrides/[slug].jsx`.
-- See `docs/vercel_deployment_guide.md` for full Vercel API integration details.
+This repo:
+- Contains page data files (JSON with copy slots, media URLs, brand kit)
+- Can contain static JSX override files for pages needing custom tweaks
+- Is opened with Claude Code for refinement
+- Changes pushed to the repo trigger a webhook that updates the Supabase data
 
-### Client Deployment Fields (migration 017)
-Added to `clients` table: `github_repo`, `vercel_project_id`, `vercel_url`, `custom_domain`, `domain_verified`
+The repo is NOT deployed separately. It's a version-controlled editing workspace.
+
+### Custom Domains
+1. Client points DNS (CNAME) to `cname.vercel-dns.com`
+2. In Vercel dashboard, add the custom domain to the Hub project
+3. In the Hub database, save `custom_domain` on the `clients` table
+4. Hub's middleware detects the domain and serves the right client's pages
+
+### Client Deployment Fields
+On `clients` table: `github_repo`, `vercel_project_id`, `vercel_url`, `custom_domain`, `domain_verified`
 
 ### Deploy Status Flow
 `draft` → `published` → `archived`
@@ -219,18 +244,27 @@ Added to `clients` table: `github_repo`, `vercel_project_id`, `vercel_url`, `cus
 Create two `published_pages` records with same avatar+offer but different `template_id`. Both get separate slugs/URLs.
 
 ### Required Secrets for Deployment
-- `VERCEL_TOKEN` — Vercel API token (Pro plan required)
-- `VERCEL_TEAM_ID` — Vercel Team ID
 - `GITHUB_TOKEN` — GitHub PAT with repo scope (for creating client repos from template)
 
+### Key Files
+- **`src/app/p/[client]/[slug]/page.tsx`** — Dynamic route that renders published landing pages
+- **`src/app/p/layout.tsx`** — Clean layout for landing page routes (no Hub shell)
+- **`src/components/templates/LeadCaptureClassic.tsx`** — Lead Capture Classic template
+- **`src/components/templates/types.ts`** — Section, SectionItem, MediaAssets, BrandKit interfaces
+- **`src/components/shared/AnimatedBackground.tsx`** — Animated hero background
+- **`src/lib/template-slots.ts`** — Template copy slot definitions, `mapComponentsToSlots()`, `serializeCopySlots()`
+- **`src/lib/api.ts`** — `deployLandingPage()` and other AI workflow API calls
+- **`supabase/functions/deploy-landing-page/index.ts`** — Edge function: creates client repo, pushes page data, saves record
+- **`docs/vercel_deployment_guide.md`** — Full Hub-served architecture documentation
+
 ### Remaining TODO
-- Build the `LogicalBoost/landing-page-templates` repo (4 templates, shared components, ThemeProvider, TemplateRenderer, catch-all route)
+- Update `deploy-landing-page` edge function to save to `published_pages` (currently still creates separate Vercel projects)
+- Add slug input to Step 4 UI
 - Brand Kit editor UI (Business Overview page)
 - Media Assets manager UI (upload, tag with role + avatar)
-- Template picker UI with media slot mapper
-- Hub-side automation: GitHub API (create client repo) + Vercel API (create project, add domain)
+- Custom domain middleware
 - Published Pages manager (URLs, domains, status)
-- "Export for Editing" feature (render page to static .jsx override file)
+- Build remaining 3 templates (bold-split, social-proof-heavy, minimal-direct)
 
 ## Competitor Intel (3-Tab Hub)
 
@@ -255,7 +289,7 @@ The `_shared/copywriter-prompts.ts` contains the comprehensive copywriting syste
 
 ## Commands
 - `npm run dev` — Start development server (port 3000)
-- `npm run build` — Production build (static export)
+- `npm run build` — Production build
 - `npm run lint` — Run ESLint
 - `npx supabase db push` — Push migrations to remote Supabase
 - `npx supabase functions deploy` — Deploy all edge functions
@@ -274,11 +308,11 @@ The `_shared/copywriter-prompts.ts` contains the comprehensive copywriting syste
 
 ## Deployment
 
-### GitHub Pages (Frontend)
-- Static export via `next.config.ts`: `output: 'export'`, `basePath: '/logical-boost-hub'`, `trailingSlash: true`
-- Auto-deploys on push to `master` via GitHub Actions
-- **Important**: Never manually add basePath in `<Link href>` or `router.replace()` — Next.js auto-prepends it
-- `usePathname()` returns the full path INCLUDING basePath
+### Vercel (Frontend)
+- SSR deployment at `hub.logicalboost.com`
+- Auto-deploys on push to `master`
+- No basePath, no static export — standard Next.js SSR
+- `next.config.ts`: only `images: { unoptimized: true }`
 - **Push to master**: `git push origin <branch>:master` to trigger deploy
 
 ### Supabase (Backend)
@@ -288,7 +322,7 @@ The `_shared/copywriter-prompts.ts` contains the comprehensive copywriting syste
 
 ## Styling
 - Dark theme using CSS custom properties in `globals.css`
-- No CSS framework — all custom styles
+- No CSS framework — all custom styles (Hub pages). Landing page templates use Tailwind CSS.
 - 3 responsive breakpoints: 1024px (tablet landscape), 768px (tablet/mobile), 480px (phone)
 - Mobile: compact angle dots instead of text badges, stacked layouts, horizontal-scroll tabs
 - **CSS architecture note**: Copy page base styles come AFTER the main responsive breakpoints in globals.css, so copy-specific responsive overrides are at the END of the file to ensure proper cascade
@@ -303,7 +337,7 @@ The `_shared/copywriter-prompts.ts` contains the comprehensive copywriting syste
 | copy_component | (not shown) | Atomic building block of messaging |
 | funnel_instance | (internal) | Avatar + Offer + Angle combo record |
 | landing_page | Landing Page | Copy + sections JSON for a page |
-| page_template | Template | 1 of 4 pre-built React layouts (in `page_templates` table) |
+| page_template | Template | Pre-built React layout (in `src/components/templates/`) |
 | published_page | (internal) | Live page with slug, domain, deploy status |
 | brand_kit | Brand Kit | Client visual identity (colors, fonts, logo) |
 | media_asset | Media Asset | Uploaded image/video tagged with role + avatar |

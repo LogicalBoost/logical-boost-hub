@@ -7,9 +7,10 @@ import Header from './Header'
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isLoginPage = pathname?.startsWith('/login')
+  const isLandingPage = pathname?.startsWith('/p/')
 
-  // Login page renders full-screen without shell
-  if (isLoginPage) {
+  // Login and landing pages render full-screen without shell
+  if (isLoginPage || isLandingPage) {
     return <>{children}</>
   }
 
