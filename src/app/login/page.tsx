@@ -17,16 +17,40 @@ export default function LoginPage() {
   const [resetSuccess, setResetSuccess] = useState(false)
 
   // Check for password reset flow on mount
+  // Supabase sends recovery links with hash fragments: #access_token=...&type=recovery
+  // OR with ?reset=true query param (our custom redirect)
   useEffect(() => {
+    // Method 1: Check hash fragment for recovery token (Supabase default flow)
+    const hash = window.location.hash
+    if (hash) {
+      const hashParams = new URLSearchParams(hash.substring(1))
+      const type = hashParams.get('type')
+      if (type === 'recovery') {
+        // Supabase auth client will automatically pick up the token from the hash
+        // and establish a session. We just need to wait for it.
+        setMode('reset')
+        return
+      }
+    }
+
+    // Method 2: Check query param (our custom redirect from resetPasswordForEmail)
     const params = new URLSearchParams(window.location.search)
     if (params.get('reset') === 'true') {
-      // Check if user has a valid session from the reset link
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) {
           setMode('reset')
         }
       })
     }
+
+    // Listen for auth state changes (catches recovery token being processed)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setMode('reset')
+      }
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {

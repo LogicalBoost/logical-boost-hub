@@ -119,11 +119,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const normalizedPath = pathname || '/'
     const isPublicPage = PUBLIC_PATHS.some(p => normalizedPath.startsWith(p))
 
+    // Check if this is a password recovery flow — don't redirect away from login
+    const hash = typeof window !== 'undefined' ? window.location.hash : ''
+    const isRecoveryFlow = hash.includes('type=recovery') ||
+      (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('reset') === 'true')
+
     if (!user && !isPublicPage) {
       // Not logged in and trying to access protected page
       router.push('/login/')
-    } else if (user && isPublicPage) {
-      // Logged in but on login page, redirect to dashboard
+    } else if (user && isPublicPage && !isRecoveryFlow) {
+      // Logged in but on login page (and NOT doing password recovery), redirect to dashboard
       router.push('/dashboard/')
     }
   }, [user, loading, pathname, router])
