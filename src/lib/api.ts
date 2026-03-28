@@ -154,7 +154,17 @@ export async function generateLandingPage(
   })
 }
 
-// Deploy landing page — creates client repo, pushes page data, creates Vercel project
+// Generate landing page copy — AI produces complete sections array from avatar+offer+business
+export async function generateLandingPageCopy(params: {
+  client_id: string
+  avatar_id: string
+  offer_id: string
+  template_slug?: string
+}) {
+  return callEdgeFunction('generate-landing-page-copy', params)
+}
+
+// Deploy landing page — publishes to Hub and pushes to client GitHub repo
 export async function deployLandingPage(params: {
   client_id: string
   client_slug: string
@@ -162,6 +172,7 @@ export async function deployLandingPage(params: {
   template_id: string
   slug: string
   copy_slots: Record<string, string>
+  sections?: unknown[]
   brand_kit?: Record<string, unknown>
   media_assets?: Record<string, unknown>
   avatar_id?: string

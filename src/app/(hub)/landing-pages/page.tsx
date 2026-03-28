@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from 'react'
 import { useAppStore } from '@/lib/store'
 import {
   generateHeroImage,
+  generateLandingPageCopy,
   deployLandingPage,
 } from '@/lib/api'
 import { TEMPLATE_SLOTS, mapComponentsToSlots, type CopySlotDef } from '@/lib/template-slots'
@@ -188,6 +189,11 @@ export default function LandingPagesPage() {
   const [customImagePrompt, setCustomImagePrompt] = useState('')
   const [imageError, setImageError] = useState<string | null>(null)
 
+  // AI-generated sections (complete PageData.sections array)
+  const [generatedSections, setGeneratedSections] = useState<unknown[] | null>(null)
+  const [generatingCopy, setGeneratingCopy] = useState(false)
+  const [lastAIPromptUsed, setLastAIPromptUsed] = useState<string | null>(null)
+
   // Parallax background image state
   const [parallaxImageUrl, setParallaxImageUrl] = useState<string | null>(null)
   const [uploadingParallax, setUploadingParallax] = useState(false)
@@ -371,6 +377,47 @@ export default function LandingPagesPage() {
     const file = e.target.files?.[0]
     if (file) handleImageUpload(file, type)
   }, [handleImageUpload])
+
+  // ─── AI Auto-Fill: Generate complete landing page copy ───
+  const handleGenerateLandingPageCopy = useCallback(async () => {
+    if (!client || !selectedAvatarId || !selectedOfferId) return
+    setGeneratingCopy(true)
+    try {
+      const result = await generateLandingPageCopy({
+        client_id: client.id,
+        avatar_id: selectedAvatarId,
+        offer_id: selectedOfferId,
+        template_slug: selectedTemplate || 'lead-capture-classic',
+      })
+      if (result.sections && Array.isArray(result.sections)) {
+        setGeneratedSections(result.sections)
+        // Also populate copy_slots from sections for backward compatibility
+        const slots: Record<string, string> = {}
+        for (const section of result.sections as Array<Record<string, unknown>>) {
+          const type = section.type as string
+          if (section.headline) slots[`${type}_headline`] = section.headline as string
+          if (section.subheadline) slots[`${type}_subheadline`] = section.subheadline as string
+          if (section.content) slots[`${type}_content`] = section.content as string
+          if (section.cta) slots[`${type}_cta`] = section.cta as string
+          if (section.sub_cta) slots[`${type}_sub_cta`] = section.sub_cta as string
+        }
+        // Also set headline-like slots for display
+        const hero = (result.sections as Array<Record<string, unknown>>).find((s: Record<string, unknown>) => s.type === 'hero')
+        if (hero) {
+          slots['t1_headline'] = (hero.headline as string) || ''
+          slots['t1_subheadline'] = (hero.subheadline as string) || ''
+          slots['t1_cta'] = (hero.cta as string) || ''
+        }
+        setCopySlots(prev => ({ ...prev, ...slots }))
+        setMissingSlotIds([]) // AI filled everything
+        showToast(`Landing page copy generated for ${result.avatar_name} × ${result.offer_name}`)
+      }
+    } catch (err) {
+      showToast(`AI generation error: ${(err as Error).message}`)
+    } finally {
+      setGeneratingCopy(false)
+    }
+  }, [client, selectedAvatarId, selectedOfferId, selectedTemplate])
 
   // Only required copy slots need to be filled to proceed
   const copyOnlySlots = useMemo(
@@ -792,32 +839,105 @@ export default function LandingPagesPage() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
             <div>
-              <h3 style={{ fontSize: 18, marginBottom: 4 }}>Review Copy Slots</h3>
+              <h3 style={{ fontSize: 18, marginBottom: 4 }}>Review Copy &amp; Generate</h3>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                {requiredCopySlots.filter(s => copySlots[s.id]?.trim()).length} of {requiredCopySlots.length} required slots filled
-                {missingSlotIds.length > 0 && (
-                  <span style={{ color: 'var(--warning)', marginLeft: 8 }}>
-                    ({missingSlotIds.length} missing)
-                  </span>
-                )}
+                {generatedSections
+                  ? `AI generated ${(generatedSections as unknown[]).length} sections — ready to build`
+                  : `${requiredCopySlots.filter(s => copySlots[s.id]?.trim()).length} of ${requiredCopySlots.length} required slots filled`
+                }
               </p>
             </div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
               <button
-                style={btn('primary', !allSlotsFilled)}
-                disabled={!allSlotsFilled}
+                style={{
+                  ...btn('primary', generatingCopy),
+                  background: generatingCopy ? 'var(--bg-input)' : 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                }}
+                disabled={generatingCopy}
+                onClick={handleGenerateLandingPageCopy}
+              >
+                {generatingCopy ? (
+                  <>
+                    <span className="spinner" style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+                    Generating Copy...
+                  </>
+                ) : generatedSections ? (
+                  <>&#x21bb; Regenerate Copy</>
+                ) : (
+                  <>&#x2728; Auto-Fill with AI</>
+                )}
+              </button>
+              <button
+                style={btn('primary', !generatedSections && !allSlotsFilled)}
+                disabled={!generatedSections && !allSlotsFilled}
                 onClick={() => setStep(4)}
               >
-                Proceed to Build
+                Proceed to Build &#x2192;
               </button>
-              {!allSlotsFilled && requiredCopySlots.length > 0 && (
-                <p style={{ fontSize: 11, color: 'var(--warning, #f59e0b)', margin: '6px 0 0', width: '100%' }}>
-                  &#9888; {requiredCopySlots.filter(s => !copySlots[s.id]?.trim()).length} required slot{requiredCopySlots.filter(s => !copySlots[s.id]?.trim()).length !== 1 ? 's' : ''} still empty:{' '}
-                  {requiredCopySlots.filter(s => !copySlots[s.id]?.trim()).map(s => s.label).join(', ')}
-                </p>
-              )}
             </div>
           </div>
+
+          {/* AI-generated sections preview */}
+          {generatedSections && (
+            <div style={{
+              ...card({ padding: 16, marginBottom: 16 }),
+              borderColor: '#6366f1',
+              background: 'rgba(99, 102, 241, 0.05)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <span style={{ fontSize: 16 }}>&#x2728;</span>
+                <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>
+                  AI-Generated Landing Page Copy
+                </span>
+                <span style={{ fontSize: 11, color: '#8b5cf6', background: 'rgba(139,92,246,0.15)', padding: '2px 8px', borderRadius: 4 }}>
+                  {(generatedSections as unknown[]).length} sections
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {(generatedSections as Array<Record<string, unknown>>).map((section, idx) => {
+                  const type = (section.type as string) || 'unknown'
+                  const headline = section.headline as string
+                  const itemCount = Array.isArray(section.items) ? section.items.length : 0
+                  return (
+                    <div key={idx} style={{
+                      padding: '10px 14px',
+                      borderRadius: 'var(--radius-sm)',
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border)',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{
+                          fontSize: 11, fontWeight: 600, color: '#8b5cf6',
+                          background: 'rgba(139,92,246,0.15)', padding: '2px 8px', borderRadius: 4,
+                          textTransform: 'uppercase',
+                        }}>
+                          {type.replace(/_/g, ' ')}
+                        </span>
+                        {headline && (
+                          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {headline}
+                          </span>
+                        )}
+                        {itemCount > 0 && (
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            ({itemCount} items)
+                          </span>
+                        )}
+                      </div>
+                      {section.cta ? (
+                        <span style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4, display: 'block' }}>
+                          CTA: {String(section.cta)}
+                        </span>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 10 }}>
+                Copy was generated using your avatar, offer, and business data. No testimonials or statistics were fabricated.
+              </p>
+            </div>
+          )}
 
           {/* Required Copy Slots */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1503,10 +1623,12 @@ export default function LandingPagesPage() {
           clientName={client?.name || ''}
           selectedTemplate={selectedTemplate}
           copySlots={copySlots}
+          sections={generatedSections}
           heroImageUrl={heroImageUrl || ''}
           parallaxImageUrl={parallaxImageUrl || ''}
           selectedAvatar={selectedAvatarId || ''}
           selectedOffer={selectedOfferId || ''}
+          brandKit={(client?.brand_kit as Record<string, unknown>) || undefined}
           onBack={() => setStep(3)}
           onPublished={() => { if (client?.id) refreshPublishedPages(client.id) }}
         />
@@ -1605,10 +1727,12 @@ function BuildStep({
   clientName,
   selectedTemplate,
   copySlots,
+  sections,
   heroImageUrl,
   parallaxImageUrl,
   selectedAvatar,
   selectedOffer,
+  brandKit,
   onBack,
   onPublished,
 }: {
@@ -1616,10 +1740,12 @@ function BuildStep({
   clientName: string
   selectedTemplate: string | null
   copySlots: Record<string, string>
+  sections?: unknown[] | null
   heroImageUrl: string
   parallaxImageUrl: string
   selectedAvatar: string
   selectedOffer: string
+  brandKit?: Record<string, unknown>
   onBack: () => void
   onPublished?: () => void
 }) {
@@ -1669,6 +1795,8 @@ function BuildStep({
         template_id: selectedTemplate,
         slug: normalizedSlug,
         copy_slots: copySlots,
+        sections: sections || undefined,
+        brand_kit: brandKit || undefined,
         media_assets: {
           hero_image: heroImageUrl || undefined,
           parallax_image: parallaxImageUrl || undefined,

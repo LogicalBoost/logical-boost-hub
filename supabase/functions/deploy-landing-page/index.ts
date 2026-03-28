@@ -175,8 +175,12 @@ function generatePageDataFile(
   copySlots: Record<string, string>,
   brandKit: Record<string, unknown>,
   mediaAssets: Record<string, string>,
+  providedSections?: unknown[],
 ): string {
-  const sections = copySlotsToSections(copySlots)
+  // Use AI-generated sections if available, otherwise convert from flat copy_slots
+  const sections = providedSections && providedSections.length > 0
+    ? providedSections
+    : copySlotsToSections(copySlots)
 
   const pageData = {
     template: {
@@ -297,13 +301,14 @@ serve(async (req: Request) => {
       template_id,
       slug,
       copy_slots,
+      sections,
       brand_kit,
       media_assets,
       avatar_id,
       offer_id,
     } = await req.json()
 
-    if (!client_id || !client_slug || !template_id || !copy_slots || !slug) {
+    if (!client_id || !client_slug || !template_id || !slug) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields: client_id, client_slug, template_id, copy_slots, slug' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -322,6 +327,7 @@ serve(async (req: Request) => {
       template_slug: template_id,
       slug,
       copy_slots: copy_slots || {},
+      sections: sections || null,
       media_assets: media_assets || {},
       brand_kit_snapshot: brand_kit || {},
       status: 'published',
@@ -403,6 +409,7 @@ serve(async (req: Request) => {
         copy_slots || {},
         brand_kit || {},
         media_assets || {},
+        sections,
       )
 
       // Generate page route file

@@ -12,6 +12,7 @@ interface PageRecord {
   client_slug: string | null
   template_slug: string | null
   copy_slots: Record<string, string> | null
+  sections: Section[] | null
   media_assets: Record<string, string> | null
   brand_kit_snapshot: BrandKit | null
   status: string
@@ -191,7 +192,7 @@ export default function LandingPage() {
         // Query published_pages directly by client_slug + slug
         const { data: pages, error } = await supabase
           .from('published_pages')
-          .select('id, slug, client_slug, template_slug, copy_slots, media_assets, brand_kit_snapshot, status')
+          .select('id, slug, client_slug, template_slug, copy_slots, sections, media_assets, brand_kit_snapshot, status')
           .eq('client_slug', clientSlug)
           .eq('slug', pageSlug)
           .eq('status', 'published')
@@ -299,11 +300,18 @@ export default function LandingPage() {
     )
   }
 
-  // Convert flat copy_slots to Section[] for the template
-  const copySlots = page.copy_slots || {}
-  const mainHeadline = copySlots.t1_headline || copySlots.hero_headline || 'Welcome'
-  const mainCta = copySlots.t1_cta || copySlots.hero_cta || 'Get Started'
-  const sections: Section[] = copySlotsToSections(copySlots, mainHeadline, mainCta)
+  // Use AI-generated sections if available, otherwise convert from flat copy_slots
+  let sections: Section[]
+  if (page.sections && Array.isArray(page.sections) && page.sections.length > 0) {
+    // AI-generated sections — already in the right format
+    sections = page.sections as Section[]
+  } else {
+    // Legacy: convert flat copy_slots to Section[]
+    const copySlots = page.copy_slots || {}
+    const mainHeadline = copySlots.t1_headline || copySlots.hero_headline || 'Welcome'
+    const mainCta = copySlots.t1_cta || copySlots.hero_cta || 'Get Started'
+    sections = copySlotsToSections(copySlots, mainHeadline, mainCta)
+  }
 
   // Build media assets
   const media: MediaAssets = {
