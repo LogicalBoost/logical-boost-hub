@@ -208,26 +208,55 @@ export interface Creative {
   updated_at: string
 }
 
-// 8 wireframe templates for the landing page builder
+// Landing page templates — matches page_templates table slugs
 export type TemplateId =
-  | 'template_1'  // Conditional Funnel / Quiz-Led
-  | 'template_2'  // Problem/Solution + Category Segmentation
-  | 'template_3'  // Feature-Dense Authority Page
-  | 'template_4'  // Possibility Showcase / Output Gallery
-  | 'template_5'  // Video + Social Proof Wall
-  | 'template_6'  // VSL / Long-Form Direct Response
-  | 'template_7'  // Comparison / Challenger
-  | 'template_8'  // Urgency / Event-Driven
+  | 'lead-capture-classic'
+  | 'bold-split'
+  | 'social-proof-heavy'
+  | 'minimal-direct'
 
-export const TEMPLATE_INFO: Record<TemplateId, { name: string; bestFor: string }> = {
-  template_1: { name: 'Conditional Funnel / Quiz-Led', bestFor: 'Lead gen, high volume, financial/legal/home services' },
-  template_2: { name: 'Problem/Solution + Category Segmentation', bestFor: 'Multiple damage types, law, financial products' },
-  template_3: { name: 'Feature-Dense Authority Page', bestFor: 'SaaS, B2B platforms, complex products' },
-  template_4: { name: 'Possibility Showcase / Output Gallery', bestFor: 'Agencies, AI tools, creative services' },
-  template_5: { name: 'Video + Social Proof Wall', bestFor: 'Coaching, courses, personal brands' },
-  template_6: { name: 'VSL / Long-Form Direct Response', bestFor: 'High-ticket, cold traffic, skeptical audiences' },
-  template_7: { name: 'Comparison / Us vs. Them', bestFor: 'Challenger brands, switching markets' },
-  template_8: { name: 'Urgency / Event-Driven', bestFor: 'Storm damage, seasonal, deadline-sensitive offers' },
+export interface TemplateDefinition {
+  name: string
+  description: string
+  sections: string[]
+  comingSoon?: boolean
+}
+
+export const AVAILABLE_TEMPLATES: (TemplateDefinition & { id: TemplateId })[] = [
+  {
+    id: 'lead-capture-classic',
+    name: 'Lead Capture Classic',
+    description: 'Standard lead gen — inspections, quotes, consultations. Clean hero with animated background, offer bullets, parallax trust section, testimonials, FAQ.',
+    sections: ['hero', 'feature_cards', 'two_column_info', 'steps', 'trust_bar', 'benefits_grid', 'testimonials', 'faq'],
+  },
+  {
+    id: 'bold-split',
+    name: 'Bold Split',
+    description: 'High-urgency, fear/risk, storm damage, emergency. Split-screen hero with bold imagery and urgent CTA.',
+    sections: [],
+    comingSoon: true,
+  },
+  {
+    id: 'social-proof-heavy',
+    name: 'Social Proof Heavy',
+    description: 'Trust-first industries, credibility barriers. Review wall, certification badges, before/after gallery.',
+    sections: [],
+    comingSoon: true,
+  },
+  {
+    id: 'minimal-direct',
+    name: 'Minimal Direct',
+    description: 'Simple offers, call-only pages, clean look. Minimal distraction, single CTA focus.',
+    sections: [],
+    comingSoon: true,
+  },
+]
+
+export const TEMPLATE_INFO: Record<string, { name: string; bestFor: string }> = {
+  'lead-capture-classic': { name: 'Lead Capture Classic', bestFor: 'Standard lead gen — inspections, quotes, consultations' },
+  'bold-split': { name: 'Bold Split', bestFor: 'High-urgency, fear/risk, storm damage, emergency' },
+  'social-proof-heavy': { name: 'Social Proof Heavy', bestFor: 'Trust-first industries, credibility barriers' },
+  'minimal-direct': { name: 'Minimal Direct', bestFor: 'Simple offers, call-only pages, clean look' },
 }
 
 export interface IterationEntry {
@@ -242,7 +271,7 @@ export interface LandingPage {
   funnel_instance_id: string | null
   avatar_id: string
   offer_id: string
-  template_id: TemplateId | null
+  template_id: TemplateId | string | null
   copy_component_ids: string[]
   copy_slots: Record<string, string> | null
   headline: string

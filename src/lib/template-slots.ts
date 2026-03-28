@@ -168,7 +168,10 @@ export const TEMPLATE_8_SLOTS: CopySlotDef[] = [
 ]
 
 // Map template IDs to their slot definitions
+// New template slugs map to existing slot definitions
 export const TEMPLATE_SLOTS: Record<string, CopySlotDef[]> = {
+  'lead-capture-classic': TEMPLATE_1_SLOTS,
+  // Legacy IDs kept for backward compatibility with existing landing pages
   template_1: TEMPLATE_1_SLOTS,
   template_2: TEMPLATE_2_SLOTS,
   template_3: TEMPLATE_3_SLOTS,

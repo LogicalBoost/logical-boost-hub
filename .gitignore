@@ -26,3 +26,4 @@ next-env.d.ts
 
 # supabase
 supabase/.temp/
+.claude/settings.local.json

@@ -6,7 +6,7 @@ import {
   generateHeroImage,
 } from '@/lib/api'
 import { TEMPLATE_SLOTS, mapComponentsToSlots, type CopySlotDef } from '@/lib/template-slots'
-import { TEMPLATE_INFO, type TemplateId, type LandingPage, type MediaAsset } from '@/types/database'
+import { TEMPLATE_INFO, AVAILABLE_TEMPLATES, type TemplateId, type LandingPage, type MediaAsset } from '@/types/database'
 import { showToast } from '@/lib/demo-toast'
 import { supabase } from '@/lib/supabase'
 
@@ -389,7 +389,7 @@ export default function LandingPagesPage() {
     setActivePage(page)
     setSelectedAvatarId(page.avatar_id)
     setSelectedOfferId(page.offer_id)
-    if (page.template_id) setSelectedTemplate(page.template_id)
+    if (page.template_id) setSelectedTemplate(page.template_id as TemplateId)
     if (page.copy_slots) setCopySlots(page.copy_slots)
     setStep(3)
   }, [])
@@ -567,73 +567,81 @@ export default function LandingPagesPage() {
           <h3 style={{ fontSize: 18, marginBottom: 16 }}>Choose a Template</h3>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: 16,
           }}>
-            {(Object.entries(TEMPLATE_INFO) as [TemplateId, { name: string; bestFor: string }][]).map(
-              ([tid, info]) => {
-                const isSelected = selectedTemplate === tid
-                return (
-                  <button
-                    key={tid}
-                    onClick={() => handleTemplateSelect(tid)}
-                    style={{
-                      ...card(),
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      border: isSelected
-                        ? '2px solid var(--accent)'
-                        : '1px solid var(--border)',
-                      transition: 'all 0.15s',
-                      position: 'relative',
-                    }}
-                    onMouseEnter={e => {
-                      if (!isSelected) (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-light)'
-                    }}
-                    onMouseLeave={e => {
-                      if (!isSelected) (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'
-                    }}
-                  >
-                    {isSelected && (
-                      <span style={{
-                        position: 'absolute',
-                        top: 10,
-                        right: 10,
-                        background: 'var(--accent)',
-                        color: '#fff',
-                        borderRadius: '50%',
-                        width: 22,
-                        height: 22,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 13,
-                        fontWeight: 700,
-                      }}>{'\u2713'}</span>
-                    )}
-                    <div style={{
-                      fontSize: 11,
+            {AVAILABLE_TEMPLATES.map((tmpl) => {
+              const isSelected = selectedTemplate === tmpl.id
+              const isComingSoon = tmpl.comingSoon === true
+              return (
+                <button
+                  key={tmpl.id}
+                  onClick={() => !isComingSoon && handleTemplateSelect(tmpl.id)}
+                  disabled={isComingSoon}
+                  style={{
+                    ...card(),
+                    textAlign: 'left',
+                    cursor: isComingSoon ? 'default' : 'pointer',
+                    border: isSelected
+                      ? '2px solid var(--accent)'
+                      : '1px solid var(--border)',
+                    transition: 'all 0.15s',
+                    position: 'relative',
+                    opacity: isComingSoon ? 0.55 : 1,
+                  }}
+                  onMouseEnter={e => {
+                    if (!isSelected && !isComingSoon) (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-light)'
+                  }}
+                  onMouseLeave={e => {
+                    if (!isSelected && !isComingSoon) (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'
+                  }}
+                >
+                  {isSelected && (
+                    <span style={{
+                      position: 'absolute',
+                      top: 10,
+                      right: 10,
+                      background: 'var(--accent)',
+                      color: '#fff',
+                      borderRadius: '50%',
+                      width: 22,
+                      height: 22,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 13,
+                      fontWeight: 700,
+                    }}>{'\u2713'}</span>
+                  )}
+                  {isComingSoon && (
+                    <span style={{
+                      position: 'absolute',
+                      top: 10,
+                      right: 10,
+                      background: 'var(--bg-input)',
+                      color: 'var(--text-muted)',
+                      borderRadius: 4,
+                      padding: '2px 8px',
+                      fontSize: 10,
                       fontWeight: 600,
-                      color: 'var(--accent)',
                       textTransform: 'uppercase',
                       letterSpacing: 0.5,
-                      marginBottom: 6,
-                    }}>
-                      {tid.replace('_', ' ')}
-                    </div>
-                    <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary)' }}>
-                      {info.name}
-                    </div>
-                    <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                      {info.bestFor}
-                    </div>
+                    }}>Coming Soon</span>
+                  )}
+                  <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary)' }}>
+                    {tmpl.name}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                    {tmpl.description}
+                  </div>
+                  {!isComingSoon && (
                     <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
-                      {TEMPLATE_SLOTS[tid]?.length || 0} copy slots
+                      {TEMPLATE_SLOTS[tmpl.id]?.length || 0} copy slots
                     </div>
-                  </button>
-                )
-              }
-            )}
+                  )}
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
@@ -1633,18 +1641,18 @@ function ExistingPageCard({
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              padding: '6px 10px',
+              justifyContent: 'center',
+              padding: 6,
               borderRadius: 'var(--radius-sm)',
               border: '1px solid transparent',
               background: 'transparent',
               color: 'var(--text-muted)',
-              fontSize: 14,
               cursor: 'pointer',
             }}
             title="Delete this page"
             onClick={() => setConfirmDelete(true)}
           >
-            &times;
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
           </button>
         )}
       </div>
@@ -1756,19 +1764,18 @@ function ExistingPageMini({
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                padding: '4px 8px',
+                justifyContent: 'center',
+                padding: 6,
                 borderRadius: 'var(--radius-sm)',
                 border: '1px solid transparent',
                 background: 'transparent',
                 color: 'var(--text-muted)',
-                fontSize: 14,
                 cursor: 'pointer',
-                lineHeight: 1,
               }}
               title="Delete this page"
               onClick={() => setConfirmDelete(true)}
             >
-              &times;
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
             </button>
           </>
         )}

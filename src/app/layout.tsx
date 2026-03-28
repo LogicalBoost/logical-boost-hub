@@ -6,6 +6,10 @@ import { AuthProvider } from '@/components/AuthProvider'
 export const metadata = {
   title: 'Logical Boost Hub',
   description: 'Multi-tenant marketing platform',
+  icons: {
+    icon: '/images/icon.png',
+    apple: '/images/icon.png',
+  },
 }
 
 export default function RootLayout({
