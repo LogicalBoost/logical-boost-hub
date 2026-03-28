@@ -18,7 +18,7 @@ const GOOGLE_AI_API_KEY = Deno.env.get('GOOGLE_AI_API_KEY')
  * - Clothing, posture, and expression must match who the avatar actually is
  * - Any optional icons/graphics must directly relate to the avatar's world and the offer
  * - NEVER use generic "business" imagery for non-business avatars
- * - Always transparent/blank background — person is isolated
+ * - Always pure white background — person is isolated (studio backdrop style)
  */
 function buildImagePrompt(
   avatarDescription: string,
@@ -151,12 +151,13 @@ STRICT RULES:
   // ── Assemble prompt by style ──
   const shared = `
 STRICT RULES:
-- TRANSPARENT BACKGROUND — completely blank/white/transparent. No room, no environment, no scenery, no floor, no wall, no gradient, no office, no outdoor scene. Just the person on nothing.
+- PURE WHITE BACKGROUND (#FFFFFF) — solid white, no gradients, no patterns, no checkerboard, no gray. The background must be completely solid white like a professional studio backdrop.
 - The person must look like ${personAppearance}. Match their clothing, age range, and vibe to this description exactly.
 - ${expression}.
 - ${iconGuidance}
-- Do NOT add any background elements, furniture, or environment. The person floats on blank space.
-- Professional studio lighting, soft diffused light, high resolution, sharp commercial photography.`
+- Do NOT add any background elements, furniture, or environment. The person is shot against a plain white studio backdrop.
+- Professional studio lighting, soft diffused light, high resolution, sharp commercial photography.
+- The image must look like a product photo on white — clean isolation against pure white.`
 
   const styleVariants: Record<string, string> = {
     hero: `Waist-up portrait of ${personAppearance}. ${expression}. Clean, modern commercial photography style, 85mm lens look. The person is the only element in the frame.${shared}`,
