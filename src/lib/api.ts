@@ -154,6 +154,21 @@ export async function generateLandingPage(
   })
 }
 
+// Deploy landing page — creates client repo, pushes page data, creates Vercel project
+export async function deployLandingPage(params: {
+  client_id: string
+  client_slug: string
+  client_name: string
+  template_id: string
+  copy_slots: Record<string, string>
+  brand_kit?: Record<string, unknown>
+  media_assets?: Record<string, unknown>
+  avatar_id?: string
+  offer_id?: string
+}) {
+  return callEdgeFunction('deploy-landing-page', params)
+}
+
 // Legacy: Edit a landing page section or full page via AI prompter
 export async function editLandingPageSection(
   landingPageId: string,

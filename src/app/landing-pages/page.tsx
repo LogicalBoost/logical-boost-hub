@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from 'react'
 import { useAppStore } from '@/lib/store'
 import {
   generateHeroImage,
+  deployLandingPage,
 } from '@/lib/api'
 import { TEMPLATE_SLOTS, mapComponentsToSlots, type CopySlotDef } from '@/lib/template-slots'
 import { TEMPLATE_INFO, AVAILABLE_TEMPLATES, type TemplateId, type LandingPage, type MediaAsset } from '@/types/database'
@@ -1356,33 +1357,20 @@ export default function LandingPagesPage() {
       )}
 
       {/* ============================================================ */}
-      {/* STEP 4: Build Landing Page (placeholder for new template-based flow) */}
+      {/* STEP 4: Build & Deploy Landing Page */}
       {/* ============================================================ */}
       {step === 4 && (
-        <div style={{ ...card({ maxWidth: 600, textAlign: 'center' as const, margin: '0 auto' }) }}>
-          <h3 style={{ fontSize: 18, marginBottom: 8 }}>Build Landing Page</h3>
-          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
-            The build pipeline is being upgraded. A new template-based rendering system will be available soon.
-          </p>
-          <div style={{
-            padding: 16,
-            borderRadius: 'var(--radius)',
-            border: '1px solid var(--border)',
-            background: 'var(--bg-input)',
-            marginBottom: 16,
-          }}>
-            <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.6 }}>
-              Your selections are saved:
-              {selectedTemplate && <><br />Template: <strong>{TEMPLATE_INFO[selectedTemplate]?.name}</strong></>}
-              <br />Copy slots: <strong>{Object.keys(copySlots).length} filled</strong>
-              {heroImageUrl && <><br />Hero image: set</>}
-              {parallaxImageUrl && <><br />Parallax image: set</>}
-            </p>
-          </div>
-          <button style={btn('ghost')} onClick={() => setStep(3)}>
-            Back to Copy Slots
-          </button>
-        </div>
+        <BuildStep
+          clientId={client?.id || ''}
+          clientName={client?.name || ''}
+          selectedTemplate={selectedTemplate}
+          copySlots={copySlots}
+          heroImageUrl={heroImageUrl || ''}
+          parallaxImageUrl={parallaxImageUrl || ''}
+          selectedAvatar={selectedAvatarId || ''}
+          selectedOffer={selectedOfferId || ''}
+          onBack={() => setStep(3)}
+        />
       )}
 
 
@@ -1464,6 +1452,303 @@ export default function LandingPagesPage() {
               boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
             }}
           />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// Build Step — Deploy landing page to client repo + Vercel
+// ============================================================
+function BuildStep({
+  clientId,
+  clientName,
+  selectedTemplate,
+  copySlots,
+  heroImageUrl,
+  parallaxImageUrl,
+  selectedAvatar,
+  selectedOffer,
+  onBack,
+}: {
+  clientId: string
+  clientName: string
+  selectedTemplate: string | null
+  copySlots: Record<string, string>
+  heroImageUrl: string
+  parallaxImageUrl: string
+  selectedAvatar: string
+  selectedOffer: string
+  onBack: () => void
+}) {
+  const [building, setBuilding] = useState(false)
+  const [buildResult, setBuildResult] = useState<{
+    success: boolean
+    preview_url?: string
+    github_url?: string
+    github_repo?: string
+    vercel_url?: string
+    message?: string
+    error?: string
+  } | null>(null)
+
+  const clientSlug = (clientName || 'client').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const templateName = selectedTemplate ? (TEMPLATE_INFO[selectedTemplate as TemplateId]?.name || selectedTemplate) : ''
+  const filledSlots = Object.keys(copySlots).filter(k => copySlots[k]?.trim()).length
+
+  async function handleBuild() {
+    if (!clientId || !selectedTemplate) return
+    setBuilding(true)
+    setBuildResult(null)
+
+    try {
+      const result = await deployLandingPage({
+        client_id: clientId,
+        client_slug: clientSlug,
+        client_name: clientName || clientSlug,
+        template_id: selectedTemplate,
+        copy_slots: copySlots,
+        media_assets: {
+          hero_image: heroImageUrl || undefined,
+          parallax_image: parallaxImageUrl || undefined,
+        },
+        avatar_id: selectedAvatar || undefined,
+        offer_id: selectedOffer || undefined,
+      })
+      setBuildResult(result)
+      showToast('Landing page deployed!')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Build failed'
+      setBuildResult({ success: false, error: msg })
+      showToast(msg)
+    } finally {
+      setBuilding(false)
+    }
+  }
+
+  return (
+    <div style={{ maxWidth: 700, margin: '0 auto' }}>
+      {/* Pre-build summary */}
+      {!buildResult && (
+        <div style={{ ...card({ padding: 24 }) }}>
+          <h3 style={{ fontSize: 18, marginBottom: 16 }}>Build & Deploy</h3>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 12,
+            marginBottom: 20,
+          }}>
+            <div style={{ padding: 12, borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg-input)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Template</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{templateName}</div>
+            </div>
+            <div style={{ padding: 12, borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg-input)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Copy Slots</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{filledSlots} filled</div>
+            </div>
+            <div style={{ padding: 12, borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg-input)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Hero Image</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: heroImageUrl ? 'var(--accent)' : 'var(--text-muted)' }}>
+                {heroImageUrl ? '✓ Set' : 'Not set'}
+              </div>
+            </div>
+            <div style={{ padding: 12, borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg-input)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Parallax</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: parallaxImageUrl ? 'var(--accent)' : 'var(--text-muted)' }}>
+                {parallaxImageUrl ? '✓ Set' : 'Not set'}
+              </div>
+            </div>
+          </div>
+
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20, lineHeight: 1.5 }}>
+            This will create a <strong>{clientSlug}-pages</strong> repo (if it doesn&apos;t exist),
+            inject your copy and media, and deploy to Vercel. The first deploy takes ~60 seconds.
+          </p>
+
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <button style={btn('ghost')} onClick={onBack}>Back</button>
+            <button
+              style={btn('primary')}
+              onClick={handleBuild}
+              disabled={building}
+            >
+              {building ? 'Deploying...' : 'Deploy Landing Page'}
+            </button>
+          </div>
+
+          {building && (
+            <div style={{ marginTop: 16, textAlign: 'center' }}>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                Creating repo, pushing page data, setting up Vercel...
+              </div>
+              <div style={{
+                marginTop: 8,
+                height: 4,
+                borderRadius: 2,
+                background: 'var(--border)',
+                overflow: 'hidden',
+              }}>
+                <div style={{
+                  height: '100%',
+                  background: 'var(--accent)',
+                  animation: 'buildProgress 3s ease-in-out infinite',
+                  width: '60%',
+                }} />
+              </div>
+              <style>{`
+                @keyframes buildProgress {
+                  0% { width: 10%; margin-left: 0; }
+                  50% { width: 60%; margin-left: 20%; }
+                  100% { width: 10%; margin-left: 90%; }
+                }
+              `}</style>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Build result */}
+      {buildResult && (
+        <div style={{ ...card({ padding: 24 }) }}>
+          {buildResult.success ? (
+            <>
+              <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                <div style={{ fontSize: 40, marginBottom: 8 }}>&#9989;</div>
+                <h3 style={{ fontSize: 18, marginBottom: 4 }}>Deployed Successfully</h3>
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{buildResult.message}</p>
+              </div>
+
+              {/* Preview URL */}
+              {buildResult.preview_url && (
+                <div style={{
+                  padding: 16,
+                  borderRadius: 'var(--radius)',
+                  border: '1px solid var(--accent)',
+                  background: 'rgba(var(--accent-rgb, 0, 200, 150), 0.05)',
+                  marginBottom: 12,
+                }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Preview URL</div>
+                  <a
+                    href={buildResult.preview_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: 'var(--accent)', fontSize: 14, fontWeight: 600, wordBreak: 'break-all' }}
+                  >
+                    {buildResult.preview_url}
+                  </a>
+                </div>
+              )}
+
+              {/* Vercel Dashboard */}
+              {buildResult.vercel_url && (
+                <div style={{
+                  padding: 16,
+                  borderRadius: 'var(--radius)',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-input)',
+                  marginBottom: 12,
+                }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Vercel Dashboard</div>
+                  <a
+                    href={buildResult.vercel_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: 'var(--text-primary)', fontSize: 14, wordBreak: 'break-all' }}
+                  >
+                    {buildResult.vercel_url}
+                  </a>
+                </div>
+              )}
+
+              {/* GitHub Repo */}
+              {buildResult.github_url && (
+                <div style={{
+                  padding: 16,
+                  borderRadius: 'var(--radius)',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-input)',
+                  marginBottom: 12,
+                }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>GitHub Repository</div>
+                  <a
+                    href={buildResult.github_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: 'var(--text-primary)', fontSize: 14, wordBreak: 'break-all' }}
+                  >
+                    {buildResult.github_repo}
+                  </a>
+                </div>
+              )}
+
+              {/* Claude Code connection instructions */}
+              {buildResult.github_repo && (
+                <div style={{
+                  padding: 16,
+                  borderRadius: 'var(--radius)',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-input)',
+                  marginBottom: 16,
+                }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Edit with Claude Code</div>
+                  <code style={{
+                    display: 'block',
+                    fontSize: 12,
+                    color: 'var(--accent)',
+                    background: 'var(--bg-primary)',
+                    padding: 10,
+                    borderRadius: 4,
+                    lineHeight: 1.6,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all',
+                  }}>
+                    {`git clone https://github.com/${buildResult.github_repo}.git\ncd ${buildResult.github_repo.split('/')[1]}\nclaude`}
+                  </code>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8, marginBottom: 0 }}>
+                    Clone the repo, make changes, push — Vercel auto-deploys.
+                  </p>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button style={btn('ghost')} onClick={() => setBuildResult(null)}>Build Another</button>
+                {buildResult.preview_url && (
+                  <a
+                    href={buildResult.preview_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ ...btn('primary'), textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                  >
+                    Open Preview ↗
+                  </a>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                <div style={{ fontSize: 40, marginBottom: 8 }}>&#10060;</div>
+                <h3 style={{ fontSize: 18, marginBottom: 4 }}>Deploy Failed</h3>
+                <p style={{
+                  fontSize: 13,
+                  color: '#ef4444',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  padding: '10px 14px',
+                  borderRadius: 6,
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  marginTop: 12,
+                }}>
+                  {buildResult.error}
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button style={btn('ghost')} onClick={onBack}>Back</button>
+                <button style={btn('primary')} onClick={() => { setBuildResult(null) }}>Try Again</button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
