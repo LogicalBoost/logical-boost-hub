@@ -44,19 +44,27 @@ serve(async (req: Request) => {
 
     // ─── Step 1: Save to published_pages table ───
     // Page is immediately live at hub.logicalboost.com/p/[client_slug]/[slug]
+    // Build the insert payload — only include FK fields if they're valid UUIDs
+    const insertPayload: Record<string, unknown> = {
+      client_id,
+      client_slug,
+      template_slug: template_id, // template_id from frontend is the slug string like 'lead-capture-classic'
+      slug,
+      copy_slots: copy_slots || {},
+      media_assets: media_assets || {},
+      brand_kit_snapshot: brand_kit || {},
+      status: 'published',
+      published_at: new Date().toISOString(),
+    }
+
+    // Only add FK references if they look like valid UUIDs
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (avatar_id && uuidRegex.test(avatar_id)) insertPayload.avatar_id = avatar_id
+    if (offer_id && uuidRegex.test(offer_id)) insertPayload.offer_id = offer_id
+
     const { data: savedPage, error: saveError } = await supabase
       .from('published_pages')
-      .insert({
-        client_id,
-        avatar_id: avatar_id || null,
-        offer_id: offer_id || null,
-        template_id,
-        slug,
-        copy_slots: copy_slots || {},
-        media_assets: media_assets || {},
-        brand_kit_snapshot: brand_kit || {},
-        status: 'published',
-      })
+      .insert(insertPayload)
       .select()
       .single()
 
