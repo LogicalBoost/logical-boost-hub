@@ -12,7 +12,7 @@ export const metadata = {
   },
 }
 
-export default function RootLayout({
+export default function HubLayout({
   children,
 }: {
   children: React.ReactNode

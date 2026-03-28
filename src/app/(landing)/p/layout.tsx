@@ -1,9 +1,4 @@
-import './landing-page.css'
-
-export const metadata = {
-  title: 'Landing Page',
-}
-
+// CSS imported by parent (landing) layout
 export default function LandingPageLayout({
   children,
 }: {
