@@ -40,9 +40,17 @@ Given a website URL and any available business context, analyze the brand and pr
    - placement: Where the logo appears (top-left, centered, etc.)
    - style: "wordmark", "icon+text", "icon-only", "monogram", etc.
 
+CRITICAL COLOR RULES:
+- You will be given ACTUAL hex colors extracted from the website HTML and CSS. USE THESE EXACT COLORS. Do NOT invent or guess colors.
+- The colors are sorted by frequency. The most-used non-black/white color is likely the primary brand color.
+- SVG fill/stroke colors are often the logo color. This is usually the primary brand color.
+- CSS custom properties with "primary", "brand", "accent" in the name tell you exactly what each color is for.
+- Button background colors are the accent/CTA color.
+- The theme-color meta tag, if present, is usually the primary brand color.
+- Only guess colors as a last resort if NO colors were extracted from the site.
+
 FORMATTING RULES:
 - NEVER use em dashes in any text. Use commas, periods, or colons instead.
-- Be specific with hex codes. If you can not determine exact colors, make your best educated guess based on common patterns for the industry.
 - If the website URL is not accessible, use the business context to suggest appropriate brand elements.
 
 Respond ONLY with valid JSON matching the structure above. No markdown wrapping.`
@@ -80,44 +88,134 @@ Deno.serve(async (req: Request) => {
       return errorResponse('Client has no website URL configured. Add a website URL in Business Overview first.')
     }
 
-    // Try to fetch the actual website HTML for better analysis
+    // Fetch the actual website HTML and extract color data
     let websiteContent = ''
     try {
       const siteResponse = await fetch(websiteUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BrandAnalyzer/1.0)' },
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
         signal: AbortSignal.timeout(10000),
       })
       if (siteResponse.ok) {
         const html = await siteResponse.text()
-        // Extract useful parts: meta tags, style info, visible text (limit size)
-        const headMatch = html.match(/<head[\s\S]*?<\/head>/i)
-        const headContent = headMatch ? headMatch[0] : ''
-        // Get inline styles and CSS links
-        const styleMatches = html.match(/<style[\s\S]*?<\/style>/gi) || []
-        const styles = styleMatches.join('\n').substring(0, 3000)
-        // Get meta tags
+
+        // 1. Extract ALL hex colors found anywhere in the HTML (inline styles, style tags, SVGs, etc.)
+        const hexColors = new Set<string>()
+        const hexMatches = html.match(/#[0-9a-fA-F]{3,8}\b/g) || []
+        for (const h of hexMatches) {
+          // Normalize 3-char to 6-char hex
+          const clean = h.toLowerCase()
+          if (clean.length === 4) {
+            hexColors.add(`#${clean[1]}${clean[1]}${clean[2]}${clean[2]}${clean[3]}${clean[3]}`)
+          } else if (clean.length === 7 || clean.length === 9) {
+            hexColors.add(clean)
+          }
+        }
+
+        // 2. Extract rgb/rgba colors
+        const rgbMatches = html.match(/rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(?:,\s*[\d.]+\s*)?\)/g) || []
+
+        // 3. Extract CSS custom properties (--color-*, --brand-*, etc.)
+        const cssVarMatches = html.match(/--[a-zA-Z-]*(?:color|brand|primary|secondary|accent|bg|background|text|cta|button)[a-zA-Z-]*\s*:\s*[^;}\n]+/gi) || []
+
+        // 4. Extract theme-color meta tag
+        const themeColorMatch = html.match(/<meta[^>]*name=["']theme-color["'][^>]*content=["']([^"']+)["']/i)
+        const themeColor = themeColorMatch ? themeColorMatch[1] : null
+
+        // 5. Extract msapplication-TileColor
+        const tileColorMatch = html.match(/<meta[^>]*name=["']msapplication-TileColor["'][^>]*content=["']([^"']+)["']/i)
+        const tileColor = tileColorMatch ? tileColorMatch[1] : null
+
+        // 6. Extract inline style attributes with color info
+        const inlineStyleMatches = html.match(/style=["'][^"']*(?:color|background|border)[^"']*["']/gi) || []
+        const inlineStyles = inlineStyleMatches.slice(0, 30).join('\n')
+
+        // 7. Extract SVG fill/stroke colors (often the logo)
+        const svgColorMatches = html.match(/(?:fill|stroke)=["']#[0-9a-fA-F]{3,8}["']/gi) || []
+        const svgColors = [...new Set(svgColorMatches)].join(', ')
+
+        // 8. Get button elements and their styles
+        const buttonMatches = html.match(/<(?:button|a)[^>]*(?:class|style)[^>]*>[\s\S]*?<\/(?:button|a)>/gi) || []
+        const buttonSamples = buttonMatches.slice(0, 5).join('\n').substring(0, 1500)
+
+        // 9. Get meta tags
         const metaMatches = html.match(/<meta[\s\S]*?>/gi) || []
         const metas = metaMatches.join('\n')
-        // Get body text (first 2000 chars)
-        const bodyText = html.replace(/<script[\s\S]*?<\/script>/gi, '')
-          .replace(/<style[\s\S]*?<\/style>/gi, '')
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim()
-          .substring(0, 2000)
+
+        // 10. Get CSS from linked stylesheets (fetch first 2)
+        let externalCssColors = ''
+        const cssLinkMatches = html.match(/<link[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']+)["']/gi) || []
+        for (const linkTag of cssLinkMatches.slice(0, 2)) {
+          const hrefMatch = linkTag.match(/href=["']([^"']+)["']/)
+          if (hrefMatch) {
+            try {
+              let cssUrl = hrefMatch[1]
+              if (cssUrl.startsWith('/')) cssUrl = new URL(cssUrl, websiteUrl).href
+              else if (!cssUrl.startsWith('http')) cssUrl = new URL(cssUrl, websiteUrl).href
+              const cssRes = await fetch(cssUrl, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+                signal: AbortSignal.timeout(5000),
+              })
+              if (cssRes.ok) {
+                const cssText = await cssRes.text()
+                // Extract colors from CSS
+                const cssHexes = cssText.match(/#[0-9a-fA-F]{3,8}\b/g) || []
+                for (const h of cssHexes) {
+                  const clean = h.toLowerCase()
+                  if (clean.length === 7) hexColors.add(clean)
+                }
+                // Extract CSS variables
+                const cssVars = cssText.match(/--[a-zA-Z-]*(?:color|brand|primary|secondary|accent|bg|background|text|cta|button)[a-zA-Z-]*\s*:\s*[^;}\n]+/gi) || []
+                cssVarMatches.push(...cssVars)
+              }
+            } catch { /* skip failed CSS fetch */ }
+          }
+        }
+
+        // 11. Get inline style blocks
+        const styleMatches = html.match(/<style[\s\S]*?<\/style>/gi) || []
+        const styles = styleMatches.join('\n').substring(0, 2000)
+
+        // Sort hex colors by frequency (most used first)
+        const colorFrequency: Record<string, number> = {}
+        for (const h of hexMatches) {
+          const clean = h.toLowerCase().length === 4
+            ? `#${h[1]}${h[1]}${h[2]}${h[2]}${h[3]}${h[3]}`.toLowerCase()
+            : h.toLowerCase()
+          if (clean.length === 7) colorFrequency[clean] = (colorFrequency[clean] || 0) + 1
+        }
+        const sortedColors = Object.entries(colorFrequency)
+          .filter(([c]) => c !== '#ffffff' && c !== '#000000' && c !== '#fff' && c !== '#000')
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 20)
+          .map(([color, count]) => `${color} (used ${count}x)`)
 
         websiteContent = `
-WEBSITE HTML HEAD:
-${headContent.substring(0, 2000)}
+ACTUAL HEX COLORS FOUND ON SITE (sorted by frequency, excluding black/white):
+${sortedColors.join('\n')}
 
-INLINE STYLES (partial):
-${styles}
+ALL UNIQUE COLORS: ${[...hexColors].filter(c => c !== '#ffffff' && c !== '#000000').join(', ')}
+
+RGB COLORS: ${rgbMatches.slice(0, 15).join(', ')}
+
+SVG FILL/STROKE COLORS (likely logo): ${svgColors || 'none found'}
+
+CSS CUSTOM PROPERTIES:
+${cssVarMatches.slice(0, 20).join('\n')}
+
+THEME COLOR META: ${themeColor || 'not set'}
+TILE COLOR META: ${tileColor || 'not set'}
+
+INLINE STYLES WITH COLOR (sample):
+${inlineStyles.substring(0, 1000)}
+
+BUTTON ELEMENTS (sample):
+${buttonSamples}
+
+INLINE STYLE BLOCKS (partial):
+${styles.substring(0, 1500)}
 
 META TAGS:
-${metas}
-
-VISIBLE TEXT (partial):
-${bodyText}`
+${metas}`
       }
     } catch {
       websiteContent = '(Could not fetch website directly. Analyze based on business context.)'
