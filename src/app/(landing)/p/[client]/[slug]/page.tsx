@@ -317,6 +317,12 @@ export default function LandingPage() {
   const media: MediaAssets = {
     hero_image: page.media_assets?.hero_image || undefined,
     parallax_image: page.media_assets?.parallax_image || undefined,
+    logo: page.media_assets?.logo || undefined,
+    steps_image: page.media_assets?.steps_image || undefined,
+    benefits_image: page.media_assets?.benefits_image || undefined,
+    process_image: page.media_assets?.process_image || undefined,
+    team_photo: page.media_assets?.team_photo || undefined,
+    testimonial_photos: (page.media_assets?.testimonial_photos as string[] | undefined) || undefined,
   }
 
   // Route to the correct template

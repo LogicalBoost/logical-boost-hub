@@ -1626,6 +1626,7 @@ export default function LandingPagesPage() {
           sections={generatedSections}
           heroImageUrl={heroImageUrl || ''}
           parallaxImageUrl={parallaxImageUrl || ''}
+          logoUrl={client?.logo_url || ''}
           selectedAvatar={selectedAvatarId || ''}
           selectedOffer={selectedOfferId || ''}
           brandKit={(client?.brand_kit as Record<string, unknown>) || undefined}
@@ -1730,6 +1731,7 @@ function BuildStep({
   sections,
   heroImageUrl,
   parallaxImageUrl,
+  logoUrl,
   selectedAvatar,
   selectedOffer,
   brandKit,
@@ -1743,6 +1745,7 @@ function BuildStep({
   sections?: unknown[] | null
   heroImageUrl: string
   parallaxImageUrl: string
+  logoUrl: string
   selectedAvatar: string
   selectedOffer: string
   brandKit?: Record<string, unknown>
@@ -1800,6 +1803,7 @@ function BuildStep({
         media_assets: {
           hero_image: heroImageUrl || undefined,
           parallax_image: parallaxImageUrl || undefined,
+          logo: logoUrl || undefined,
         },
         avatar_id: selectedAvatar || undefined,
         offer_id: selectedOffer || undefined,

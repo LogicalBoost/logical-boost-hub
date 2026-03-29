@@ -1,5 +1,7 @@
-// Generate Hero Image — calls Google Gemini API
-// to produce a photorealistic hero shot based on the avatar description.
+// Generate Image — calls Google Gemini API
+// to produce a photorealistic image based on the avatar description.
+// Supports multiple roles: hero_image, parallax, process_step, photo,
+// background_texture, gallery, other.
 //
 // The image is uploaded to Supabase Storage (client-assets bucket)
 // and the public URL is returned for use in the landing page builder.
@@ -9,6 +11,127 @@ import { corsHeaders, jsonResponse, errorResponse } from '../_shared/ai-client.t
 
 // Google AI Studio API key (free tier — works with Gemini Flash image generation)
 const GOOGLE_AI_API_KEY = Deno.env.get('GOOGLE_AI_API_KEY')
+
+// Valid media asset roles that this function can generate
+const VALID_ROLES = ['hero_image', 'parallax', 'process_step', 'photo', 'background_texture', 'gallery', 'other'] as const
+type ImageRole = typeof VALID_ROLES[number]
+
+/**
+ * Derive a business/industry context string from avatar + offer descriptions.
+ */
+function deriveContext(avatarDesc: string, offerDesc: string | null): string {
+  const parts = [avatarDesc]
+  if (offerDesc) parts.push(offerDesc)
+  return parts.join('. ')
+}
+
+/**
+ * Build a parallax background prompt — wide, atmospheric, no people focus.
+ */
+function buildParallaxPrompt(
+  avatarDescription: string,
+  offerDescription: string | null,
+  businessContext?: string
+): string {
+  const context = businessContext || deriveContext(avatarDescription, offerDescription)
+  return `Wide cinematic landscape photograph suitable for a parallax scrolling background on a website.
+
+Context about the business and audience: ${context}
+
+Generate an atmospheric, wide-format scene that relates to this business context. The image should be:
+- Dramatic and moody with rich colors and depth
+- Wide aspect ratio (16:9 or wider)
+- Suitable as a background — NOT the main focal point of a page
+- Slightly dark or muted so text can overlay it legibly
+- NO people as the main subject (distant/tiny silhouettes are OK)
+- NO text, logos, or watermarks
+
+Think: aerial neighborhood view for a roofing company, city skyline at dusk for fintech, rolling farmland for agriculture, workshop interior for trades.
+
+STRICT RULES:
+- High resolution, cinematic photography style
+- Rich atmospheric lighting (golden hour, blue hour, dramatic clouds, or moody interior light)
+- Sharp focus with natural depth of field
+- The scene must feel relevant to the business described above`
+}
+
+/**
+ * Build a contextual scene prompt for process_step, photo, or other roles.
+ */
+function buildScenePrompt(
+  avatarDescription: string,
+  offerDescription: string | null,
+  businessContext?: string
+): string {
+  const context = businessContext || deriveContext(avatarDescription, offerDescription)
+  return `Professional photograph of a scene or setting related to this business context: ${context}
+
+Generate a contextual image that shows the world this business operates in — a setting, workspace, tool, or environment that the target audience would recognize and relate to.
+
+- NOT a portrait of a single person (show environments, tools, workspaces, or activities)
+- People can appear as part of the scene but should not be the isolated subject
+- Clean, well-lit commercial photography style
+- Relevant to the business and audience described above
+- NO text, logos, or watermarks
+
+STRICT RULES:
+- High resolution, professional commercial photography
+- Clean composition with good lighting
+- Authentic and relatable — not overly staged or stock-photo generic
+- Sharp focus, natural colors`
+}
+
+/**
+ * Build a gallery prompt for product/service related images.
+ */
+function buildGalleryPrompt(
+  avatarDescription: string,
+  offerDescription: string | null,
+  businessContext?: string
+): string {
+  const context = businessContext || deriveContext(avatarDescription, offerDescription)
+  return `Professional product or service photograph related to this business: ${context}
+
+Generate an image showcasing the product, service, or end result that this business delivers to its customers. Think: completed project, product in use, service being performed, or the tangible outcome a customer receives.
+
+- Focus on the product/service/result, not on people
+- Clean, well-lit product photography style
+- The image should make the viewer want to buy or inquire
+- NO text, logos, or watermarks
+
+STRICT RULES:
+- High resolution, commercial product photography
+- Clean white or neutral background preferred, or tasteful lifestyle context
+- Sharp focus, accurate colors
+- Professional and aspirational`
+}
+
+/**
+ * Build a background texture prompt.
+ */
+function buildTexturePrompt(
+  avatarDescription: string,
+  offerDescription: string | null,
+  businessContext?: string
+): string {
+  const context = businessContext || deriveContext(avatarDescription, offerDescription)
+  return `Abstract or subtle textured background image suitable for a website section background.
+
+Business context: ${context}
+
+Generate a subtle, non-distracting background texture or pattern that complements this type of business. The image should:
+- Be suitable as a CSS background-image (tileable or full-bleed)
+- Have very low visual noise so text remains readable on top
+- Use muted, professional colors related to the business industry
+- NOT contain any recognizable objects, people, or text
+- Be abstract, geometric, or organic texture only
+
+STRICT RULES:
+- High resolution, seamless or near-seamless texture
+- Muted and understated — this is a background, not a focal image
+- Professional color palette
+- NO text, logos, watermarks, or identifiable objects`
+}
 
 /**
  * Build an image generation prompt from avatar + offer data.
@@ -24,7 +147,9 @@ function buildImagePrompt(
   avatarDescription: string,
   offerDescription: string | null,
   imageStyle: string = 'hero',
-  customPrompt?: string
+  customPrompt?: string,
+  role: ImageRole = 'hero_image',
+  businessContext?: string
 ): string {
   if (customPrompt?.trim()) {
     return `${customPrompt.trim()}.
@@ -35,6 +160,23 @@ STRICT RULES:
 - If any small icons or graphics float around the person, they must directly relate to the person described above. No random corporate icons.
 - Professional studio lighting, high resolution, sharp focus.
 - The person should look confident, approachable, and genuine.`
+  }
+
+  // ── Role-specific prompts (non-hero) ──
+  if (role === 'parallax') {
+    return buildParallaxPrompt(avatarDescription, offerDescription, businessContext)
+  }
+  if (role === 'process_step' || role === 'photo') {
+    return buildScenePrompt(avatarDescription, offerDescription, businessContext)
+  }
+  if (role === 'gallery') {
+    return buildGalleryPrompt(avatarDescription, offerDescription, businessContext)
+  }
+  if (role === 'background_texture') {
+    return buildTexturePrompt(avatarDescription, offerDescription, businessContext)
+  }
+  if (role === 'other') {
+    return buildScenePrompt(avatarDescription, offerDescription, businessContext)
   }
 
   const desc = avatarDescription.toLowerCase()
@@ -259,10 +401,16 @@ Deno.serve(async (req: Request) => {
       offer_id,                  // Optional — used for icon/context relevance
       image_style = 'hero',    // hero | family | trust | lifestyle
       custom_prompt,             // Optional override prompt
+      role = 'hero_image',       // hero_image | parallax | process_step | photo | background_texture | gallery | other
     } = await req.json()
 
     if (!client_id || !avatar_id) {
       return errorResponse('client_id and avatar_id are required')
+    }
+
+    // Validate role
+    if (!VALID_ROLES.includes(role)) {
+      return errorResponse(`Invalid role "${role}". Valid roles: ${VALID_ROLES.join(', ')}`)
     }
 
     const supabase = createClient(
@@ -299,17 +447,18 @@ Deno.serve(async (req: Request) => {
       avatar.description || avatar.name,
       offerDescription,
       image_style,
-      custom_prompt
+      custom_prompt,
+      role as ImageRole
     )
 
-    console.log(`Generating hero image for avatar "${avatar.name}" with style "${image_style}"`)
+    console.log(`Generating ${role} image for avatar "${avatar.name}" with style "${image_style}"`)
     console.log(`Prompt: ${imagePrompt.substring(0, 200)}...`)
 
     // Generate image via Gemini Flash
     const imageBytes = await generateImage(imagePrompt)
 
     // Upload to Supabase Storage
-    const filename = `hero-${avatar_id}-${image_style}-${Date.now()}.png`
+    const filename = `${role}-${avatar_id}-${image_style}-${Date.now()}.png`
     const storagePath = `${client_id}/${filename}`
 
     const { error: uploadError } = await supabase
@@ -338,14 +487,14 @@ Deno.serve(async (req: Request) => {
       .insert({
         client_id,
         avatar_id,
-        role: 'hero_image',
+        role,
         file_url: publicUrl,
         file_type: 'image',
         storage_path: storagePath,
         filename,
         prompt_used: imagePrompt,
         style: image_style,
-        display_name: `${avatar.name} - ${image_style}`,
+        display_name: `${avatar.name} - ${role} - ${image_style}`,
         metadata: { avatar_name: avatar.name, source: 'ai_generated' },
       })
       .select()
@@ -361,6 +510,7 @@ Deno.serve(async (req: Request) => {
       storage_path: storagePath,
       prompt_used: imagePrompt,
       style: image_style,
+      role,
       asset: assetRecord || null,
     })
   } catch (err) {
