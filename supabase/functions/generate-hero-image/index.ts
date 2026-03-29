@@ -150,7 +150,18 @@ function buildImagePrompt(
   role: ImageRole = 'hero_image',
   businessContext?: string
 ): string {
+  // ── Custom prompt with role-aware rules ──
   if (customPrompt?.trim()) {
+    if (role === 'parallax') {
+      return `${customPrompt.trim()}.
+
+STRICT RULES:
+- Wide cinematic landscape photograph (16:9 or wider aspect ratio).
+- Dramatic atmospheric lighting — golden hour, blue hour, or moody.
+- Slightly dark or muted so text overlays remain legible.
+- NO people as the main subject. NO text, logos, or watermarks.
+- High resolution, cinematic photography style with natural depth of field.`
+    }
     return `${customPrompt.trim()}.
 
 STRICT RULES:
@@ -353,13 +364,32 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Build the image prompt from avatar + offer context
+    // Fetch business context for better scene prompts (parallax, gallery, etc.)
+    let businessContext: string | undefined
+    if (role !== 'hero_image') {
+      const { data: clientData } = await supabase
+        .from('clients')
+        .select('name, business_summary, services')
+        .eq('id', client_id)
+        .single()
+      if (clientData) {
+        const parts = [`Business: ${clientData.name}`]
+        if (clientData.business_summary) parts.push(clientData.business_summary)
+        if (clientData.services && Array.isArray(clientData.services)) {
+          parts.push(`Services: ${clientData.services.join(', ')}`)
+        }
+        businessContext = parts.join('. ')
+      }
+    }
+
+    // Build the image prompt from avatar + offer + business context
     const imagePrompt = buildImagePrompt(
       avatar.description || avatar.name,
       offerDescription,
       image_style,
       custom_prompt,
-      role as ImageRole
+      role as ImageRole,
+      businessContext
     )
 
     console.log(`Generating ${role} image for avatar "${avatar.name}" with style "${image_style}"`)

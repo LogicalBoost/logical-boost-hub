@@ -197,6 +197,9 @@ export default function LandingPagesPage() {
   // Parallax background image state
   const [parallaxImageUrl, setParallaxImageUrl] = useState<string | null>(null)
   const [uploadingParallax, setUploadingParallax] = useState(false)
+  const [generatingParallax, setGeneratingParallax] = useState(false)
+  const [parallaxError, setParallaxError] = useState<string | null>(null)
+  const [customParallaxPrompt, setCustomParallaxPrompt] = useState('')
 
   // Lightbox state for full image preview
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
@@ -340,6 +343,36 @@ export default function LandingPagesPage() {
       setGeneratingImage(false)
     }
   }, [client, selectedAvatarId, imageStyle, customImagePrompt])
+
+  const handleGenerateParallaxImage = useCallback(async () => {
+    if (!client || !selectedAvatarId) return
+    setGeneratingParallax(true)
+    setParallaxError(null)
+    try {
+      const result = await generateHeroImage(
+        client.id,
+        selectedAvatarId,
+        'hero', // style doesn't matter for parallax — role-specific prompt takes over
+        customParallaxPrompt.trim() || undefined,
+        selectedOfferId || undefined,
+        'parallax'
+      )
+      if (result.image_url) {
+        setParallaxImageUrl(result.image_url)
+        setCopySlots(prev => ({ ...prev, parallax_image: result.image_url }))
+        showToast('Parallax background generated')
+        if (client) refreshMediaAssets(client.id)
+      } else {
+        setParallaxError('No image was returned. Try again or upload your own.')
+      }
+    } catch (err) {
+      const msg = (err as Error).message
+      setParallaxError(msg)
+      showToast(`Image generation error: ${msg}`)
+    } finally {
+      setGeneratingParallax(false)
+    }
+  }, [client, selectedAvatarId, selectedOfferId, customParallaxPrompt])
 
   // Upload an image file to Supabase storage (for hero or parallax)
   const handleImageUpload = useCallback(async (
@@ -1750,49 +1783,118 @@ export default function LandingPagesPage() {
                 </div>
               )}
 
-              {/* Upload zone */}
-              <div
-                onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#3b82f6' }}
-                onDragLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
-                onDrop={e => { e.currentTarget.style.borderColor = 'var(--border)'; handleImageDrop(e, 'parallax') }}
-                onClick={() => document.getElementById('parallax-image-input')?.click()}
-                style={{
-                  border: '2px dashed var(--border)',
-                  borderRadius: 'var(--radius)',
-                  padding: '20px 16px',
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  transition: 'border-color 0.2s',
-                  background: 'rgba(59, 130, 246, 0.02)',
-                }}
-              >
-                {uploadingParallax ? (
-                  <div>
-                    <div style={{
-                      width: 28, height: 28,
-                      border: '3px solid var(--border)', borderTopColor: '#3b82f6',
-                      borderRadius: '50%', margin: '0 auto 6px',
-                      animation: 'spin 1s linear infinite',
-                    }} />
-                    <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Uploading...</p>
+              {/* Two columns: Upload | AI Generate */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                {/* Upload / Drop zone */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
+                    Upload Image
+                  </label>
+                  <div
+                    onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#3b82f6' }}
+                    onDragLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+                    onDrop={e => { e.currentTarget.style.borderColor = 'var(--border)'; handleImageDrop(e, 'parallax') }}
+                    onClick={() => document.getElementById('parallax-image-input')?.click()}
+                    style={{
+                      border: '2px dashed var(--border)',
+                      borderRadius: 'var(--radius)',
+                      padding: '28px 16px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'border-color 0.2s',
+                      background: 'rgba(59, 130, 246, 0.02)',
+                    }}
+                  >
+                    {uploadingParallax ? (
+                      <div>
+                        <div style={{
+                          width: 32, height: 32,
+                          border: '3px solid var(--border)', borderTopColor: '#3b82f6',
+                          borderRadius: '50%', margin: '0 auto 8px',
+                          animation: 'spin 1s linear infinite',
+                        }} />
+                        <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Uploading...</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 28, marginBottom: 6, opacity: 0.5 }}>&#128193;</div>
+                        <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 4px' }}>
+                          Drop an image here
+                        </p>
+                        <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>
+                          or click to browse (PNG, JPG, WebP)
+                        </p>
+                      </>
+                    )}
+                    <input
+                      id="parallax-image-input"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      style={{ display: 'none' }}
+                      onChange={e => handleImageFileSelect(e, 'parallax')}
+                    />
                   </div>
-                ) : (
-                  <>
-                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 4px' }}>
-                      {parallaxImageUrl ? 'Drop a new image to replace' : 'Drop an image here or click to browse'}
+                </div>
+
+                {/* AI Generate */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
+                    AI Generate
+                  </label>
+
+                  {/* Custom prompt */}
+                  <textarea
+                    value={customParallaxPrompt}
+                    onChange={e => setCustomParallaxPrompt(e.target.value)}
+                    placeholder="Optional: describe the scene you want (e.g. 'aerial view of suburban neighborhood rooftops at golden hour')..."
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-input)',
+                      color: 'var(--text-primary)',
+                      fontSize: 12,
+                      resize: 'vertical',
+                      lineHeight: 1.5,
+                      marginBottom: 8,
+                    }}
+                  />
+
+                  <button
+                    style={{
+                      ...btn('primary', generatingParallax),
+                      background: generatingParallax ? 'var(--bg-input)' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                      width: '100%',
+                      justifyContent: 'center',
+                    }}
+                    disabled={generatingParallax || !selectedAvatarId}
+                    onClick={handleGenerateParallaxImage}
+                  >
+                    {generatingParallax ? (
+                      <>
+                        <span style={{
+                          width: 14, height: 14,
+                          border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff',
+                          borderRadius: '50%', display: 'inline-block',
+                          animation: 'spin 1s linear infinite',
+                        }} />
+                        Generating...
+                      </>
+                    ) : 'Generate with AI'}
+                  </button>
+
+                  {parallaxError && (
+                    <p style={{ fontSize: 11, color: 'var(--danger)', marginTop: 6 }}>
+                      {parallaxError}
                     </p>
-                    <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>
-                      Best: wide landscape photos, cityscapes, textures, nature scenes (1920px+ width)
-                    </p>
-                  </>
-                )}
-                <input
-                  id="parallax-image-input"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  style={{ display: 'none' }}
-                  onChange={e => handleImageFileSelect(e, 'parallax')}
-                />
+                  )}
+
+                  <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.4 }}>
+                    AI generates cinematic wide landscapes matched to your avatar&apos;s industry. Best for trust bar backgrounds.
+                  </p>
+                </div>
               </div>
 
             </div>
