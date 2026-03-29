@@ -420,8 +420,8 @@ function TrustBar({ section, media }: { section: Section; media: MediaAssets }) 
         backgroundSize: 'cover',
       } : undefined}
     >
-      {/* Dark overlay — uses secondary color */}
-      <div className={`absolute inset-0 ${parallax ? 'bg-[var(--color-secondary)]/85' : 'bg-gradient-to-br from-[var(--color-secondary)] to-[var(--color-secondary)]/90'}`} />
+      {/* Branded overlay — gradient from secondary to primary for rich branded feel */}
+      <div className={`absolute inset-0 ${parallax ? 'bg-gradient-to-br from-[var(--color-secondary)]/90 to-[var(--color-primary)]/80' : 'bg-gradient-to-br from-[var(--color-secondary)] to-[var(--color-primary)]/90'}`} />
 
       {parallax && (
         <style>{`

@@ -34,25 +34,36 @@ function buildParallaxPrompt(
   businessContext?: string
 ): string {
   const context = businessContext || deriveContext(avatarDescription, offerDescription)
-  return `Wide cinematic landscape photograph suitable for a parallax scrolling background on a website.
+  return `You are an expert brand photographer and art director creating a cinematic background photograph for a website trust section.
 
-Context about the business and audience: ${context}
+BUSINESS & AUDIENCE CONTEXT:
+${context}
 
-Generate an atmospheric, wide-format scene that relates to this business context. The image should be:
-- Dramatic and moody with rich colors and depth
+AVATAR (the target customer):
+${avatarDescription}
+
+${offerDescription ? `OFFER: ${offerDescription}` : ''}
+
+YOUR TASK:
+Create a wide, atmospheric photograph that captures the WORLD this business and its customers live in. This image will sit behind a dark branded overlay with white text on top, so it needs to work as a background — moody, textured, and rich.
+
+CREATIVE DIRECTION:
+- Think about where this avatar LIVES and WORKS. What does their world look like?
+- A lending company targeting gig workers → city streets at dusk, car dashboards, urban intersections with ride-share lights
+- A roofing company → aerial neighborhood rooftops, dramatic storm clouds over suburbs, close-up of roof shingles with rain
+- A fitness brand → gym interior with moody lighting, weights rack in dramatic light, empty track at dawn
+- A financial advisor → city skyline at blue hour, modern office corridor with warm lights, stock exchange floor
+- A restaurant → kitchen with steam and warm light, table setting with candles, chef's hands plating food
+
+TECHNICAL REQUIREMENTS:
 - Wide aspect ratio (16:9 or wider)
-- Suitable as a background — NOT the main focal point of a page
-- Slightly dark or muted so text can overlay it legibly
+- Dramatic atmospheric lighting — golden hour, blue hour, dramatic clouds, or moody interior ambient light
+- Rich colors and deep shadows — this will have a colored overlay on top so darker images work better
+- Shallow to medium depth of field for a cinematic feel
 - NO people as the main subject (distant/tiny silhouettes are OK)
-- NO text, logos, or watermarks
-
-Think: aerial neighborhood view for a roofing company, city skyline at dusk for fintech, rolling farmland for agriculture, workshop interior for trades.
-
-STRICT RULES:
-- High resolution, cinematic photography style
-- Rich atmospheric lighting (golden hour, blue hour, dramatic clouds, or moody interior light)
-- Sharp focus with natural depth of field
-- The scene must feel relevant to the business described above`
+- NO text, logos, watermarks, or UI elements of ANY kind
+- High resolution, cinematic photography style (think movie still or editorial spread)
+- The scene MUST feel specific to the business and audience described above — not generic stock photography`
 }
 
 /**
