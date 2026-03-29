@@ -201,6 +201,26 @@ export default function LandingPagesPage() {
   // Lightbox state for full image preview
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
+  // Delete a published page with confirmation
+  async function handleDeletePublishedPage(pageId: string, slug: string) {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "/${slug}"?\n\nThis will permanently remove the published page. This cannot be undone.`
+    )
+    if (!confirmed) return
+
+    const { error } = await supabase
+      .from('published_pages')
+      .delete()
+      .eq('id', pageId)
+
+    if (error) {
+      showToast('Failed to delete: ' + error.message)
+    } else {
+      showToast(`Page /${slug} deleted`)
+      refreshPublishedPages(client!.id)
+    }
+  }
+
   // Derived data
   const approvedAvatars = useMemo(
     () => [...avatars].filter(a => a.status === 'approved').sort((a, b) => a.priority - b.priority),
@@ -605,6 +625,21 @@ export default function LandingPagesPage() {
                                 <line x1="10" y1="14" x2="21" y2="3" />
                               </svg>
                             </a>
+                            {canEdit && (
+                              <button
+                                onClick={() => handleDeletePublishedPage(page.id, page.slug)}
+                                title="Delete page"
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}
+                                onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
+                                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                                  <line x1="10" y1="11" x2="10" y2="17" />
+                                  <line x1="14" y1="11" x2="14" y2="17" />
+                                </svg>
+                              </button>
+                            )}
                           </div>
                         </div>
                       )
