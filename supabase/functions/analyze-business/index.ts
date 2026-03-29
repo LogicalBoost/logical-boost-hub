@@ -25,8 +25,51 @@ You must produce:
 
 7. INITIAL OFFERS — Suggest 2–4 conversion offers with ALL fields: name, offer_type, headline, subheadline, description, primary_cta, conversion_type, benefits, proof_elements, urgency_elements, faq, landing_page_type.
 
+8. EXTRACTED CONTENT — Carefully scan the website content for real, verifiable content assets. Extract ALL of the following that you can find:
+
+  a. "testimonials" — Customer testimonials and reviews found on the website. For EACH one extract:
+     - "person_name": The customer's name (use exactly as shown on the site)
+     - "person_role": Their title, company, location, or identifier (e.g. "Homeowner, Orlando" or "CEO, Acme Corp")
+     - "body": The exact quote text. Do NOT paraphrase or modify. Copy verbatim.
+     - "rating": Star rating if shown (1-5), or null
+     - "source": Where you found it ("website", "Google Reviews widget", "Yelp widget", etc.)
+
+  b. "stats" — Any specific numbers, metrics, or statistics mentioned on the site:
+     - "stat_value": The number as displayed (e.g. "2,100+", "4.9/5.0", "$8.2M", "15 Years")
+     - "stat_label": What the number represents (e.g. "Inspections Completed", "Average Rating")
+
+  c. "team_members" — Key team members, founders, or leadership shown on the site:
+     - "person_name": Full name
+     - "person_role": Their title
+     - "body": Short bio if available
+     - "person_photo": URL to their photo if visible on the site
+
+  d. "certifications" — Licenses, certifications, accreditations, BBB ratings, partner badges:
+     - "title": Name of the certification or accreditation
+     - "body": Description if available
+
+  e. "awards" — Any awards or recognition mentioned:
+     - "title": Award name
+     - "body": Details
+
+  f. "faqs" — Any FAQ content found on the site:
+     - "title": The question
+     - "body": The answer
+
+  g. "process_steps" — Any "How It Works" or process steps described on the site:
+     - "title": Step name
+     - "body": Step description
+     - "sort_order": Step number (1, 2, 3...)
+
+CRITICAL RULES FOR EXTRACTED CONTENT:
+- Only extract content that ACTUALLY EXISTS on the website. NEVER fabricate testimonials, reviews, stats, or team members.
+- Copy testimonial quotes VERBATIM. Do not rewrite or improve them.
+- If you cannot find any testimonials, reviews, or team members, return empty arrays for those fields. Do NOT make them up.
+- Stats must be real numbers from the site. Do not estimate or round.
+- Mark the source accurately so the team knows where each piece came from.
+
 FORMATTING RULES:
-- NEVER use em dashes (—) in any generated text. Use commas, periods, colons, or separate sentences instead.
+- NEVER use em dashes in any generated text. Use commas, periods, colons, or separate sentences instead.
 - Benefits must be SHORT bullet points (5-10 words each), suitable for banners and landing pages.
 
 Be thorough. Be specific. No generic filler.
@@ -147,10 +190,118 @@ ${team_notes || 'None provided'}`
       }
     }
 
+    // Insert extracted content (testimonials, reviews, stats, team, certs, awards, faqs, process steps)
+    let contentCreated = 0
+    const extractedContent = parsed.extracted_content as Record<string, unknown[]> | undefined
+
+    if (extractedContent) {
+      const contentRecords: Array<Record<string, unknown>> = []
+
+      // Testimonials
+      const testimonials = (extractedContent.testimonials || []) as Array<Record<string, unknown>>
+      for (const t of testimonials) {
+        contentRecords.push({
+          client_id,
+          content_type: 'testimonial',
+          person_name: t.person_name ? String(t.person_name) : null,
+          person_role: t.person_role ? String(t.person_role) : null,
+          body: t.body ? String(t.body) : null,
+          rating: typeof t.rating === 'number' ? t.rating : null,
+          source: t.source ? String(t.source) : 'website',
+          is_featured: true,
+        })
+      }
+
+      // Stats
+      const stats = (extractedContent.stats || []) as Array<Record<string, unknown>>
+      for (const s of stats) {
+        contentRecords.push({
+          client_id,
+          content_type: 'stat',
+          stat_value: s.stat_value ? String(s.stat_value) : null,
+          stat_label: s.stat_label ? String(s.stat_label) : null,
+          source: 'website',
+        })
+      }
+
+      // Team members
+      const team = (extractedContent.team_members || []) as Array<Record<string, unknown>>
+      for (const m of team) {
+        contentRecords.push({
+          client_id,
+          content_type: 'team_member',
+          person_name: m.person_name ? String(m.person_name) : null,
+          person_role: m.person_role ? String(m.person_role) : null,
+          body: m.body ? String(m.body) : null,
+          person_photo: m.person_photo ? String(m.person_photo) : null,
+          source: 'website',
+        })
+      }
+
+      // Certifications
+      const certs = (extractedContent.certifications || []) as Array<Record<string, unknown>>
+      for (const c of certs) {
+        contentRecords.push({
+          client_id,
+          content_type: 'certification',
+          title: c.title ? String(c.title) : null,
+          body: c.body ? String(c.body) : null,
+          source: 'website',
+        })
+      }
+
+      // Awards
+      const awards = (extractedContent.awards || []) as Array<Record<string, unknown>>
+      for (const a of awards) {
+        contentRecords.push({
+          client_id,
+          content_type: 'award',
+          title: a.title ? String(a.title) : null,
+          body: a.body ? String(a.body) : null,
+          source: 'website',
+        })
+      }
+
+      // FAQs
+      const faqs = (extractedContent.faqs || []) as Array<Record<string, unknown>>
+      for (const f of faqs) {
+        contentRecords.push({
+          client_id,
+          content_type: 'faq',
+          title: f.title ? String(f.title) : null,
+          body: f.body ? String(f.body) : null,
+          source: 'website',
+        })
+      }
+
+      // Process steps
+      const steps = (extractedContent.process_steps || []) as Array<Record<string, unknown>>
+      for (const s of steps) {
+        contentRecords.push({
+          client_id,
+          content_type: 'process_step',
+          title: s.title ? String(s.title) : null,
+          body: s.body ? String(s.body) : null,
+          sort_order: typeof s.sort_order === 'number' ? s.sort_order : 0,
+          source: 'website',
+        })
+      }
+
+      if (contentRecords.length > 0) {
+        const { error: contentError } = await supabase.from('client_content').insert(contentRecords)
+        if (contentError) {
+          console.error('Content insert error:', JSON.stringify(contentError))
+        } else {
+          contentCreated = contentRecords.length
+        }
+      }
+    }
+
     return jsonResponse({
       success: true,
       avatars_created: avatarsCreated,
       offers_created: offersCreated,
+      content_extracted: contentCreated,
     })
   } catch (err) {
     return errorResponse((err as Error).message, 500)

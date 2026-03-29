@@ -82,6 +82,28 @@ export default function SettingsPage() {
   const [reanalyzing, setReanalyzing] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  // ─── Company Assets state ───
+  interface ClientContentItem {
+    id: string
+    content_type: string
+    title: string | null
+    body: string | null
+    person_name: string | null
+    person_role: string | null
+    person_photo: string | null
+    rating: number | null
+    stat_value: string | null
+    stat_label: string | null
+    source: string | null
+    sort_order: number
+    is_featured: boolean
+    created_at: string
+  }
+  const [clientContent, setClientContent] = useState<ClientContentItem[]>([])
+  const [loadingContent, setLoadingContent] = useState(false)
+  const [addingContentType, setAddingContentType] = useState<string | null>(null)
+  const [newContentForm, setNewContentForm] = useState<Record<string, string>>({})
+
   // ─── Intake state ───
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [intakeLoadingMessage, setIntakeLoadingMessage] = useState('')
@@ -116,6 +138,78 @@ export default function SettingsPage() {
       setAnswers(initial)
     }
   }, [intakeQuestions])
+
+  // Load client content when client changes
+  useEffect(() => {
+    if (client?.id) {
+      loadClientContent()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client?.id])
+
+  async function loadClientContent() {
+    if (!client?.id) return
+    setLoadingContent(true)
+    const { data } = await supabase
+      .from('client_content')
+      .select('*')
+      .eq('client_id', client.id)
+      .order('content_type')
+      .order('sort_order')
+      .order('created_at')
+    setClientContent((data || []) as ClientContentItem[])
+    setLoadingContent(false)
+  }
+
+  async function handleAddContent(contentType: string) {
+    if (!client?.id) return
+    const form = newContentForm
+    const record: Record<string, unknown> = {
+      client_id: client.id,
+      content_type: contentType,
+      source: 'manual',
+    }
+
+    if (contentType === 'testimonial' || contentType === 'review') {
+      record.person_name = form.person_name || null
+      record.person_role = form.person_role || null
+      record.body = form.body || null
+      record.rating = form.rating ? parseInt(form.rating) : null
+    } else if (contentType === 'stat') {
+      record.stat_value = form.stat_value || null
+      record.stat_label = form.stat_label || null
+    } else if (contentType === 'team_member') {
+      record.person_name = form.person_name || null
+      record.person_role = form.person_role || null
+      record.body = form.body || null
+    } else if (contentType === 'faq') {
+      record.title = form.title || null
+      record.body = form.body || null
+    } else {
+      record.title = form.title || null
+      record.body = form.body || null
+    }
+
+    const { error } = await supabase.from('client_content').insert(record)
+    if (error) {
+      showToast('Failed to add: ' + error.message)
+    } else {
+      showToast('Added successfully')
+      setAddingContentType(null)
+      setNewContentForm({})
+      loadClientContent()
+    }
+  }
+
+  async function handleDeleteContent(id: string) {
+    if (!confirm('Delete this item?')) return
+    const { error } = await supabase.from('client_content').delete().eq('id', id)
+    if (error) {
+      showToast('Failed to delete: ' + error.message)
+    } else {
+      setClientContent(prev => prev.filter(c => c.id !== id))
+    }
+  }
 
   // ═══════════════════════════════════════
   // Team functions
@@ -1022,6 +1116,262 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Company Assets Section */}
+          <div className="card">
+            <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Company Assets</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 400 }}>
+                Extracted from website + manually added
+              </span>
+            </div>
+
+            {loadingContent ? (
+              <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading assets...</div>
+            ) : (
+              <div style={{ marginTop: 16, display: 'grid', gap: 16 }}>
+                {/* Testimonials */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>Testimonials & Reviews</h4>
+                    {canEdit && (
+                      <button className="btn btn-secondary" style={{ fontSize: 11, padding: '4px 10px' }}
+                        onClick={() => { setAddingContentType('testimonial'); setNewContentForm({}) }}>
+                        + Add
+                      </button>
+                    )}
+                  </div>
+                  {addingContentType === 'testimonial' && (
+                    <div style={{ padding: 12, background: 'var(--surface-hover)', borderRadius: 8, marginBottom: 8, display: 'grid', gap: 8 }}>
+                      <input className="form-input" placeholder="Person name" value={newContentForm.person_name || ''}
+                        onChange={e => setNewContentForm(p => ({ ...p, person_name: e.target.value }))} />
+                      <input className="form-input" placeholder="Role / Location (e.g. Homeowner, Orlando)" value={newContentForm.person_role || ''}
+                        onChange={e => setNewContentForm(p => ({ ...p, person_role: e.target.value }))} />
+                      <textarea className="form-textarea" rows={3} placeholder="Testimonial quote (copy verbatim)" value={newContentForm.body || ''}
+                        onChange={e => setNewContentForm(p => ({ ...p, body: e.target.value }))} />
+                      <select className="form-input" value={newContentForm.rating || ''} onChange={e => setNewContentForm(p => ({ ...p, rating: e.target.value }))}>
+                        <option value="">Rating (optional)</option>
+                        <option value="5">5 Stars</option>
+                        <option value="4">4 Stars</option>
+                        <option value="3">3 Stars</option>
+                      </select>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={() => handleAddContent('testimonial')}>Save</button>
+                        <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => setAddingContentType(null)}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                  {clientContent.filter(c => c.content_type === 'testimonial' || c.content_type === 'review').length === 0 ? (
+                    <div style={{ padding: 12, color: 'var(--text-muted)', fontSize: 13, fontStyle: 'italic' }}>
+                      No testimonials yet. Click &quot;Analyze Business&quot; to extract from website, or add manually.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      {clientContent.filter(c => c.content_type === 'testimonial' || c.content_type === 'review').map(t => (
+                        <div key={t.id} style={{ padding: 12, background: 'var(--surface-hover)', borderRadius: 8, position: 'relative' }}>
+                          <div style={{ fontSize: 13, fontStyle: 'italic', lineHeight: 1.5 }}>&ldquo;{t.body}&rdquo;</div>
+                          <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <span style={{ fontWeight: 600, fontSize: 13 }}>{t.person_name}</span>
+                              {t.person_role && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}> — {t.person_role}</span>}
+                              {t.rating && <span style={{ marginLeft: 8, color: '#f59e0b' }}>{'★'.repeat(t.rating)}</span>}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t.source}</span>
+                              {canEdit && (
+                                <button onClick={() => handleDeleteContent(t.id)} title="Delete"
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2 }}>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Stats */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>Stats & Metrics</h4>
+                    {canEdit && (
+                      <button className="btn btn-secondary" style={{ fontSize: 11, padding: '4px 10px' }}
+                        onClick={() => { setAddingContentType('stat'); setNewContentForm({}) }}>
+                        + Add
+                      </button>
+                    )}
+                  </div>
+                  {addingContentType === 'stat' && (
+                    <div style={{ padding: 12, background: 'var(--surface-hover)', borderRadius: 8, marginBottom: 8, display: 'grid', gap: 8 }}>
+                      <input className="form-input" placeholder='Stat value (e.g. "2,100+", "4.9/5.0")' value={newContentForm.stat_value || ''}
+                        onChange={e => setNewContentForm(p => ({ ...p, stat_value: e.target.value }))} />
+                      <input className="form-input" placeholder='Label (e.g. "Happy Clients", "Years Experience")' value={newContentForm.stat_label || ''}
+                        onChange={e => setNewContentForm(p => ({ ...p, stat_label: e.target.value }))} />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={() => handleAddContent('stat')}>Save</button>
+                        <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => setAddingContentType(null)}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                  {clientContent.filter(c => c.content_type === 'stat').length === 0 ? (
+                    <div style={{ padding: 12, color: 'var(--text-muted)', fontSize: 13, fontStyle: 'italic' }}>No stats yet.</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {clientContent.filter(c => c.content_type === 'stat').map(s => (
+                        <div key={s.id} style={{ padding: '8px 16px', background: 'var(--surface-hover)', borderRadius: 8, textAlign: 'center', position: 'relative', minWidth: 120 }}>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>{s.stat_value}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.stat_label}</div>
+                          {canEdit && (
+                            <button onClick={() => handleDeleteContent(s.id)} title="Delete"
+                              style={{ position: 'absolute', top: 4, right: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2 }}>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Team Members */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>Team Members</h4>
+                    {canEdit && (
+                      <button className="btn btn-secondary" style={{ fontSize: 11, padding: '4px 10px' }}
+                        onClick={() => { setAddingContentType('team_member'); setNewContentForm({}) }}>
+                        + Add
+                      </button>
+                    )}
+                  </div>
+                  {addingContentType === 'team_member' && (
+                    <div style={{ padding: 12, background: 'var(--surface-hover)', borderRadius: 8, marginBottom: 8, display: 'grid', gap: 8 }}>
+                      <input className="form-input" placeholder="Full name" value={newContentForm.person_name || ''}
+                        onChange={e => setNewContentForm(p => ({ ...p, person_name: e.target.value }))} />
+                      <input className="form-input" placeholder="Title / Role" value={newContentForm.person_role || ''}
+                        onChange={e => setNewContentForm(p => ({ ...p, person_role: e.target.value }))} />
+                      <textarea className="form-textarea" rows={2} placeholder="Short bio (optional)" value={newContentForm.body || ''}
+                        onChange={e => setNewContentForm(p => ({ ...p, body: e.target.value }))} />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={() => handleAddContent('team_member')}>Save</button>
+                        <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => setAddingContentType(null)}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                  {clientContent.filter(c => c.content_type === 'team_member').length === 0 ? (
+                    <div style={{ padding: 12, color: 'var(--text-muted)', fontSize: 13, fontStyle: 'italic' }}>No team members yet.</div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      {clientContent.filter(c => c.content_type === 'team_member').map(m => (
+                        <div key={m.id} style={{ padding: 10, background: 'var(--surface-hover)', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <span style={{ fontWeight: 600, fontSize: 13 }}>{m.person_name}</span>
+                            {m.person_role && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}> — {m.person_role}</span>}
+                            {m.body && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{m.body}</div>}
+                          </div>
+                          {canEdit && (
+                            <button onClick={() => handleDeleteContent(m.id)} title="Delete"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2 }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Certifications & Awards */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>Certifications & Awards</h4>
+                    {canEdit && (
+                      <button className="btn btn-secondary" style={{ fontSize: 11, padding: '4px 10px' }}
+                        onClick={() => { setAddingContentType('certification'); setNewContentForm({}) }}>
+                        + Add
+                      </button>
+                    )}
+                  </div>
+                  {addingContentType === 'certification' && (
+                    <div style={{ padding: 12, background: 'var(--surface-hover)', borderRadius: 8, marginBottom: 8, display: 'grid', gap: 8 }}>
+                      <input className="form-input" placeholder="Certification or award name" value={newContentForm.title || ''}
+                        onChange={e => setNewContentForm(p => ({ ...p, title: e.target.value }))} />
+                      <input className="form-input" placeholder="Details (optional)" value={newContentForm.body || ''}
+                        onChange={e => setNewContentForm(p => ({ ...p, body: e.target.value }))} />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={() => handleAddContent('certification')}>Save</button>
+                        <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => setAddingContentType(null)}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                  {clientContent.filter(c => c.content_type === 'certification' || c.content_type === 'award').length === 0 ? (
+                    <div style={{ padding: 12, color: 'var(--text-muted)', fontSize: 13, fontStyle: 'italic' }}>No certifications or awards yet.</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {clientContent.filter(c => c.content_type === 'certification' || c.content_type === 'award').map(c => (
+                        <div key={c.id} style={{ padding: '6px 12px', background: 'var(--surface-hover)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span>{c.content_type === 'award' ? '🏆' : '✓'} {c.title}</span>
+                          {canEdit && (
+                            <button onClick={() => handleDeleteContent(c.id)} title="Delete"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0 }}>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* FAQs */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>FAQs</h4>
+                    {canEdit && (
+                      <button className="btn btn-secondary" style={{ fontSize: 11, padding: '4px 10px' }}
+                        onClick={() => { setAddingContentType('faq'); setNewContentForm({}) }}>
+                        + Add
+                      </button>
+                    )}
+                  </div>
+                  {addingContentType === 'faq' && (
+                    <div style={{ padding: 12, background: 'var(--surface-hover)', borderRadius: 8, marginBottom: 8, display: 'grid', gap: 8 }}>
+                      <input className="form-input" placeholder="Question" value={newContentForm.title || ''}
+                        onChange={e => setNewContentForm(p => ({ ...p, title: e.target.value }))} />
+                      <textarea className="form-textarea" rows={3} placeholder="Answer" value={newContentForm.body || ''}
+                        onChange={e => setNewContentForm(p => ({ ...p, body: e.target.value }))} />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={() => handleAddContent('faq')}>Save</button>
+                        <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => setAddingContentType(null)}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                  {clientContent.filter(c => c.content_type === 'faq').length === 0 ? (
+                    <div style={{ padding: 12, color: 'var(--text-muted)', fontSize: 13, fontStyle: 'italic' }}>No FAQs yet.</div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: 6 }}>
+                      {clientContent.filter(c => c.content_type === 'faq').map(f => (
+                        <div key={f.id} style={{ padding: 10, background: 'var(--surface-hover)', borderRadius: 8, display: 'flex', justifyContent: 'space-between' }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 13 }}>{f.title}</div>
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{f.body}</div>
+                          </div>
+                          {canEdit && (
+                            <button onClick={() => handleDeleteContent(f.id)} title="Delete"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2, flexShrink: 0 }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Re-analyze Section */}
