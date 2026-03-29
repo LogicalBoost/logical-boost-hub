@@ -210,7 +210,7 @@ function HeroBlock({ section, media }: { section: Section; media: MediaAssets })
                   src={img}
                   alt=""
                   className="absolute inset-0 w-full h-full object-contain drop-shadow-2xl z-10"
-                  style={{ background: 'transparent' }}
+                  style={{ mixBlendMode: 'multiply' }}
                 />
               </div>
             ) : (
