@@ -480,9 +480,12 @@ export default function SettingsPage() {
     try {
       await analyzeBusiness(client.id, client.website, reanalyzeNotes.trim())
       await loadClientData(client.id)
+      await loadClientContent()
       setReanalyzeNotes('')
+      showToast('Business re-analyzed successfully')
     } catch (err) {
       setError((err as Error).message)
+      showToast('Re-analysis failed: ' + (err as Error).message)
     } finally {
       setReanalyzing(false)
     }
@@ -1379,7 +1382,7 @@ export default function SettingsPage() {
             <div className="card">
               <div className="card-title">Re-analyze Business</div>
               <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8, marginBottom: 12 }}>
-                Uses intake answers and call notes to build a comprehensive business overview.
+                Re-scrapes the website to extract testimonials, stats, team, and other assets. Add new notes below if available, or just click to re-analyze with the current URL.
               </p>
               <div style={{ display: 'grid', gap: 12 }}>
                 <div className="form-group">
@@ -1402,7 +1405,7 @@ export default function SettingsPage() {
                   <button
                     className="btn btn-primary"
                     onClick={handleReanalyze}
-                    disabled={reanalyzing || !reanalyzeNotes.trim()}
+                    disabled={reanalyzing}
                   >
                     {reanalyzing ? 'Processing...' : 'Re-analyze Business'}
                   </button>

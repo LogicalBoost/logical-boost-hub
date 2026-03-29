@@ -92,10 +92,35 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
+    // Fetch website content if URL provided
+    let fetchedContent = landing_page_content || ''
+    if (website_url && !fetchedContent) {
+      try {
+        const res = await fetch(website_url, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LogicalBoost/1.0)' },
+          redirect: 'follow',
+        })
+        if (res.ok) {
+          const html = await res.text()
+          // Strip scripts/styles, keep text content
+          fetchedContent = html
+            .replace(/<script[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[\s\S]*?<\/style>/gi, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 30000) // Cap to avoid token overflow
+        }
+      } catch (e) {
+        console.error('Failed to fetch website:', e)
+      }
+    }
+
     const userMessage = `CLIENT INPUTS:
 
 Website URL: ${website_url || 'Not provided'}
-Website Content: ${landing_page_content || 'Not provided'}
+Website Content (scraped from site):
+${fetchedContent || 'Could not fetch website content'}
 
 Call Notes:
 ${call_notes || 'None provided'}
@@ -189,6 +214,12 @@ ${team_notes || 'None provided'}`
         offersCreated = offerRecords.length
       }
     }
+
+    // Clear old website-extracted content (preserve manually-added items)
+    await supabase.from('client_content')
+      .delete()
+      .eq('client_id', client_id)
+      .eq('source', 'website')
 
     // Insert extracted content (testimonials, reviews, stats, team, certs, awards, faqs, process steps)
     let contentCreated = 0
