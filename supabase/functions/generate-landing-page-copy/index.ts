@@ -152,6 +152,44 @@ serve(async (req: Request) => {
       .eq('client_id', client_id)
       .not('answer', 'is', null)
 
+    // 6. Real testimonials/reviews from client_content table
+    const { data: clientContent } = await supabase
+      .from('client_content')
+      .select('content_type, person_name, person_role, body, rating, source, stat_value, stat_label, title')
+      .eq('client_id', client_id)
+      .in('content_type', ['testimonial', 'review', 'stat', 'faq'])
+      .order('is_featured', { ascending: false })
+      .order('sort_order')
+      .limit(30)
+
+    const realTestimonials = (clientContent || []).filter(c => c.content_type === 'testimonial' || c.content_type === 'review')
+    const realStats = (clientContent || []).filter(c => c.content_type === 'stat')
+    const realFaqs = (clientContent || []).filter(c => c.content_type === 'faq')
+
+    // Build testimonials context for the AI
+    let testimonialsContext = ''
+    if (realTestimonials.length > 0) {
+      testimonialsContext = `REAL REVIEWS/TESTIMONIALS (use these VERBATIM — do NOT modify quotes):\n${realTestimonials.map((t, i) =>
+        `${i + 1}. "${t.body}" — ${t.person_name || 'Customer'}${t.person_role ? `, ${t.person_role}` : ''}${t.rating ? ` (${t.rating}/5 stars)` : ''}${t.source ? ` [Source: ${t.source}]` : ''}`
+      ).join('\n')}`
+    } else {
+      testimonialsContext = 'NO REAL TESTIMONIALS AVAILABLE — do NOT fabricate any. OMIT the testimonials section entirely.'
+    }
+
+    let statsContext = ''
+    if (realStats.length > 0) {
+      statsContext = `REAL STATS/METRICS (use in trust_bar section):\n${realStats.map(s =>
+        `- ${s.stat_value}: ${s.stat_label}`
+      ).join('\n')}`
+    }
+
+    let faqContext = ''
+    if (realFaqs.length > 0) {
+      faqContext = `REAL FAQs (incorporate into FAQ section):\n${realFaqs.map(f =>
+        `Q: ${f.title}\nA: ${f.body}`
+      ).join('\n\n')}`
+    }
+
     // ─── Build context for Claude ───
 
     const businessContext = [
@@ -163,7 +201,9 @@ serve(async (req: Request) => {
       clientData.trust_signals ? `TRUST SIGNALS: ${JSON.stringify(clientData.trust_signals)}` : '',
       clientData.tone ? `BRAND TONE: ${clientData.tone}` : '',
       clientData.ad_copy_rules ? `COPY RULES: ${clientData.ad_copy_rules}` : '',
-      clientData.reviews ? `REAL REVIEWS/TESTIMONIALS:\n${JSON.stringify(clientData.reviews)}` : 'NO REAL TESTIMONIALS AVAILABLE — do NOT fabricate any.',
+      testimonialsContext,
+      statsContext,
+      faqContext,
       clientData.call_notes ? `CALL NOTES: ${clientData.call_notes}` : '',
     ].filter(Boolean).join('\n\n')
 

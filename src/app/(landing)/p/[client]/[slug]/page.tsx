@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import type { Section, MediaAssets, BrandKit } from '@/components/templates/types'
+import type { Section, MediaAssets, BrandKit, TrustpilotWidget } from '@/components/templates/types'
 import LeadCaptureClassic from '@/components/templates/LeadCaptureClassic'
 
 interface PageRecord {
@@ -323,6 +323,7 @@ export default function LandingPage() {
     process_image: page.media_assets?.process_image || undefined,
     team_photo: page.media_assets?.team_photo || undefined,
     testimonial_photos: (page.media_assets?.testimonial_photos as string[] | undefined) || undefined,
+    trustpilot_widget: (page.media_assets?.trustpilot_widget as TrustpilotWidget | undefined) || undefined,
   }
 
   // Route to the correct template

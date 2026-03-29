@@ -60,6 +60,16 @@ export interface Section {
   phone?: string
 }
 
+export interface TrustpilotWidget {
+  businessUnitId?: string
+  domain?: string
+  reviewUrl?: string
+  miniWidget?: string
+  carouselWidget?: string
+  gridWidget?: string
+  scriptTag?: string
+}
+
 export interface MediaAssets {
   hero_image?: string
   parallax_image?: string
@@ -72,7 +82,8 @@ export interface MediaAssets {
   gallery?: string[]
   steps_image?: string
   benefits_image?: string
-  [key: string]: string | string[] | undefined
+  trustpilot_widget?: TrustpilotWidget
+  [key: string]: string | string[] | TrustpilotWidget | undefined
 }
 
 export interface TemplateInfo {

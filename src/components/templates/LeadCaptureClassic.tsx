@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import type { Section, SectionItem, MediaAssets } from './types'
+import { useState, useEffect, useRef } from 'react'
+import type { Section, SectionItem, MediaAssets, TrustpilotWidget } from './types'
 import AnimatedBackground from '../shared/AnimatedBackground'
 import {
   ChevronDown,
@@ -144,6 +144,11 @@ export default function LeadCaptureClassic({ sections, media }: Props) {
 
       {/* ─── TESTIMONIALS ─── */}
       {testimonials && <TestimonialsBlock section={testimonials} media={media} />}
+
+      {/* ─── TRUSTPILOT WIDGET ─── */}
+      {media.trustpilot_widget?.businessUnitId && (
+        <TrustpilotBlock widget={media.trustpilot_widget} />
+      )}
 
       {/* ─── FAQ ─── */}
       {faq && <FaqBlock section={faq} />}
@@ -600,6 +605,73 @@ function TestimonialsBlock({ section, media }: { section: Section; media: MediaA
             ))}
           </div>
         )}
+      </div>
+    </section>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════
+   TRUSTPILOT WIDGET — Embedded review widget
+   ═══════════════════════════════════════════════════════ */
+function TrustpilotBlock({ widget }: { widget: TrustpilotWidget }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    // Load the Trustpilot widget bootstrap script if not already loaded
+    if (!document.querySelector('script[src*="widget.trustpilot.com"]')) {
+      const script = document.createElement('script')
+      script.src = '//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js'
+      script.async = true
+      document.head.appendChild(script)
+      script.onload = () => {
+        // Initialize Trustpilot widgets after script loads
+        if ((window as unknown as Record<string, unknown>).Trustpilot && containerRef.current) {
+          (window as unknown as Record<string, { loadFromElement: (el: HTMLElement, flag: boolean) => void }>).Trustpilot.loadFromElement(containerRef.current, true)
+        }
+      }
+    } else {
+      // Script already loaded — re-initialize
+      setTimeout(() => {
+        if ((window as unknown as Record<string, unknown>).Trustpilot && containerRef.current) {
+          (window as unknown as Record<string, { loadFromElement: (el: HTMLElement, flag: boolean) => void }>).Trustpilot.loadFromElement(containerRef.current, true)
+        }
+      }, 100)
+    }
+  }, [widget])
+
+  if (!widget.businessUnitId) return null
+
+  return (
+    <section className="py-12 md:py-16 bg-gray-50">
+      <div className="max-w-5xl mx-auto px-4 md:px-10" ref={containerRef}>
+        <div className="text-center mb-8">
+          <p className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-2">Verified Reviews</p>
+          {widget.reviewUrl && (
+            <a
+              href={widget.reviewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-gray-400 hover:text-[var(--color-primary)] transition-colors"
+            >
+              See all reviews on Trustpilot &#8599;
+            </a>
+          )}
+        </div>
+        {/* Carousel widget — shows scrolling review cards */}
+        <div
+          className="trustpilot-widget"
+          data-locale="en-US"
+          data-template-id="53aa8912dec7e10d38f59f36"
+          data-businessunit-id={widget.businessUnitId}
+          data-style-height="140px"
+          data-style-width="100%"
+          data-theme="light"
+          data-stars="4,5"
+        >
+          <a href={widget.reviewUrl || '#'} target="_blank" rel="noopener noreferrer">
+            Trustpilot
+          </a>
+        </div>
       </div>
     </section>
   )

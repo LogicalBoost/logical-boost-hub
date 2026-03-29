@@ -1918,6 +1918,7 @@ export default function LandingPagesPage() {
           selectedAvatar={selectedAvatarId || ''}
           selectedOffer={selectedOfferId || ''}
           brandKit={(client?.brand_kit as Record<string, unknown>) || undefined}
+          trustpilotWidget={(client?.metadata as Record<string, unknown>)?.trustpilot as Record<string, unknown> | undefined}
           onBack={() => setStep(3)}
           onPublished={() => { if (client?.id) refreshPublishedPages(client.id) }}
         />
@@ -2026,6 +2027,7 @@ function BuildStep({
   selectedAvatar,
   selectedOffer,
   brandKit,
+  trustpilotWidget,
   onBack,
   onPublished,
 }: {
@@ -2040,6 +2042,7 @@ function BuildStep({
   selectedAvatar: string
   selectedOffer: string
   brandKit?: Record<string, unknown>
+  trustpilotWidget?: Record<string, unknown>
   onBack: () => void
   onPublished?: () => void
 }) {
@@ -2095,6 +2098,7 @@ function BuildStep({
           hero_image: heroImageUrl || undefined,
           parallax_image: parallaxImageUrl || undefined,
           logo: logoUrl || undefined,
+          ...(trustpilotWidget ? { trustpilot_widget: trustpilotWidget } : {}),
         },
         avatar_id: selectedAvatar || undefined,
         offer_id: selectedOffer || undefined,
@@ -2142,6 +2146,12 @@ function BuildStep({
               <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Parallax</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: parallaxImageUrl ? 'var(--accent)' : 'var(--text-muted)' }}>
                 {parallaxImageUrl ? '✓ Set' : 'Not set'}
+              </div>
+            </div>
+            <div style={{ padding: 12, borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg-input)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Trustpilot</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: trustpilotWidget?.businessUnitId ? 'var(--accent)' : 'var(--text-muted)' }}>
+                {trustpilotWidget?.businessUnitId ? '✓ Widget included' : 'Not detected'}
               </div>
             </div>
           </div>
