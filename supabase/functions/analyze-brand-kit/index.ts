@@ -138,18 +138,52 @@ ${websiteContent}`
       maxTokens: 4096,
     })
 
-    const brandKit = parseJsonResponse<Record<string, unknown>>(response)
+    const rawBrandKit = parseJsonResponse<Record<string, unknown>>(response)
 
-    // Store the brand kit on the client record (using ad_copy_rules JSON field or a dedicated field)
-    // For now, store in a brand_kit field on the client
+    // Flatten nested structure into the format the template/deploy expects
+    // AI may return { colors: { primary_color: ... }, typography: { ... } }
+    // but consumers expect flat { primary_color: ..., heading_font: ... }
+    const colors = (rawBrandKit.colors || {}) as Record<string, unknown>
+    const typography = (rawBrandKit.typography || {}) as Record<string, unknown>
+    const buttonStyle = (rawBrandKit.button_style || rawBrandKit.buttonStyle || {}) as Record<string, unknown>
+    const visualIdentity = (rawBrandKit.visual_identity || rawBrandKit.visualIdentity || {}) as Record<string, unknown>
+    const logoNotes = (rawBrandKit.logo_notes || rawBrandKit.logoNotes || {}) as Record<string, unknown>
+
+    const flatBrandKit: Record<string, unknown> = {
+      // Colors — check flat first, then nested
+      primary_color: rawBrandKit.primary_color || colors.primary_color || null,
+      secondary_color: rawBrandKit.secondary_color || colors.secondary_color || null,
+      accent_color: rawBrandKit.accent_color || colors.accent_color || null,
+      background_color: rawBrandKit.background_color || colors.background_color || null,
+      text_color: rawBrandKit.text_color || colors.text_color || null,
+      additional_colors: rawBrandKit.additional_colors || colors.additional_colors || [],
+      // Typography
+      heading_font: rawBrandKit.heading_font || typography.heading_font || null,
+      body_font: rawBrandKit.body_font || typography.body_font || null,
+      font_style_notes: rawBrandKit.font_style_notes || typography.font_style_notes || null,
+      // Button style
+      button_style: {
+        shape: buttonStyle.shape || 'rounded',
+        color: buttonStyle.color || null,
+        text_color: buttonStyle.text_color || null,
+        borderRadius: buttonStyle.shape === 'pill' ? '9999px' : buttonStyle.shape === 'square' ? '0px' : buttonStyle.shape === 'soft-rounded' ? '8px' : '10px',
+        style_notes: buttonStyle.style_notes || null,
+      },
+      // Visual identity (preserved for reference)
+      visual_identity: visualIdentity,
+      logo_notes: logoNotes,
+      // Keep raw for debugging
+      _raw: rawBrandKit,
+    }
+
     await supabase.from('clients').update({
-      brand_kit: brandKit,
+      brand_kit: flatBrandKit,
       updated_at: new Date().toISOString(),
     }).eq('id', client_id)
 
     return jsonResponse({
       success: true,
-      brand_kit: brandKit,
+      brand_kit: flatBrandKit,
     })
   } catch (err) {
     return errorResponse((err as Error).message, 500)

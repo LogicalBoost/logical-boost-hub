@@ -5,7 +5,7 @@ import { useAuth } from '@/components/AuthProvider'
 import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import { showToast } from '@/lib/demo-toast'
-import { analyzeBusiness, generateIntake, refineSystem } from '@/lib/api'
+import { analyzeBusiness, analyzeBrandKit, generateIntake, refineSystem } from '@/lib/api'
 import type { UserRole, Competitor } from '@/types/database'
 import TagInput from '@/components/TagInput'
 import LogoUpload from '@/components/LogoUpload'
@@ -81,6 +81,17 @@ export default function SettingsPage() {
   const [reanalyzeNotes, setReanalyzeNotes] = useState('')
   const [reanalyzing, setReanalyzing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [analyzingBrandKit, setAnalyzingBrandKit] = useState(false)
+
+  // ─── Brand Kit editing state ───
+  const [editingBrandKit, setEditingBrandKit] = useState(false)
+  const [bkPrimary, setBkPrimary] = useState('')
+  const [bkSecondary, setBkSecondary] = useState('')
+  const [bkAccent, setBkAccent] = useState('')
+  const [bkBackground, setBkBackground] = useState('')
+  const [bkText, setBkText] = useState('')
+  const [bkHeadingFont, setBkHeadingFont] = useState('')
+  const [bkBodyFont, setBkBodyFont] = useState('')
 
   // ─── Company Assets state ───
   interface ClientContentItem {
@@ -400,7 +411,56 @@ export default function SettingsPage() {
     setBrandConstraints(client.ad_copy_rules?.brand_constraints ?? '')
     setComplianceNotes(client.ad_copy_rules?.compliance_notes ?? '')
     setCompetitors(client.competitors ? [...client.competitors] : [])
+    // Sync brand kit
+    const bk = client.brand_kit as Record<string, unknown> | null
+    setBkPrimary((bk?.primary_color as string) || '')
+    setBkSecondary((bk?.secondary_color as string) || '')
+    setBkAccent((bk?.accent_color as string) || '')
+    setBkBackground((bk?.background_color as string) || '')
+    setBkText((bk?.text_color as string) || '')
+    setBkHeadingFont((bk?.heading_font as string) || '')
+    setBkBodyFont((bk?.body_font as string) || '')
     setEditing(true)
+  }
+
+  async function handleAnalyzeBrandKit() {
+    if (!client) return
+    setAnalyzingBrandKit(true)
+    try {
+      await analyzeBrandKit(client.id)
+      await refreshClient(client.id)
+      showToast('Brand kit extracted from website')
+    } catch (err) {
+      showToast('Brand kit extraction failed: ' + (err as Error).message)
+    } finally {
+      setAnalyzingBrandKit(false)
+    }
+  }
+
+  async function handleSaveBrandKit() {
+    if (!client) return
+    const existing = (client.brand_kit as Record<string, unknown>) || {}
+    const updated = {
+      ...existing,
+      primary_color: bkPrimary || existing.primary_color,
+      secondary_color: bkSecondary || existing.secondary_color,
+      accent_color: bkAccent || existing.accent_color,
+      background_color: bkBackground || existing.background_color,
+      text_color: bkText || existing.text_color,
+      heading_font: bkHeadingFont || existing.heading_font,
+      body_font: bkBodyFont || existing.body_font,
+    }
+    const { error } = await supabase.from('clients').update({
+      brand_kit: updated,
+      updated_at: new Date().toISOString(),
+    }).eq('id', client.id)
+    if (error) {
+      showToast('Failed to save brand kit: ' + error.message)
+    } else {
+      showToast('Brand kit saved')
+      setEditingBrandKit(false)
+      await refreshClient(client.id)
+    }
   }
 
   async function handleSaveBusiness() {
@@ -1050,6 +1110,142 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+
+          {/* Brand Kit */}
+          <div className="card">
+            <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Brand Kit</span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {canEdit && !editingBrandKit && (
+                  <button className="btn btn-secondary" style={{ fontSize: 11, padding: '4px 10px' }}
+                    onClick={() => {
+                      const bk = client.brand_kit as Record<string, unknown> | null
+                      setBkPrimary((bk?.primary_color as string) || '')
+                      setBkSecondary((bk?.secondary_color as string) || '')
+                      setBkAccent((bk?.accent_color as string) || '')
+                      setBkBackground((bk?.background_color as string) || '')
+                      setBkText((bk?.text_color as string) || '')
+                      setBkHeadingFont((bk?.heading_font as string) || '')
+                      setBkBodyFont((bk?.body_font as string) || '')
+                      setEditingBrandKit(true)
+                    }}>
+                    Edit
+                  </button>
+                )}
+                {canEdit && (
+                  <button
+                    className="btn btn-primary"
+                    style={{ fontSize: 11, padding: '4px 10px' }}
+                    onClick={handleAnalyzeBrandKit}
+                    disabled={analyzingBrandKit}
+                  >
+                    {analyzingBrandKit ? 'Analyzing...' : 'Extract from Website'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {(() => {
+              const bk = client.brand_kit as Record<string, unknown> | null
+              if (!bk?.primary_color && !editingBrandKit) {
+                return (
+                  <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                    No brand kit yet. Click &quot;Extract from Website&quot; to analyze colors and fonts from the client&apos;s site.
+                  </div>
+                )
+              }
+
+              if (editingBrandKit) {
+                return (
+                  <div style={{ marginTop: 16, display: 'grid', gap: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+                      {[
+                        { label: 'Primary', value: bkPrimary, set: setBkPrimary },
+                        { label: 'Secondary', value: bkSecondary, set: setBkSecondary },
+                        { label: 'Accent / CTA', value: bkAccent, set: setBkAccent },
+                        { label: 'Background', value: bkBackground, set: setBkBackground },
+                        { label: 'Text', value: bkText, set: setBkText },
+                      ].map(c => (
+                        <div key={c.label} className="form-group">
+                          <label className="form-label" style={{ fontSize: 11 }}>{c.label}</label>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <input
+                              type="color"
+                              value={c.value || '#000000'}
+                              onChange={e => c.set(e.target.value)}
+                              style={{ width: 36, height: 32, padding: 0, border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', background: 'none' }}
+                            />
+                            <input
+                              className="form-input"
+                              type="text"
+                              placeholder="#000000"
+                              value={c.value}
+                              onChange={e => c.set(e.target.value)}
+                              style={{ fontSize: 12, fontFamily: 'monospace' }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: 11 }}>Heading Font</label>
+                        <input className="form-input" value={bkHeadingFont} onChange={e => setBkHeadingFont(e.target.value)} placeholder="e.g. Inter, sans-serif" />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontSize: 11 }}>Body Font</label>
+                        <input className="form-input" value={bkBodyFont} onChange={e => setBkBodyFont(e.target.value)} placeholder="e.g. Inter, sans-serif" />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className="btn btn-primary" onClick={handleSaveBrandKit}>Save Brand Kit</button>
+                      <button className="btn btn-secondary" onClick={() => setEditingBrandKit(false)}>Cancel</button>
+                    </div>
+                  </div>
+                )
+              }
+
+              // Display mode
+              return (
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+                    {[
+                      { label: 'Primary', color: bk?.primary_color as string },
+                      { label: 'Secondary', color: bk?.secondary_color as string },
+                      { label: 'Accent', color: bk?.accent_color as string },
+                      { label: 'Background', color: bk?.background_color as string },
+                      { label: 'Text', color: bk?.text_color as string },
+                    ].filter(c => c.color).map(c => (
+                      <div key={c.label} style={{ textAlign: 'center' }}>
+                        <div style={{
+                          width: 48, height: 48, borderRadius: 8,
+                          background: c.color,
+                          border: '2px solid var(--border)',
+                          marginBottom: 4,
+                        }} />
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{c.label}</div>
+                        <div style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{c.color}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {(bk?.heading_font || bk?.body_font) ? (
+                    <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-muted)' }}>
+                      {bk?.heading_font ? <span>Headings: <strong style={{ color: 'var(--text-primary)' }}>{String(bk.heading_font)}</strong></span> : null}
+                      {bk?.body_font ? <span>Body: <strong style={{ color: 'var(--text-primary)' }}>{String(bk.body_font)}</strong></span> : null}
+                    </div>
+                  ) : null}
+                  {/* Color preview bar */}
+                  <div style={{ marginTop: 12, borderRadius: 8, overflow: 'hidden', display: 'flex', height: 8 }}>
+                    {[bk?.primary_color, bk?.secondary_color, bk?.accent_color, bk?.background_color, bk?.text_color]
+                      .filter(Boolean)
+                      .map((color, i) => (
+                        <div key={i} style={{ flex: 1, background: color as string }} />
+                      ))}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
 
           {/* Competitors */}
           <div className="card">
