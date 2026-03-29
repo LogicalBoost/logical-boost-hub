@@ -201,6 +201,9 @@ export default function LandingPagesPage() {
   // Lightbox state for full image preview
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
+  // Tab state: builder vs published pages list
+  const [activeView, setActiveView] = useState<'builder' | 'pages'>('builder')
+
   // Delete a published page with confirmation
   async function handleDeletePublishedPage(pageId: string, slug: string) {
     const confirmed = window.confirm(
@@ -503,27 +506,85 @@ export default function LandingPagesPage() {
   // ============================================================
   // Render
   // ============================================================
+  const livePageCount = publishedPages.filter(p => p.status === 'published').length
+
   return (
     <div style={{ padding: '24px 32px', maxWidth: 1200, margin: '0 auto' }}>
       {/* Page header */}
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 26, marginBottom: 4 }}>Landing Page Builder</h1>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 26, marginBottom: 4 }}>Landing Pages</h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
           Build, preview, and deploy high-converting landing pages
         </p>
       </div>
 
       {/* ============================================================ */}
+      {/* View Tabs: Builder / Published Pages */}
+      {/* ============================================================ */}
+      <div style={{
+        display: 'flex',
+        gap: 0,
+        marginBottom: 24,
+        borderBottom: '2px solid var(--border)',
+      }}>
+        <button
+          onClick={() => setActiveView('builder')}
+          style={{
+            padding: '12px 24px',
+            fontSize: 15,
+            fontWeight: 600,
+            background: 'none',
+            border: 'none',
+            borderBottom: activeView === 'builder' ? '2px solid var(--accent)' : '2px solid transparent',
+            color: activeView === 'builder' ? 'var(--accent)' : 'var(--text-muted)',
+            cursor: 'pointer',
+            marginBottom: -2,
+            transition: 'color 0.15s, border-color 0.15s',
+          }}
+        >
+          Builder
+        </button>
+        <button
+          onClick={() => setActiveView('pages')}
+          style={{
+            padding: '12px 24px',
+            fontSize: 15,
+            fontWeight: 600,
+            background: 'none',
+            border: 'none',
+            borderBottom: activeView === 'pages' ? '2px solid var(--accent)' : '2px solid transparent',
+            color: activeView === 'pages' ? 'var(--accent)' : 'var(--text-muted)',
+            cursor: 'pointer',
+            marginBottom: -2,
+            transition: 'color 0.15s, border-color 0.15s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          Published Pages
+          {livePageCount > 0 && (
+            <span style={{
+              fontSize: 11,
+              fontWeight: 700,
+              background: 'var(--accent)',
+              color: 'var(--bg-card)',
+              borderRadius: 10,
+              padding: '2px 8px',
+              minWidth: 20,
+              textAlign: 'center',
+            }}>
+              {livePageCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ============================================================ */}
       {/* Published Pages List — grouped by avatar + offer */}
       {/* ============================================================ */}
-      {publishedPages.length > 0 && (
+      {activeView === 'pages' && publishedPages.length > 0 && (
         <div style={{ marginBottom: 28 }}>
-          <h3 style={{ fontSize: 16, marginBottom: 12, color: 'var(--text-primary)' }}>
-            Published Pages
-            <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8 }}>
-              ({publishedPages.filter(p => p.status === 'published').length} live)
-            </span>
-          </h3>
           {(() => {
             // Group pages by avatar_id + offer_id
             const groups: Record<string, PublishedPage[]> = {}
@@ -664,6 +725,30 @@ export default function LandingPagesPage() {
           )}
         </div>
       )}
+
+      {/* Empty state for pages tab */}
+      {activeView === 'pages' && publishedPages.filter(p => p.status === 'published').length === 0 && (
+        <div style={{
+          padding: 60, textAlign: 'center', color: 'var(--text-muted)',
+          background: 'var(--bg-card)', borderRadius: 'var(--radius-sm)',
+          border: '1px solid var(--border)',
+        }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>&#128196;</div>
+          <h3 style={{ fontSize: 16, color: 'var(--text-primary)', marginBottom: 8 }}>No published pages yet</h3>
+          <p style={{ fontSize: 13, marginBottom: 16 }}>Use the Builder tab to create and publish your first landing page.</p>
+          <button
+            className="btn btn-primary"
+            onClick={() => setActiveView('builder')}
+          >
+            Go to Builder
+          </button>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* Builder View */}
+      {/* ============================================================ */}
+      {activeView === 'builder' && <>
 
       {/* Step indicator */}
       <div style={{
@@ -1698,6 +1783,9 @@ export default function LandingPagesPage() {
       )}
 
       {/* ============================================================ */}
+      {/* End Builder View */}
+      </>}
+
       {/* Lightbox / Full Image Preview Modal */}
       {/* ============================================================ */}
       {lightboxUrl && (
