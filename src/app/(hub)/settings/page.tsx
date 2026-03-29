@@ -1373,6 +1373,55 @@ export default function SettingsPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Trustpilot Widget */}
+                {(() => {
+                  const meta = client?.metadata as Record<string, Record<string, string>> | undefined
+                  const tp = meta?.trustpilot
+                  if (!tp) return null
+                  return (
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <h4 style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>Trustpilot Integration</h4>
+                        <a href={tp.reviewUrl} target="_blank" rel="noopener noreferrer"
+                          style={{ fontSize: 11, color: 'var(--accent)' }}>
+                          View on Trustpilot
+                        </a>
+                      </div>
+                      <div style={{ padding: 12, background: 'var(--surface-hover)', borderRadius: 8, display: 'grid', gap: 10 }}>
+                        <div style={{ fontSize: 12 }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Business ID: </span>
+                          <code style={{ fontSize: 11, background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 4 }}>{tp.businessUnitId}</code>
+                        </div>
+                        <div style={{ fontSize: 12 }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Domain: </span>
+                          <code style={{ fontSize: 11, background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 4 }}>{tp.domain}</code>
+                        </div>
+                        <details style={{ fontSize: 12 }}>
+                          <summary style={{ cursor: 'pointer', color: 'var(--accent)', marginBottom: 6 }}>Widget Snippets (click to expand)</summary>
+                          <div style={{ display: 'grid', gap: 8 }}>
+                            <div>
+                              <div style={{ fontWeight: 600, marginBottom: 4 }}>Mini Rating Bar</div>
+                              <pre style={{ fontSize: 10, background: 'rgba(0,0,0,0.3)', padding: 8, borderRadius: 4, overflow: 'auto', whiteSpace: 'pre-wrap' }}>{tp.miniWidget}</pre>
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600, marginBottom: 4 }}>Review Carousel</div>
+                              <pre style={{ fontSize: 10, background: 'rgba(0,0,0,0.3)', padding: 8, borderRadius: 4, overflow: 'auto', whiteSpace: 'pre-wrap' }}>{tp.carouselWidget}</pre>
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600, marginBottom: 4 }}>Review Grid</div>
+                              <pre style={{ fontSize: 10, background: 'rgba(0,0,0,0.3)', padding: 8, borderRadius: 4, overflow: 'auto', whiteSpace: 'pre-wrap' }}>{tp.gridWidget}</pre>
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600, marginBottom: 4 }}>Script Tag (add to &lt;head&gt;)</div>
+                              <pre style={{ fontSize: 10, background: 'rgba(0,0,0,0.3)', padding: 8, borderRadius: 4, overflow: 'auto', whiteSpace: 'pre-wrap' }}>{tp.scriptTag}</pre>
+                            </div>
+                          </div>
+                        </details>
+                      </div>
+                    </div>
+                  )
+                })() as React.ReactNode}
               </div>
             )}
           </div>

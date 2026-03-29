@@ -94,6 +94,7 @@ Deno.serve(async (req: Request) => {
 
     // Fetch website content if URL provided
     let fetchedContent = landing_page_content || ''
+    let rawHtml = ''
     if (website_url && !fetchedContent) {
       try {
         const res = await fetch(website_url, {
@@ -101,9 +102,9 @@ Deno.serve(async (req: Request) => {
           redirect: 'follow',
         })
         if (res.ok) {
-          const html = await res.text()
+          rawHtml = await res.text()
           // Strip scripts/styles, keep text content
-          fetchedContent = html
+          fetchedContent = rawHtml
             .replace(/<script[\s\S]*?<\/script>/gi, '')
             .replace(/<style[\s\S]*?<\/style>/gi, '')
             .replace(/<[^>]+>/g, ' ')
@@ -116,11 +117,106 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Detect Trustpilot and fetch reviews
+    let trustpilotContent = ''
+    let trustpilotBusinessId = ''
+    let trustpilotDomain = ''
+    if (rawHtml || website_url) {
+      // Try to find Trustpilot business unit ID from widget embed
+      const buidMatch = rawHtml.match(/data-businessunit-id=["']([^"']+)["']/i)
+      if (buidMatch) trustpilotBusinessId = buidMatch[1]
+
+      // Try to find Trustpilot link on the page
+      const tpLinkMatch = rawHtml.match(/trustpilot\.com\/review\/([^\s"'<]+)/i)
+      if (tpLinkMatch) trustpilotDomain = tpLinkMatch[1].replace(/[/"]/g, '')
+
+      // If no Trustpilot found on page, try the website domain directly
+      if (!trustpilotDomain && website_url) {
+        try {
+          const urlObj = new URL(website_url)
+          trustpilotDomain = urlObj.hostname.replace(/^www\./, '')
+        } catch (_) { /* ignore */ }
+      }
+
+      // Fetch Trustpilot public review page
+      if (trustpilotDomain) {
+        try {
+          const tpUrl = `https://www.trustpilot.com/review/${trustpilotDomain}`
+          const tpRes = await fetch(tpUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
+            redirect: 'follow',
+          })
+          if (tpRes.ok) {
+            const tpHtml = await tpRes.text()
+
+            // Extract overall rating
+            const ratingMatch = tpHtml.match(/TrustScore\s*([\d.]+)/i) || tpHtml.match(/"ratingValue":\s*"?([\d.]+)"?/i)
+            const countMatch = tpHtml.match(/([\d,]+)\s*reviews?/i) || tpHtml.match(/"ratingCount":\s*"?([\d,]+)"?/i)
+
+            // Extract JSON-LD review data if present
+            const jsonLdMatches = tpHtml.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)
+            let reviewsFromJsonLd: Array<{ author: string, body: string, rating: number, date: string }> = []
+            if (jsonLdMatches) {
+              for (const match of jsonLdMatches) {
+                try {
+                  const jsonStr = match.replace(/<\/?script[^>]*>/gi, '')
+                  const data = JSON.parse(jsonStr)
+                  // Look for reviews in @graph or direct review array
+                  const reviews = data['@graph']?.find?.((item: Record<string, unknown>) => item['@type'] === 'LocalBusiness')?.review
+                    || data.review
+                    || (data['@type'] === 'Review' ? [data] : null)
+                  if (Array.isArray(reviews)) {
+                    for (const r of reviews.slice(0, 10)) {
+                      reviewsFromJsonLd.push({
+                        author: r.author?.name || r.author || 'Anonymous',
+                        body: r.reviewBody || r.description || '',
+                        rating: r.reviewRating?.ratingValue ? parseInt(r.reviewRating.ratingValue) : 5,
+                        date: r.datePublished || '',
+                      })
+                    }
+                  }
+                } catch (_) { /* ignore parse errors */ }
+              }
+            }
+
+            // If no JSON-LD reviews, extract from HTML text
+            if (reviewsFromJsonLd.length === 0) {
+              // Strip to text and include for AI to parse
+              const tpText = tpHtml
+                .replace(/<script[\s\S]*?<\/script>/gi, '')
+                .replace(/<style[\s\S]*?<\/style>/gi, '')
+                .replace(/<[^>]+>/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, 10000)
+              trustpilotContent = `\n\nTRUSTPILOT PAGE CONTENT (from trustpilot.com/review/${trustpilotDomain}):\n${tpText}`
+            } else {
+              trustpilotContent = `\n\nTRUSTPILOT REVIEWS (from trustpilot.com/review/${trustpilotDomain}):`
+              if (ratingMatch) trustpilotContent += `\nOverall TrustScore: ${ratingMatch[1]}/5`
+              if (countMatch) trustpilotContent += ` (${countMatch[1]} total reviews)`
+              for (const r of reviewsFromJsonLd) {
+                trustpilotContent += `\n- "${r.body}" - ${r.author} (${r.rating}/5 stars${r.date ? ', ' + r.date : ''})`
+              }
+            }
+
+            // Save Trustpilot business ID if found
+            if (!trustpilotBusinessId) {
+              const buidFromTp = tpHtml.match(/data-businessunit-id=["']([^"']+)["']/i)
+                || tpHtml.match(/"businessUnitId":\s*"([^"]+)"/i)
+              if (buidFromTp) trustpilotBusinessId = buidFromTp[1]
+            }
+          }
+        } catch (e) {
+          console.error('Failed to fetch Trustpilot:', e)
+        }
+      }
+    }
+
     const userMessage = `CLIENT INPUTS:
 
 Website URL: ${website_url || 'Not provided'}
 Website Content (scraped from site):
-${fetchedContent || 'Could not fetch website content'}
+${fetchedContent || 'Could not fetch website content'}${trustpilotContent}
 
 Call Notes:
 ${call_notes || 'None provided'}
@@ -215,11 +311,11 @@ ${team_notes || 'None provided'}`
       }
     }
 
-    // Clear old website-extracted content (preserve manually-added items)
+    // Clear old auto-extracted content (preserve manually-added items)
     await supabase.from('client_content')
       .delete()
       .eq('client_id', client_id)
-      .eq('source', 'website')
+      .in('source', ['website', 'trustpilot'])
 
     // Insert extracted content (testimonials, reviews, stats, team, certs, awards, faqs, process steps)
     let contentCreated = 0
@@ -328,11 +424,40 @@ ${team_notes || 'None provided'}`
       }
     }
 
+    // Save Trustpilot widget info if detected
+    let trustpilotWidget = null
+    if (trustpilotBusinessId && trustpilotDomain) {
+      // Trustpilot TrustBox widget snippet (current format)
+      trustpilotWidget = {
+        businessUnitId: trustpilotBusinessId,
+        domain: trustpilotDomain,
+        reviewUrl: `https://www.trustpilot.com/review/${trustpilotDomain}`,
+        // Mini widget - shows star rating inline
+        miniWidget: `<div class="trustpilot-widget" data-locale="en-US" data-template-id="5419b6a8b0d04a076446a9ad" data-businessunit-id="${trustpilotBusinessId}" data-style-height="24px" data-style-width="100%" data-theme="dark"><a href="https://www.trustpilot.com/review/${trustpilotDomain}" target="_blank" rel="noopener">Trustpilot</a></div>`,
+        // Carousel widget - shows scrolling reviews
+        carouselWidget: `<div class="trustpilot-widget" data-locale="en-US" data-template-id="53aa8912dec7e10d38f59f36" data-businessunit-id="${trustpilotBusinessId}" data-style-height="140px" data-style-width="100%" data-theme="dark" data-stars="4,5"><a href="https://www.trustpilot.com/review/${trustpilotDomain}" target="_blank" rel="noopener">Trustpilot</a></div>`,
+        // Grid widget - shows review cards
+        gridWidget: `<div class="trustpilot-widget" data-locale="en-US" data-template-id="539ad60defb9600b94d7df2c" data-businessunit-id="${trustpilotBusinessId}" data-style-height="500px" data-style-width="100%" data-theme="dark" data-stars="4,5"><a href="https://www.trustpilot.com/review/${trustpilotDomain}" target="_blank" rel="noopener">Trustpilot</a></div>`,
+        // Script tag needed in <head>
+        scriptTag: `<script type="text/javascript" src="//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js" async></script>`,
+      }
+
+      // Save Trustpilot info as metadata on the client
+      await supabase.from('clients').update({
+        metadata: { trustpilot: trustpilotWidget },
+      }).eq('id', client_id)
+    }
+
     return jsonResponse({
       success: true,
       avatars_created: avatarsCreated,
       offers_created: offersCreated,
       content_extracted: contentCreated,
+      trustpilot: trustpilotWidget ? {
+        detected: true,
+        domain: trustpilotDomain,
+        business_id: trustpilotBusinessId,
+      } : { detected: false },
     })
   } catch (err) {
     return errorResponse((err as Error).message, 500)

@@ -30,6 +30,7 @@ export interface Client {
   intake_status: 'pending' | 'completed'
   github_repo: string | null
   custom_domain: string | null
+  metadata: Record<string, unknown> | null
   created_at: string
   updated_at: string
 }
