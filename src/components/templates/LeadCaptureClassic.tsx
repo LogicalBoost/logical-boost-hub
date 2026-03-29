@@ -74,6 +74,15 @@ const SOCIALS: Record<string, React.ComponentType<{ className?: string }>> = {
 }
 
 /* ═══════════════════════════════════════════════════════
+   COLOR USAGE GUIDE:
+   - --color-primary: Icons, icon backgrounds, borders, decorative elements, blobs, section backgrounds
+   - --color-secondary: Dark sections (trust bar, footer), overlays
+   - --color-accent: CTA buttons ONLY, accent word highlights, stat numbers
+   - --color-text: Headings and body text
+   - --color-bg: Page background
+   ═══════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════
    MAIN TEMPLATE
    ═══════════════════════════════════════════════════════ */
 
@@ -146,7 +155,7 @@ export default function LeadCaptureClassic({ sections, media }: Props) {
 }
 
 /* ═══════════════════════════════════════════════════════
-   HERO — Dark bg, text left, person image right with blob
+   HERO — White bg, text left, person image right with blob
    ═══════════════════════════════════════════════════════ */
 function HeroBlock({ section, media }: { section: Section; media: MediaAssets }) {
   const img = media.hero_image
@@ -177,7 +186,7 @@ function HeroBlock({ section, media }: { section: Section; media: MediaAssets })
             {section.sub_cta && (
               <div className="mt-4 flex items-center justify-center md:justify-start gap-2">
                 <span className="inline-flex items-center gap-2 bg-gray-100 rounded-full px-4 py-1.5 text-gray-500 text-sm border border-gray-200">
-                  <Clock className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+                  <Clock className="w-3.5 h-3.5 text-[var(--color-primary)]" />
                   {section.sub_cta}
                 </span>
               </div>
@@ -188,16 +197,15 @@ function HeroBlock({ section, media }: { section: Section; media: MediaAssets })
           <div className="flex-shrink-0 md:max-w-[45%] flex justify-center">
             {img ? (
               <div className="relative w-[320px] md:w-[400px] lg:w-[460px] aspect-square">
-                {/* Organic blob bg — fills behind transparent areas of PNG */}
+                {/* Organic blob bg — uses primary color */}
                 <div
-                  className="absolute inset-0 bg-gradient-to-br from-[var(--color-accent)]/20 to-[var(--color-accent)]/8"
+                  className="absolute inset-0 bg-gradient-to-br from-[var(--color-primary)]/20 to-[var(--color-primary)]/8"
                   style={{ borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%' }}
                 />
                 <div
-                  className="absolute inset-[3%] bg-gradient-to-br from-[var(--color-accent)]/15 to-[var(--color-accent)]/5"
+                  className="absolute inset-[3%] bg-gradient-to-br from-[var(--color-primary)]/15 to-[var(--color-primary)]/5"
                   style={{ borderRadius: '40% 60% 55% 45% / 40% 45% 55% 60%' }}
                 />
-                {/* Image with mix-blend to composite transparent PNGs cleanly */}
                 <img
                   src={img}
                   alt=""
@@ -207,7 +215,7 @@ function HeroBlock({ section, media }: { section: Section; media: MediaAssets })
               </div>
             ) : (
               <div
-                className="w-[320px] h-[320px] bg-[var(--color-accent)]/5 border border-[var(--color-accent)]/10"
+                className="w-[320px] h-[320px] bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/10"
                 style={{ borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%' }}
               />
             )}
@@ -219,22 +227,21 @@ function HeroBlock({ section, media }: { section: Section; media: MediaAssets })
 }
 
 /* ═══════════════════════════════════════════════════════
-   FEATURE CARDS — Green bar with 3 white cards
+   FEATURE CARDS — Primary color bar with 3 white cards
    ═══════════════════════════════════════════════════════ */
 function FeatureCardsBar({ section }: { section: Section }) {
   const items = section.items || []
   return (
-    <section className="bg-[var(--color-accent)] py-5 md:py-6">
+    <section className="bg-[var(--color-primary)] py-5 md:py-6">
       <div className="max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
           {items.map((item, i) => (
             <div key={i} className="bg-white rounded-2xl shadow-sm p-4 md:p-5 flex items-center gap-4">
               <div className="relative flex-shrink-0">
-                <div className="w-12 h-12 rounded-full bg-[var(--color-accent)]/10 flex items-center justify-center">
-                  <Icon name={item.icon} className="w-5 h-5 text-[var(--color-accent)]" />
+                <div className="w-12 h-12 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center">
+                  <Icon name={item.icon} className="w-5 h-5 text-[var(--color-primary)]" />
                 </div>
-                {/* Offset circle behind */}
-                <div className="absolute -top-1 -right-1 w-12 h-12 rounded-full bg-[var(--color-accent)]/5 -z-10" />
+                <div className="absolute -top-1 -right-1 w-12 h-12 rounded-full bg-[var(--color-primary)]/5 -z-10" />
               </div>
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide">{item.label}</p>
@@ -273,9 +280,7 @@ function TwoColumnInfo({ section }: { section: Section }) {
         </div>
 
         <div className="grid md:grid-cols-2 gap-5 md:gap-6 mb-10">
-          {/* Left box */}
           <InfoBox items={left} title={left[0]?.title} />
-          {/* Right box */}
           <InfoBox items={right} title={right[0]?.title} />
         </div>
 
@@ -296,16 +301,16 @@ function TwoColumnInfo({ section }: { section: Section }) {
 
 function InfoBox({ items, title }: { items: SectionItem[]; title?: string }) {
   return (
-    <div className="rounded-xl border border-[var(--color-accent)]/25 p-6 md:p-7">
+    <div className="rounded-xl border border-[var(--color-primary)]/25 p-6 md:p-7">
       {title && (
         <h3 className="font-bold text-lg text-[var(--color-text)] mb-4">{title}</h3>
       )}
       <ul className="space-y-3">
         {items.map((item, i) => {
-          if (i === 0 && item.title) return null // title already rendered above
+          if (i === 0 && item.title) return null
           return (
             <li key={i} className="flex items-start gap-2.5">
-              <CheckCircle className="w-4.5 h-4.5 mt-0.5 text-[var(--color-accent)] flex-shrink-0" />
+              <CheckCircle className="w-4.5 h-4.5 mt-0.5 text-[var(--color-primary)] flex-shrink-0" />
               <span className="text-sm text-gray-600 leading-relaxed">{item.text}</span>
             </li>
           )
@@ -343,7 +348,7 @@ function StepsBlock({ section, media }: { section: Section; media: MediaAssets }
             {img ? (
               <div className="relative w-[280px]">
                 <div
-                  className="absolute inset-[-8%] bg-[var(--color-accent)]/8"
+                  className="absolute inset-[-8%] bg-[var(--color-primary)]/8"
                   style={{ borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%' }}
                 />
                 <img src={img} alt="" className="relative z-10 rounded-3xl shadow-xl w-full" />
@@ -361,14 +366,13 @@ function StepsBlock({ section, media }: { section: Section; media: MediaAssets }
                 className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 md:p-6 flex items-start gap-4"
               >
                 <div className="relative flex-shrink-0">
-                  <div className="w-14 h-14 rounded-full bg-[var(--color-accent)]/10 flex items-center justify-center">
-                    <Icon name={item.icon} className="w-6 h-6 text-[var(--color-accent)]" />
+                  <div className="w-14 h-14 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center">
+                    <Icon name={item.icon} className="w-6 h-6 text-[var(--color-primary)]" />
                   </div>
                 </div>
                 <div className="flex-1">
                   <h3 className="font-bold text-[var(--color-text)] mb-1">{item.title}</h3>
                   <p className="text-sm text-gray-500 leading-relaxed">{item.text}</p>
-                  {/* Last step gets CTA */}
                   {i === items.length - 1 && section.cta && (
                     <a
                       href={section.cta_url || '#lead-form'}
@@ -403,10 +407,9 @@ function TrustBar({ section, media }: { section: Section; media: MediaAssets }) 
         backgroundSize: 'cover',
       } : undefined}
     >
-      {/* Dark overlay */}
+      {/* Dark overlay — uses secondary color */}
       <div className={`absolute inset-0 ${parallax ? 'bg-[var(--color-secondary)]/85' : 'bg-gradient-to-br from-[var(--color-secondary)] to-[var(--color-secondary)]/90'}`} />
 
-      {/* iOS parallax fallback */}
       {parallax && (
         <style>{`
           @supports (-webkit-touch-callout: none) {
@@ -474,7 +477,7 @@ function BenefitsGrid({ section, media }: { section: Section; media: MediaAssets
               {items.map((item, i) => (
                 <div
                   key={i}
-                  className="rounded-xl border border-[var(--color-accent)]/20 p-5 text-center hover:border-[var(--color-accent)]/40 hover:shadow-md transition-all"
+                  className="rounded-xl border border-[var(--color-primary)]/20 p-5 text-center hover:border-[var(--color-primary)]/40 hover:shadow-md transition-all"
                 >
                   <h3 className="font-bold text-[var(--color-text)] mb-2">{item.title}</h3>
                   <p className="text-sm text-gray-500 leading-relaxed">{item.text}</p>
@@ -488,7 +491,7 @@ function BenefitsGrid({ section, media }: { section: Section; media: MediaAssets
             {img ? (
               <div className="relative w-full max-w-[280px]">
                 <div
-                  className="absolute inset-[-6%] bg-[var(--color-accent)]/8"
+                  className="absolute inset-[-6%] bg-[var(--color-primary)]/8"
                   style={{ borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%' }}
                 />
                 <img src={img} alt="" className="relative z-10 rounded-2xl shadow-lg w-full" />
@@ -578,7 +581,7 @@ function TestimonialsBlock({ section, media }: { section: Section; media: MediaA
                 key={i}
                 onClick={() => setActive(i)}
                 className={`w-2.5 h-2.5 rounded-full transition-colors ${
-                  i === active ? 'bg-[var(--color-accent)]' : 'bg-gray-300'
+                  i === active ? 'bg-[var(--color-primary)]' : 'bg-gray-300'
                 }`}
               />
             ))}
@@ -613,7 +616,7 @@ function FaqBlock({ section }: { section: Section }) {
                 onClick={() => setOpen(open === i ? null : i)}
                 className="w-full flex items-center justify-between py-5 text-left group"
               >
-                <span className="font-medium text-[var(--color-text)] group-hover:text-[var(--color-accent)] transition-colors pr-4">
+                <span className="font-medium text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors pr-4">
                   {item.question}
                 </span>
                 <ChevronDown

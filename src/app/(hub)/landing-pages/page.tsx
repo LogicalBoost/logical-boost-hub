@@ -224,6 +224,28 @@ export default function LandingPagesPage() {
     }
   }
 
+  async function handleDeleteMediaAsset(assetId: string, storagePath: string | null) {
+    const confirmed = window.confirm('Delete this image? This cannot be undone.')
+    if (!confirmed) return
+
+    // Delete from storage if we have the path
+    if (storagePath) {
+      await supabase.storage.from('client-assets').remove([storagePath])
+    }
+
+    const { error } = await supabase
+      .from('media_assets')
+      .delete()
+      .eq('id', assetId)
+
+    if (error) {
+      showToast('Failed to delete: ' + error.message)
+    } else {
+      showToast('Image deleted')
+      if (client) refreshMediaAssets(client.id)
+    }
+  }
+
   // Derived data
   const approvedAvatars = useMemo(
     () => [...avatars].filter(a => a.status === 'approved').sort((a, b) => a.priority - b.priority),
@@ -1297,11 +1319,6 @@ export default function LandingPagesPage() {
                     {mediaAssets.filter(a => a.role === 'hero_image').map(asset => (
                       <div
                         key={asset.id}
-                        onClick={() => {
-                          setHeroImageUrl(asset.file_url)
-                          setCopySlots(prev => ({ ...prev, hero_image: asset.file_url }))
-                          showToast('Hero image selected')
-                        }}
                         style={{
                           width: 100,
                           height: 72,
@@ -1316,19 +1333,46 @@ export default function LandingPagesPage() {
                         }}
                         title={asset.style ? `${asset.style} style` : 'Uploaded image'}
                       >
-                        <img
-                          src={asset.file_url}
-                          alt=""
-                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                        />
+                        <div
+                          onClick={() => {
+                            setHeroImageUrl(asset.file_url)
+                            setCopySlots(prev => ({ ...prev, hero_image: asset.file_url }))
+                            showToast('Hero image selected')
+                          }}
+                          style={{ width: '100%', height: '100%' }}
+                        >
+                          <img
+                            src={asset.file_url}
+                            alt=""
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                          />
+                        </div>
                         {heroImageUrl === asset.file_url && (
                           <div style={{
                             position: 'absolute', inset: 0,
                             background: 'rgba(139,92,246,0.25)',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             color: '#fff', fontSize: 18, fontWeight: 700,
+                            pointerEvents: 'none',
                           }}>&#10003;</div>
                         )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteMediaAsset(asset.id, asset.storage_path)
+                          }}
+                          style={{
+                            position: 'absolute', top: 2, right: 2,
+                            width: 18, height: 18, borderRadius: '50%',
+                            background: 'rgba(0,0,0,0.6)', border: 'none',
+                            color: '#fff', fontSize: 11, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            opacity: 0.6, transition: 'opacity 0.2s',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = '#ef4444' }}
+                          onMouseLeave={e => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.background = 'rgba(0,0,0,0.6)' }}
+                          title="Delete image"
+                        >&#10005;</button>
                       </div>
                     ))}
                   </div>
@@ -1592,11 +1636,6 @@ export default function LandingPagesPage() {
                     {mediaAssets.filter(a => a.role === 'parallax').map(asset => (
                       <div
                         key={asset.id}
-                        onClick={() => {
-                          setParallaxImageUrl(asset.file_url)
-                          setCopySlots(prev => ({ ...prev, parallax_image: asset.file_url }))
-                          showToast('Parallax background selected')
-                        }}
                         style={{
                           width: 120,
                           height: 56,
@@ -1610,19 +1649,46 @@ export default function LandingPagesPage() {
                           boxShadow: parallaxImageUrl === asset.file_url ? '0 0 12px rgba(59,130,246,0.3)' : 'none',
                         }}
                       >
-                        <img
-                          src={asset.file_url}
-                          alt=""
-                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                        />
+                        <div
+                          onClick={() => {
+                            setParallaxImageUrl(asset.file_url)
+                            setCopySlots(prev => ({ ...prev, parallax_image: asset.file_url }))
+                            showToast('Parallax background selected')
+                          }}
+                          style={{ width: '100%', height: '100%' }}
+                        >
+                          <img
+                            src={asset.file_url}
+                            alt=""
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                          />
+                        </div>
                         {parallaxImageUrl === asset.file_url && (
                           <div style={{
                             position: 'absolute', inset: 0,
                             background: 'rgba(59,130,246,0.25)',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             color: '#fff', fontSize: 18, fontWeight: 700,
+                            pointerEvents: 'none',
                           }}>&#10003;</div>
                         )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteMediaAsset(asset.id, asset.storage_path)
+                          }}
+                          style={{
+                            position: 'absolute', top: 2, right: 2,
+                            width: 18, height: 18, borderRadius: '50%',
+                            background: 'rgba(0,0,0,0.6)', border: 'none',
+                            color: '#fff', fontSize: 11, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            opacity: 0.6, transition: 'opacity 0.2s',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = '#ef4444' }}
+                          onMouseLeave={e => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.background = 'rgba(0,0,0,0.6)' }}
+                          title="Delete image"
+                        >&#10005;</button>
                       </div>
                     ))}
                   </div>

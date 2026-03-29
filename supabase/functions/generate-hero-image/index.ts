@@ -137,11 +137,10 @@ STRICT RULES:
  * Build an image generation prompt from avatar + offer data.
  *
  * Key principles:
- * - The person must LOOK like the avatar (gig worker ≠ corporate suit)
- * - Clothing, posture, and expression must match who the avatar actually is
- * - Any optional icons/graphics must directly relate to the avatar's world and the offer
- * - NEVER use generic "business" imagery for non-business avatars
- * - Always pure white background — person is isolated (studio backdrop style)
+ * - Pass the FULL avatar description to the AI — no keyword matching
+ * - The person must LOOK like the avatar description says
+ * - Pure white background for easy CSS removal (mix-blend-mode: multiply)
+ * - No floating icons or graphics — clean portrait only
  */
 function buildImagePrompt(
   avatarDescription: string,
@@ -155,9 +154,9 @@ function buildImagePrompt(
     return `${customPrompt.trim()}.
 
 STRICT RULES:
-- TRANSPARENT BACKGROUND — completely blank, no environment, no room, no scenery, no floor, no gradient.
-- The person is fully isolated on transparency.
-- If any small icons or graphics float around the person, they must directly relate to the person described above. No random corporate icons.
+- PURE WHITE BACKGROUND (#FFFFFF). Solid white, no gradients, no patterns, no gray, no environment.
+- The person is fully isolated on a white studio backdrop.
+- NO floating icons, graphics, or decorative elements.
 - Professional studio lighting, high resolution, sharp focus.
 - The person should look confident, approachable, and genuine.`
   }
@@ -179,133 +178,44 @@ STRICT RULES:
     return buildScenePrompt(avatarDescription, offerDescription, businessContext)
   }
 
-  const desc = avatarDescription.toLowerCase()
-  const offer = (offerDescription || '').toLowerCase()
+  // ── Hero image: use full avatar + offer description directly ──
+  const offerContext = offerDescription
+    ? `\nThe offer/service being promoted: ${offerDescription}`
+    : ''
 
-  // ── Person appearance ──
-  // Read the avatar description carefully to determine who this person actually is.
-  // The prompt must describe clothing, look, and vibe that match the real avatar.
-  let personAppearance = 'a real everyday person in casual-professional clothing'
-
-  if (desc.includes('gig') || desc.includes('driver') || desc.includes('delivery') || desc.includes('rideshare') || desc.includes('uber') || desc.includes('lyft') || desc.includes('doordash')) {
-    personAppearance = 'a real gig worker / rideshare driver — wearing a casual t-shirt or hoodie, relaxed and approachable, NOT in a suit or formal wear'
-  } else if (desc.includes('freelance') || desc.includes('self-employ') || desc.includes('solopreneur') || desc.includes('side hustle')) {
-    personAppearance = 'a self-employed freelancer — casual clothes (t-shirt, flannel, or simple top), relaxed and independent vibe'
-  } else if (desc.includes('contractor') || desc.includes('trades') || desc.includes('plumb') || desc.includes('electri') || desc.includes('hvac') || desc.includes('roof') || desc.includes('construction')) {
-    personAppearance = 'a skilled trades worker — wearing a work shirt or polo, practical and hands-on look, NOT in a suit'
-  } else if (desc.includes('nurse') || desc.includes('medical') || desc.includes('healthcare') || desc.includes('doctor') || desc.includes('caregiver')) {
-    personAppearance = 'a healthcare professional — wearing scrubs or a medical coat, warm and caring expression'
-  } else if (desc.includes('teacher') || desc.includes('educator') || desc.includes('professor')) {
-    personAppearance = 'a teacher or educator — wearing smart casual clothing, warm and knowledgeable expression'
-  } else if (desc.includes('parent') || desc.includes('mom') || desc.includes('dad') || desc.includes('stay-at-home') || desc.includes('family')) {
-    personAppearance = 'a parent — wearing comfortable everyday clothes, warm and relatable'
-  } else if (desc.includes('student') || desc.includes('college') || desc.includes('grad')) {
-    personAppearance = 'a young student — casual clothes (hoodie, t-shirt, backpack strap on shoulder), youthful and optimistic'
-  } else if (desc.includes('retiree') || desc.includes('retire') || desc.includes('senior') || desc.includes('older')) {
-    personAppearance = 'an older adult — wearing neat casual clothes, dignified and relaxed'
-  } else if (desc.includes('executive') || desc.includes('ceo') || desc.includes('corporate') || desc.includes('c-suite')) {
-    personAppearance = 'a corporate executive — wearing a tailored suit or blazer, polished and authoritative'
-  } else if (desc.includes('small business') || desc.includes('business owner') || desc.includes('entrepreneur')) {
-    personAppearance = 'a small business owner — wearing business casual (button-up shirt, no tie), confident and hands-on'
-  } else if (desc.includes('tech') || desc.includes('developer') || desc.includes('engineer') || desc.includes('startup')) {
-    personAppearance = 'a tech professional — wearing a casual button-up or clean t-shirt, modern and sharp'
-  } else if (desc.includes('fitness') || desc.includes('athlete') || desc.includes('gym') || desc.includes('trainer')) {
-    personAppearance = 'a fitness-oriented person — wearing athletic or athleisure clothing, energetic and healthy'
-  } else if (desc.includes('creative') || desc.includes('artist') || desc.includes('designer') || desc.includes('photographer')) {
-    personAppearance = 'a creative professional — wearing stylish casual clothing, expressive and authentic'
-  } else if (desc.includes('restaurant') || desc.includes('chef') || desc.includes('food') || desc.includes('server')) {
-    personAppearance = 'a food industry worker — wearing a clean apron or casual work clothes, personable'
-  } else if (desc.includes('retail') || desc.includes('sales') || desc.includes('store')) {
-    personAppearance = 'a retail worker — wearing a casual polo or everyday work clothes, friendly and helpful'
-  }
-
-  // ── Emotional expression ──
-  let expression = 'looking confident and approachable with a genuine, natural smile'
-  if (desc.includes('stress') || desc.includes('overwhelm') || desc.includes('frustrat') || desc.includes('struggling')) {
-    expression = 'looking relieved and hopeful, genuine smile, as if a burden has been lifted'
-  } else if (desc.includes('skepti') || desc.includes('cautious') || desc.includes('careful') || desc.includes('distrust')) {
-    expression = 'looking pleasantly surprised and reassured, warm natural expression'
-  }
-
-  // ── Icon context ──
-  // Icons must match what this specific avatar deals with daily.
-  // Derive from avatar description AND offer description.
-  let iconGuidance = 'Do NOT include any floating icons or graphics.'
-
-  // Build specific icon suggestions from avatar + offer context
-  const iconIdeas: string[] = []
-
-  // Avatar-based icons
-  if (desc.includes('gig') || desc.includes('driver') || desc.includes('rideshare') || desc.includes('delivery')) {
-    iconIdeas.push('car', 'phone with map', 'dollar sign', 'steering wheel')
-  }
-  if (desc.includes('tax') || desc.includes('deduction') || offer.includes('tax')) {
-    iconIdeas.push('tax form', 'receipt', 'calculator', 'money')
-  }
-  if (desc.includes('freelance') || desc.includes('self-employ') || desc.includes('1099')) {
-    iconIdeas.push('laptop', 'invoice', 'calendar', 'dollar sign')
-  }
-  if (desc.includes('contractor') || desc.includes('trades') || desc.includes('plumb') || desc.includes('roof')) {
-    iconIdeas.push('wrench', 'hard hat', 'house', 'tools')
-  }
-  if (desc.includes('medical') || desc.includes('health') || desc.includes('nurse') || desc.includes('patient')) {
-    iconIdeas.push('heart', 'medical cross', 'stethoscope', 'shield')
-  }
-  if (desc.includes('fitness') || desc.includes('gym') || desc.includes('workout')) {
-    iconIdeas.push('dumbbell', 'heart rate', 'running shoe', 'timer')
-  }
-  if (desc.includes('parent') || desc.includes('family') || desc.includes('mom') || desc.includes('dad')) {
-    iconIdeas.push('house', 'heart', 'piggy bank', 'calendar')
-  }
-  if (desc.includes('student') || desc.includes('education') || desc.includes('learn')) {
-    iconIdeas.push('book', 'graduation cap', 'lightbulb', 'pencil')
-  }
-  if (desc.includes('small business') || desc.includes('business owner') || desc.includes('entrepreneur')) {
-    iconIdeas.push('storefront', 'chart', 'handshake', 'lightbulb')
-  }
-  if (desc.includes('tech') || desc.includes('developer') || desc.includes('startup')) {
-    iconIdeas.push('code brackets', 'laptop', 'gear', 'cloud')
-  }
-  if (desc.includes('restaurant') || desc.includes('food') || desc.includes('chef')) {
-    iconIdeas.push('plate', 'chef hat', 'fork and knife', 'receipt')
-  }
-
-  // Offer-based icons
-  if (offer.includes('loan') || offer.includes('financ') || offer.includes('credit') || offer.includes('money')) {
-    iconIdeas.push('dollar sign', 'wallet', 'money stack')
-  }
-  if (offer.includes('insurance') || offer.includes('protect') || offer.includes('coverage')) {
-    iconIdeas.push('shield', 'umbrella', 'checkmark')
-  }
-  if (offer.includes('save') || offer.includes('discount') || offer.includes('deal')) {
-    iconIdeas.push('piggy bank', 'percentage sign', 'savings')
-  }
-  if (offer.includes('consult') || offer.includes('call') || offer.includes('appointment') || offer.includes('book')) {
-    iconIdeas.push('phone', 'calendar', 'checkmark')
-  }
-
-  if (iconIdeas.length > 0) {
-    // Deduplicate and pick up to 4
-    const unique = [...new Set(iconIdeas)].slice(0, 4)
-    iconGuidance = `OPTIONAL: 2-3 very small, subtle, flat-style icons can float around the person for visual context. ONLY use icons from this list: ${unique.join(', ')}. Icons must be tiny, semi-transparent, and not distract from the person. If in doubt, use NO icons — a clean image is always better than wrong icons.`
-  }
-
-  // ── Assemble prompt by style ──
-  const shared = `
+  const sharedRules = `
 STRICT RULES:
-- PURE WHITE BACKGROUND (#FFFFFF) — solid white, no gradients, no patterns, no checkerboard, no gray. The background must be completely solid white like a professional studio backdrop.
-- The person must look like ${personAppearance}. Match their clothing, age range, and vibe to this description exactly.
-- ${expression}.
-- ${iconGuidance}
-- Do NOT add any background elements, furniture, or environment. The person is shot against a plain white studio backdrop.
+- PURE WHITE BACKGROUND (#FFFFFF). Solid white like a professional studio backdrop. No gradients, no patterns, no gray, no checkerboard, no environment, no furniture, no floor.
+- The person's clothing, age, appearance, and vibe must match the avatar description above. Read it carefully. A gig worker should NOT wear a suit. A construction worker should NOT be in an office. Match the real person described.
+- NO floating icons, graphics, decorative elements, or text overlays. Just the person on white.
 - Professional studio lighting, soft diffused light, high resolution, sharp commercial photography.
-- The image must look like a product photo on white — clean isolation against pure white.`
+- The image must look like a product/catalog photo on solid white. Clean isolation.
+- The person should look confident, genuine, and approachable with a natural expression.`
 
   const styleVariants: Record<string, string> = {
-    hero: `Waist-up portrait of ${personAppearance}. ${expression}. Clean, modern commercial photography style, 85mm lens look. The person is the only element in the frame.${shared}`,
-    family: `Medium shot of a small relatable family (2-3 people) in comfortable everyday clothes. They look happy, connected, and genuine — a natural candid moment. Warm soft studio lighting.${shared}`,
-    trust: `Shoulders-up headshot of ${personAppearance}. Direct eye contact with camera. ${expression}. Trustworthy and approachable. Soft key light, executive portrait style.${shared}`,
-    lifestyle: `Medium-wide shot of ${personAppearance}. ${expression}. Natural-looking studio light. Editorial photography style — authentic and aspirational.${shared}`,
+    hero: `Waist-up portrait photograph of a person who matches this description:
+"${avatarDescription}"
+${offerContext}
+
+Generate a photorealistic person who looks exactly like someone described above. Their clothing, posture, grooming, and overall vibe must authentically represent who this person is in real life. Clean, modern commercial photography style, 85mm lens look. The person is the only element in the frame, looking at camera with a warm natural expression.${sharedRules}`,
+
+    family: `Medium shot photograph of a small relatable family (2-3 people) that matches the audience described below:
+"${avatarDescription}"
+${offerContext}
+
+The family should look like real people from this demographic. Their clothing and setting should match who they actually are. They look happy, connected, and genuine. Warm soft studio lighting. Natural candid moment.${sharedRules}`,
+
+    trust: `Professional headshot photograph (shoulders-up) of a person who matches this description:
+"${avatarDescription}"
+${offerContext}
+
+Direct eye contact with camera. Trustworthy and approachable. The person's appearance must authentically match the description above. Soft key light, executive portrait style.${sharedRules}`,
+
+    lifestyle: `Medium-wide editorial photograph of a person who matches this description:
+"${avatarDescription}"
+${offerContext}
+
+Natural-looking studio light. The person's clothing and demeanor must authentically represent the avatar described above. Editorial photography style: authentic and aspirational.${sharedRules}`,
   }
 
   return styleVariants[imageStyle] || styleVariants.hero
@@ -326,9 +236,10 @@ async function generateImage(prompt: string): Promise<Uint8Array> {
     )
   }
 
-  // Image-capable models: gemini-3.1-flash-image-preview, gemini-3-pro-image-preview, gemini-2.5-flash-image
-  // Standard models (gemini-2.0-flash etc) do NOT support image output
-  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent'
+  // Image-capable models (paid tier): gemini-2.5-flash-image
+  // Preview models (free tier only): gemini-3.1-flash-image-preview, gemini-3-pro-image-preview
+  // Note: "-preview" suffix models route to free tier quotas even on paid plans
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent'
 
   const body = {
     contents: [{
