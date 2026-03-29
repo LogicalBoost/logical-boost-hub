@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/components/AuthProvider'
 import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import { showToast } from '@/lib/demo-toast'
 import { analyzeBusiness, analyzeBrandKit, generateIntake, refineSystem } from '@/lib/api'
-import type { UserRole, Competitor } from '@/types/database'
+import type { UserRole, Competitor, PromptTemplate } from '@/types/database'
 import TagInput from '@/components/TagInput'
 import LogoUpload from '@/components/LogoUpload'
 
@@ -26,7 +26,7 @@ interface ClientAssignment {
   client_id: string
 }
 
-type SettingsTab = 'business' | 'intake' | 'profile' | 'team' | 'clients'
+type SettingsTab = 'business' | 'intake' | 'profile' | 'team' | 'clients' | 'prompts'
 
 export default function SettingsPage() {
   const { profile, user } = useAuth()
@@ -93,6 +93,13 @@ export default function SettingsPage() {
   const [bkHeadingFont, setBkHeadingFont] = useState('')
   const [bkBodyFont, setBkBodyFont] = useState('')
 
+  // ─── Prompt Templates state ───
+  const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([])
+  const [loadingPrompts, setLoadingPrompts] = useState(false)
+  const [editingPromptId, setEditingPromptId] = useState<string | null>(null)
+  const [editPromptText, setEditPromptText] = useState('')
+  const [savingPrompt, setSavingPrompt] = useState(false)
+
   // ─── Company Assets state ───
   interface ClientContentItem {
     id: string
@@ -157,6 +164,14 @@ export default function SettingsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client?.id])
+
+  // Load prompt templates when prompts tab is activated or client changes
+  useEffect(() => {
+    if (activeTab === 'prompts') {
+      loadPromptTemplates()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, client?.id])
 
   async function loadClientContent() {
     if (!client?.id) return
@@ -627,6 +642,130 @@ export default function SettingsPage() {
       setLoading(false)
       setIntakeLoadingMessage('')
     }
+  }
+
+  // ═══════════════════════════════════════
+  // Prompt Templates functions
+  // ═══════════════════════════════════════
+
+  async function loadPromptTemplates() {
+    setLoadingPrompts(true)
+    // Load agency defaults (client_id is null)
+    const { data: defaults } = await supabase
+      .from('prompt_templates')
+      .select('*')
+      .is('client_id', null)
+      .eq('is_active', true)
+      .order('prompt_key')
+    const all: PromptTemplate[] = [...(defaults || [])]
+    // If a client is selected, also load client-specific overrides
+    if (client?.id) {
+      const { data: overrides } = await supabase
+        .from('prompt_templates')
+        .select('*')
+        .eq('client_id', client.id)
+        .eq('is_active', true)
+        .order('prompt_key')
+      if (overrides) all.push(...overrides)
+    }
+    setPromptTemplates(all)
+    setLoadingPrompts(false)
+  }
+
+  async function handleSavePrompt(promptId: string) {
+    setSavingPrompt(true)
+    const { error } = await supabase
+      .from('prompt_templates')
+      .update({
+        system_prompt: editPromptText,
+        updated_at: new Date().toISOString(),
+        version: (promptTemplates.find(p => p.id === promptId)?.version || 1) + 1,
+      })
+      .eq('id', promptId)
+    setSavingPrompt(false)
+    if (error) {
+      showToast('Failed to save prompt: ' + error.message)
+    } else {
+      showToast('Prompt saved')
+      setEditingPromptId(null)
+      setEditPromptText('')
+      loadPromptTemplates()
+    }
+  }
+
+  async function handleCustomizeForClient(prompt: PromptTemplate) {
+    if (!client?.id) {
+      showToast('Select a client first')
+      return
+    }
+    setSavingPrompt(true)
+    const { data, error } = await supabase
+      .from('prompt_templates')
+      .insert({
+        client_id: client.id,
+        prompt_key: prompt.prompt_key,
+        name: prompt.name,
+        description: prompt.description,
+        system_prompt: prompt.system_prompt,
+        user_prompt_template: prompt.user_prompt_template,
+        is_active: true,
+        version: 1,
+      })
+      .select()
+      .single()
+    setSavingPrompt(false)
+    if (error) {
+      if (error.code === '23505') {
+        showToast('Client-specific override already exists for this prompt')
+      } else {
+        showToast('Failed to create override: ' + error.message)
+      }
+    } else if (data) {
+      showToast('Client override created — now edit it')
+      loadPromptTemplates()
+      setEditingPromptId(data.id)
+      setEditPromptText(data.system_prompt)
+    }
+  }
+
+  async function handleResetToDefault(prompt: PromptTemplate) {
+    if (!confirm('Delete this client-specific override and revert to the agency default?')) return
+    setSavingPrompt(true)
+    const { error } = await supabase
+      .from('prompt_templates')
+      .delete()
+      .eq('id', prompt.id)
+    setSavingPrompt(false)
+    if (error) {
+      showToast('Failed to reset: ' + error.message)
+    } else {
+      showToast('Reset to agency default')
+      setEditingPromptId(null)
+      loadPromptTemplates()
+    }
+  }
+
+  function startEditPrompt(prompt: PromptTemplate) {
+    if (editingPromptId === prompt.id) {
+      // Toggle off
+      setEditingPromptId(null)
+      setEditPromptText('')
+    } else {
+      setEditingPromptId(prompt.id)
+      setEditPromptText(prompt.system_prompt)
+    }
+  }
+
+  function formatTimeAgo(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return 'just now'
+    if (mins < 60) return `${mins}m ago`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    if (days < 30) return `${days}d ago`
+    return new Date(dateStr).toLocaleDateString()
   }
 
   // ═══════════════════════════════════════
@@ -2063,6 +2202,214 @@ export default function SettingsPage() {
   }
 
   // ═══════════════════════════════════════
+  // Prompts tab render
+  // ═══════════════════════════════════════
+
+  function renderPromptsTab() {
+    // Group prompts: client overrides first, then agency defaults
+    // For each prompt_key, show the client override if it exists, otherwise the agency default
+    const agencyDefaults = promptTemplates.filter(p => p.client_id === null)
+    const clientOverrides = promptTemplates.filter(p => p.client_id !== null)
+
+    // Build display list: client overrides first (if client selected), then agency defaults not overridden
+    const overriddenKeys = new Set(clientOverrides.map(p => p.prompt_key))
+    const displayList: { prompt: PromptTemplate; isOverride: boolean; hasOverride: boolean }[] = []
+
+    // Client overrides at top
+    for (const p of clientOverrides) {
+      displayList.push({ prompt: p, isOverride: true, hasOverride: true })
+    }
+    // Agency defaults (mark if they have a client override)
+    for (const p of agencyDefaults) {
+      displayList.push({ prompt: p, isOverride: false, hasOverride: overriddenKeys.has(p.prompt_key) })
+    }
+
+    const PLACEHOLDER_LEGEND: { key: string; description: string }[] = [
+      { key: '{{avatar_name}}', description: 'Target avatar name' },
+      { key: '{{offer_name}}', description: 'Offer name' },
+      { key: '{{business_summary}}', description: 'Client business summary' },
+      { key: '{{template_slug}}', description: 'Landing page template ID' },
+      { key: '{{business_context}}', description: 'Full business context block' },
+      { key: '{{avatar_context}}', description: 'Full avatar details block' },
+      { key: '{{offer_context}}', description: 'Full offer details block' },
+    ]
+
+    return (
+      <div>
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
+            Manage the AI prompts used for content generation.
+            {client ? ` Showing prompts for ${client.name} with agency defaults.` : ' Showing agency-wide default prompts.'}
+          </p>
+
+          {/* Placeholder legend */}
+          <details style={{ marginBottom: 16 }}>
+            <summary style={{
+              fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', userSelect: 'none',
+            }}>
+              Available placeholder variables
+            </summary>
+            <div style={{
+              marginTop: 8, padding: 12, background: 'var(--bg-card)',
+              border: '1px solid var(--border)', borderRadius: 8, fontSize: 12,
+            }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 16px' }}>
+                {PLACEHOLDER_LEGEND.map(p => (
+                  <React.Fragment key={p.key}>
+                    <code style={{ color: 'var(--accent)', fontFamily: 'monospace' }}>{p.key}</code>
+                    <span style={{ color: 'var(--text-secondary)' }}>{p.description}</span>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          </details>
+        </div>
+
+        {loadingPrompts ? (
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Loading prompts...</div>
+        ) : displayList.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+            No prompt templates found. Push migration 022 to create the default prompts.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 16 }}>
+            {displayList.map(({ prompt, isOverride, hasOverride }) => {
+              const isEditing = editingPromptId === prompt.id
+              // If this is an agency default that has a client override, dim it
+              const isDimmed = !isOverride && hasOverride && client
+
+              return (
+                <div
+                  key={prompt.id}
+                  className="funnel-section-card"
+                  style={isDimmed ? { opacity: 0.5 } : undefined}
+                >
+                  <div className="funnel-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: 15 }}>{prompt.name}</h3>
+                      {prompt.description && (
+                        <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)', fontWeight: 400 }}>
+                          {prompt.description}
+                        </p>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                      <span style={{
+                        fontSize: 11,
+                        padding: '2px 8px',
+                        borderRadius: 4,
+                        fontWeight: 600,
+                        background: isOverride ? 'rgba(59,130,246,0.15)' : 'rgba(34,197,94,0.15)',
+                        color: isOverride ? '#3b82f6' : '#22c55e',
+                      }}>
+                        {isOverride ? 'Client Override' : 'Agency Default'}
+                      </span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        v{prompt.version}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '12px 20px 16px' }}>
+                    {/* Action buttons */}
+                    <div style={{ display: 'flex', gap: 8, marginBottom: isEditing ? 12 : 0, flexWrap: 'wrap' }}>
+                      <button
+                        className={`btn ${isEditing ? 'btn-secondary' : 'btn-primary'}`}
+                        style={{ fontSize: 12, padding: '6px 14px' }}
+                        onClick={() => startEditPrompt(prompt)}
+                      >
+                        {isEditing ? 'Collapse' : 'Edit'}
+                      </button>
+
+                      {!isOverride && client && !hasOverride && (
+                        <button
+                          className="btn btn-secondary"
+                          style={{ fontSize: 12, padding: '6px 14px' }}
+                          onClick={() => handleCustomizeForClient(prompt)}
+                          disabled={savingPrompt}
+                        >
+                          Customize for {client.name}
+                        </button>
+                      )}
+
+                      {isOverride && (
+                        <button
+                          className="btn btn-secondary"
+                          style={{ fontSize: 12, padding: '6px 14px', color: '#ef4444' }}
+                          onClick={() => handleResetToDefault(prompt)}
+                          disabled={savingPrompt}
+                        >
+                          Reset to Default
+                        </button>
+                      )}
+
+                      {isDimmed && (
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center' }}>
+                          Overridden by client-specific prompt above
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Editor area */}
+                    {isEditing && (
+                      <div>
+                        <textarea
+                          value={editPromptText}
+                          onChange={e => setEditPromptText(e.target.value)}
+                          style={{
+                            width: '100%',
+                            minHeight: 360,
+                            padding: 16,
+                            fontFamily: '"Fira Code", "Cascadia Code", "JetBrains Mono", monospace',
+                            fontSize: 12,
+                            lineHeight: 1.6,
+                            background: 'var(--bg-input)',
+                            color: 'var(--text-primary)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 8,
+                            resize: 'vertical',
+                            outline: 'none',
+                          }}
+                          onFocus={e => { e.target.style.borderColor = 'var(--accent)' }}
+                          onBlur={e => { e.target.style.borderColor = 'var(--border)' }}
+                          spellCheck={false}
+                        />
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                              className="btn btn-primary"
+                              style={{ fontSize: 12, padding: '6px 16px' }}
+                              onClick={() => handleSavePrompt(prompt.id)}
+                              disabled={savingPrompt || editPromptText === prompt.system_prompt}
+                            >
+                              {savingPrompt ? 'Saving...' : 'Save'}
+                            </button>
+                            <button
+                              className="btn btn-secondary"
+                              style={{ fontSize: 12, padding: '6px 16px' }}
+                              onClick={() => { setEditingPromptId(null); setEditPromptText('') }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                            Last updated: {formatTimeAgo(prompt.updated_at)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ═══════════════════════════════════════
   // Main render
   // ═══════════════════════════════════════
 
@@ -2107,6 +2454,12 @@ export default function SettingsPage() {
             >
               Client Access
             </button>
+            <button
+              className={`funnel-tab ${activeTab === 'prompts' ? 'funnel-tab-active' : ''}`}
+              onClick={() => setActiveTab('prompts')}
+            >
+              Prompts
+            </button>
           </>
         )}
       </div>
@@ -2117,6 +2470,7 @@ export default function SettingsPage() {
       {activeTab === 'profile' && renderProfileTab()}
       {activeTab === 'team' && isAdmin && renderTeamTab()}
       {activeTab === 'clients' && isAdmin && renderClientAccessTab()}
+      {activeTab === 'prompts' && isAdmin && renderPromptsTab()}
     </div>
   )
 }

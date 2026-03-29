@@ -96,3 +96,38 @@ export function jsonResponse(data: unknown, status = 200) {
 export function errorResponse(message: string, status = 400) {
   return jsonResponse({ error: message }, status)
 }
+
+/**
+ * Look up a custom prompt for a client (or agency default).
+ * Returns the system_prompt string if found, or null to fall back to hardcoded.
+ */
+export async function getCustomPrompt(
+  supabaseClient: { from: (table: string) => unknown },
+  clientId: string,
+  promptKey: string
+): Promise<string | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabaseClient as any
+
+  // Try client-specific first
+  const { data: clientPrompt } = await sb
+    .from('prompt_templates')
+    .select('system_prompt')
+    .eq('client_id', clientId)
+    .eq('prompt_key', promptKey)
+    .eq('is_active', true)
+    .single()
+
+  if (clientPrompt) return clientPrompt.system_prompt
+
+  // Fall back to agency default
+  const { data: defaultPrompt } = await sb
+    .from('prompt_templates')
+    .select('system_prompt')
+    .is('client_id', null)
+    .eq('prompt_key', promptKey)
+    .eq('is_active', true)
+    .single()
+
+  return defaultPrompt?.system_prompt || null
+}

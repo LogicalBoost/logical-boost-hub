@@ -473,8 +473,10 @@ select optgroup {
 }
 
 .btn-sm {
-  padding: 5px 10px;
+  padding: 6px 14px;
   font-size: 13px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .btn-icon {

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { supabase } from './supabase'
-import type { Client, Avatar, Offer, IntakeQuestion, CopyComponent, FunnelInstance, CompetitorIntel, LandingPage, MediaAsset, BrandKitRecord, PageTemplate, PublishedPage, UserRole } from '@/types/database'
+import type { Client, Avatar, Offer, IntakeQuestion, CopyComponent, FunnelInstance, CompetitorIntel, LandingPage, MediaAsset, BrandKitRecord, PageTemplate, PublishedPage, PromptTemplate, UserRole } from '@/types/database'
 
 interface AppState {
   client: Client | null
@@ -17,6 +17,7 @@ interface AppState {
   mediaAssets: MediaAsset[]
   brandKit: BrandKitRecord | null
   pageTemplates: PageTemplate[]
+  promptTemplates: PromptTemplate[]
   loading: boolean
   error: string | null
   userRole: UserRole
@@ -56,6 +57,7 @@ interface AppStore extends AppState {
   refreshPublishedPages: (clientId: string) => Promise<void>
   refreshMediaAssets: (clientId: string) => Promise<void>
   refreshBrandKit: (clientId: string) => Promise<void>
+  refreshPromptTemplates: (clientId?: string) => Promise<void>
   /** Refresh just the client record from DB (e.g. after logo upload or brand kit analysis) */
   refreshClient: (clientId: string) => Promise<void>
   setUserRole: (role: UserRole) => void
@@ -77,6 +79,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([])
   const [brandKit, setBrandKit] = useState<BrandKitRecord | null>(null)
   const [pageTemplates, setPageTemplates] = useState<PageTemplate[]>([])
+  const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<UserRole>('admin')
@@ -284,6 +287,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setBrandKit(data || null)
   }, [])
 
+  const refreshPromptTemplates = useCallback(async (clientId?: string) => {
+    // Load agency defaults (client_id is null)
+    const { data: defaults } = await supabase
+      .from('prompt_templates')
+      .select('*')
+      .is('client_id', null)
+      .eq('is_active', true)
+      .order('prompt_key')
+    const all: PromptTemplate[] = [...(defaults || [])]
+    // If a client is selected, also load client-specific overrides
+    if (clientId) {
+      const { data: overrides } = await supabase
+        .from('prompt_templates')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('is_active', true)
+        .order('prompt_key')
+      if (overrides) all.push(...overrides)
+    }
+    setPromptTemplates(all)
+  }, [])
+
   const refreshClient = useCallback(async (clientId: string) => {
     const { data } = await supabase.from('clients').select('*').eq('id', clientId).single()
     if (data) {
@@ -295,12 +320,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      allClients, client, avatars, offers, intakeQuestions, funnelInstances, copyComponents, competitors, landingPages, publishedPages, mediaAssets, brandKit, pageTemplates, loading, error,
+      allClients, client, avatars, offers, intakeQuestions, funnelInstances, copyComponents, competitors, landingPages, publishedPages, mediaAssets, brandKit, pageTemplates, promptTemplates, loading, error,
       userRole, canEdit, isClientRole,
       setClient, setAvatars, setOffers, setIntakeQuestions, setCopyComponents, setFunnelInstances, setCompetitors, setLandingPages, setPublishedPages, setMediaAssets, setBrandKit,
       setLoading, setError, loadAllClients, loadClientData, switchClient, createClient: createNewClient,
       updateAvatar, updateOffer, refreshAvatars, refreshOffers, refreshIntake,
-      refreshCopyComponents, refreshFunnelInstances, refreshLandingPages, refreshPublishedPages, refreshMediaAssets, refreshBrandKit, refreshClient, setUserRole,
+      refreshCopyComponents, refreshFunnelInstances, refreshLandingPages, refreshPublishedPages, refreshMediaAssets, refreshBrandKit, refreshPromptTemplates, refreshClient, setUserRole,
     }}>
       {children}
     </AppContext.Provider>

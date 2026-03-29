@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { callClaude, parseJsonResponse, corsHeaders, jsonResponse, errorResponse } from '../_shared/ai-client.ts'
+import { callClaude, parseJsonResponse, corsHeaders, jsonResponse, errorResponse, getCustomPrompt } from '../_shared/ai-client.ts'
 
 /**
  * Generate Landing Page Copy
@@ -228,8 +228,12 @@ Remember:
 - Trust bar stats must be REAL from the data above, or use qualitative descriptors instead
 - Return ONLY valid JSON`
 
+    // ─── Check for custom prompt ───
+    const customPrompt = await getCustomPrompt(supabase, client_id, 'landing_page_copy')
+    const systemPrompt = customPrompt || SYSTEM_PROMPT
+
     // ─── Call Claude ───
-    const response = await callClaude(SYSTEM_PROMPT, userMessage, {
+    const response = await callClaude(systemPrompt, userMessage, {
       maxTokens: 8192,
     })
 

@@ -475,3 +475,19 @@ export const ANGLES: Angle[] = [
 export function getAngleLabel(slug: string): string {
   return ANGLES.find(a => a.slug === slug)?.label ?? slug
 }
+
+// Prompt template record (from prompt_templates table)
+export interface PromptTemplate {
+  id: string
+  client_id: string | null
+  prompt_key: string
+  name: string
+  description: string | null
+  system_prompt: string
+  user_prompt_template: string | null
+  is_active: boolean
+  version: number
+  created_at: string
+  updated_at: string
+  created_by: string | null
+}
