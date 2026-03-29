@@ -162,14 +162,18 @@ STRICT RULES:
 - NO people as the main subject. NO text, logos, or watermarks.
 - High resolution, cinematic photography style with natural depth of field.`
     }
-    return `${customPrompt.trim()}.
+    return `You are an expert brand photographer creating a hero image for a landing page.
 
-STRICT RULES:
-- PURE WHITE BACKGROUND (#FFFFFF). Solid white, no gradients, no patterns, no gray, no environment.
-- The person is fully isolated on a white studio backdrop.
-- NO floating icons, graphics, or decorative elements.
-- Professional studio lighting, high resolution, sharp focus.
-- The person should look confident, approachable, and genuine.`
+${customPrompt.trim()}.
+
+PHOTOGRAPHY RULES:
+- Full contextual scene photograph — the person is IN their natural environment.
+- Warm, professional lighting. Shallow depth of field (f/1.8-2.8) with beautifully blurred background.
+- The person should look confident, genuine, and approachable — looking at camera with a warm natural expression.
+- Square or 4:5 aspect ratio (portrait orientation, not landscape).
+- NO text, logos, watermarks, or overlays of any kind.
+- NO artificial studio look. This should feel like a real moment captured by a professional photographer.
+- High resolution, magazine-quality commercial photography.`
   }
 
   // ── Role-specific prompts (non-hero) ──
@@ -189,44 +193,65 @@ STRICT RULES:
     return buildScenePrompt(avatarDescription, offerDescription, businessContext)
   }
 
-  // ── Hero image: use full avatar + offer description directly ──
+  // ── Hero image: contextual scene photo of the avatar in their world ──
   const offerContext = offerDescription
     ? `\nThe offer/service being promoted: ${offerDescription}`
     : ''
 
+  const businessInfo = businessContext
+    ? `\nBusiness context: ${businessContext}`
+    : ''
+
   const sharedRules = `
-STRICT RULES:
-- PURE WHITE BACKGROUND (#FFFFFF). Solid white like a professional studio backdrop. No gradients, no patterns, no gray, no checkerboard, no environment, no furniture, no floor.
-- The person's clothing, age, appearance, and vibe must match the avatar description above. Read it carefully. A gig worker should NOT wear a suit. A construction worker should NOT be in an office. Match the real person described.
-- NO floating icons, graphics, decorative elements, or text overlays. Just the person on white.
-- Professional studio lighting, soft diffused light, high resolution, sharp commercial photography.
-- The image must look like a product/catalog photo on solid white. Clean isolation.
-- The person should look confident, genuine, and approachable with a natural expression.`
+
+PHOTOGRAPHY DIRECTION:
+You are an expert brand photographer and creative director. Your job is to capture a single hero photograph that instantly communicates who this person is and what world they live in.
+
+TECHNICAL REQUIREMENTS:
+- Full contextual scene — the person is IN their real environment (their workplace, their daily setting, the place where they do what they do).
+- Warm, natural lighting. Golden hour, window light, or soft ambient — never harsh or clinical.
+- Shallow depth of field (f/1.8-2.8) — the person is sharp, the background is a beautiful soft bokeh that tells the story of their world.
+- The person is the clear subject but the environment is visible and relevant. Think: a contractor on a job site, a nurse in a clinic hallway, a gig driver near their car, a parent in their kitchen.
+- Square or 4:5 aspect ratio (portrait format).
+- The person should look directly at camera with a warm, confident, genuine expression. Not overly posed. Natural.
+- Their clothing MUST match who they really are. Read the avatar description carefully. A gig worker wears casual clothes. A trades worker wears work gear. A corporate exec wears a blazer. Match it exactly.
+
+ABSOLUTE RULES:
+- NO text, logos, watermarks, UI elements, or overlays of ANY kind.
+- NO white/plain backgrounds. The person must be in a real, contextual environment.
+- NO stock photo clichés (no pointing at screens, no fake handshakes, no sterile conference rooms unless that's actually their world).
+- NO floating objects, icons, or decorative graphics.
+- This must look like an editorial photograph from a brand campaign — authentic, aspirational, and specific to this person's life.
+- High resolution, magazine-quality commercial photography. Think Apple or Nike campaign imagery.`
 
   const styleVariants: Record<string, string> = {
-    hero: `Waist-up portrait photograph of a person who matches this description:
+    hero: `Create a waist-up portrait photograph of a real person who matches this avatar description:
 "${avatarDescription}"
 ${offerContext}
+${businessInfo}
 
-Generate a photorealistic person who looks exactly like someone described above. Their clothing, posture, grooming, and overall vibe must authentically represent who this person is in real life. Clean, modern commercial photography style, 85mm lens look. The person is the only element in the frame, looking at camera with a warm natural expression.${sharedRules}`,
+The person is in their natural environment — the place that defines their daily life. They are looking at camera with a warm, confident expression. 85mm lens perspective. The background tells the story of who they are.${sharedRules}`,
 
-    family: `Medium shot photograph of a small relatable family (2-3 people) that matches the audience described below:
+    family: `Create a medium shot photograph of a small relatable family (2-3 people) that matches this audience:
 "${avatarDescription}"
 ${offerContext}
+${businessInfo}
 
-The family should look like real people from this demographic. Their clothing and setting should match who they actually are. They look happy, connected, and genuine. Warm soft studio lighting. Natural candid moment.${sharedRules}`,
+The family is in a natural home or everyday setting. They look happy, connected, and genuine — a real candid moment. Warm natural lighting. The environment reflects their real life.${sharedRules}`,
 
-    trust: `Professional headshot photograph (shoulders-up) of a person who matches this description:
+    trust: `Create a professional headshot photograph (shoulders-up, tightly framed) of a person who matches this description:
 "${avatarDescription}"
 ${offerContext}
+${businessInfo}
 
-Direct eye contact with camera. Trustworthy and approachable. The person's appearance must authentically match the description above. Soft key light, executive portrait style.${sharedRules}`,
+Direct eye contact with camera. Trustworthy and approachable. Soft natural key light. The background should be a softly blurred version of their professional environment — just enough to suggest context without distraction.${sharedRules}`,
 
-    lifestyle: `Medium-wide editorial photograph of a person who matches this description:
+    lifestyle: `Create a medium-wide editorial photograph showing a person who matches this description in an active moment:
 "${avatarDescription}"
 ${offerContext}
+${businessInfo}
 
-Natural-looking studio light. The person's clothing and demeanor must authentically represent the avatar described above. Editorial photography style: authentic and aspirational.${sharedRules}`,
+The person is engaged in their work or daily activity — not just standing and posing. Show them doing what they do, but pausing to look at camera with a natural expression. Environmental storytelling through the setting.${sharedRules}`,
   }
 
   return styleVariants[imageStyle] || styleVariants.hero

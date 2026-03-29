@@ -193,31 +193,44 @@ function HeroBlock({ section, media }: { section: Section; media: MediaAssets })
             )}
           </div>
 
-          {/* Right: person image with blob */}
+          {/* Right: hero image with decorative shapes */}
           <div className="flex-shrink-0 md:max-w-[45%] flex justify-center">
             {img ? (
-              <div className="relative w-[320px] md:w-[400px] lg:w-[460px] aspect-square">
-                {/* Organic blob bg — uses primary color */}
+              <div className="relative w-[300px] md:w-[380px] lg:w-[420px]">
+                {/* Decorative shapes behind the image */}
                 <div
-                  className="absolute inset-0 bg-gradient-to-br from-[var(--color-primary)]/20 to-[var(--color-primary)]/8"
-                  style={{ borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%' }}
+                  className="absolute -top-4 -right-4 w-[85%] h-[85%] rounded-3xl bg-[var(--color-primary)]/10"
+                  style={{ transform: 'rotate(6deg)' }}
                 />
                 <div
-                  className="absolute inset-[3%] bg-gradient-to-br from-[var(--color-primary)]/15 to-[var(--color-primary)]/5"
-                  style={{ borderRadius: '40% 60% 55% 45% / 40% 45% 55% 60%' }}
+                  className="absolute -bottom-3 -left-3 w-20 h-20 rounded-2xl bg-[var(--color-primary)]/15"
+                  style={{ transform: 'rotate(-12deg)' }}
                 />
+                <div
+                  className="absolute top-[20%] -right-6 w-12 h-12 rounded-full bg-[var(--color-accent)]/20"
+                />
+                <div
+                  className="absolute -bottom-2 right-[15%] w-8 h-8 rounded-full bg-[var(--color-primary)]/20"
+                />
+                {/* The actual image */}
                 <img
                   src={img}
                   alt=""
-                  className="absolute inset-0 w-full h-full object-contain drop-shadow-2xl z-10"
-                  style={{ mixBlendMode: 'multiply' }}
+                  className="relative z-10 w-full rounded-2xl shadow-2xl object-cover"
+                  style={{ aspectRatio: '4/5' }}
                 />
               </div>
             ) : (
-              <div
-                className="w-[320px] h-[320px] bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/10"
-                style={{ borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%' }}
-              />
+              <div className="relative w-[300px] md:w-[380px]">
+                <div
+                  className="absolute -top-4 -right-4 w-[85%] h-[85%] rounded-3xl bg-[var(--color-primary)]/10"
+                  style={{ transform: 'rotate(6deg)' }}
+                />
+                <div
+                  className="w-full rounded-2xl bg-gray-100 border border-gray-200"
+                  style={{ aspectRatio: '4/5' }}
+                />
+              </div>
             )}
           </div>
         </div>
