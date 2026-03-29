@@ -652,7 +652,7 @@ function FooterBlock({ section, media }: { section?: Section; media: MediaAssets
           {/* Logo */}
           <div>
             {media.logo ? (
-              <img src={media.logo} alt="Logo" className="h-6 md:h-8 object-contain brightness-200 invert" />
+              <img src={media.logo} alt="Logo" className="h-6 md:h-8 object-contain" style={{ filter: 'brightness(0) invert(1)' }} />
             ) : (
               <div className="h-6 w-24 rounded bg-white/10" />
             )}
