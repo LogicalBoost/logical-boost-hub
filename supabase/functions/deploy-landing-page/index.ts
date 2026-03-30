@@ -502,6 +502,38 @@ pages/
         .from('clients')
         .update({ github_repo: clientRepoFull })
         .eq('id', client_id)
+
+      // Set up webhook for page data sync (only on new repos)
+      if (!repoExists) {
+        const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
+        try {
+          const webhookRes = await fetch(
+            `https://api.github.com/repos/${clientRepoFull}/hooks`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `token ${GITHUB_TOKEN}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                name: 'web',
+                active: true,
+                events: ['push'],
+                config: {
+                  url: `${SUPABASE_URL}/functions/v1/github-webhook`,
+                  content_type: 'json',
+                },
+              }),
+            }
+          )
+          if (!webhookRes.ok) {
+            console.error('Failed to create webhook (non-fatal):', await webhookRes.text())
+          }
+        } catch (e) {
+          console.error('Webhook setup failed (non-fatal):', e)
+        }
+      }
     }
 
     return new Response(
