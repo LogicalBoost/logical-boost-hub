@@ -8,7 +8,7 @@ import {
   deployLandingPage,
 } from '@/lib/api'
 import { TEMPLATE_SLOTS, mapComponentsToSlots, type CopySlotDef } from '@/lib/template-slots'
-import { TEMPLATE_INFO, AVAILABLE_TEMPLATES, type TemplateId, type LandingPage, type MediaAsset, type PublishedPage } from '@/types/database'
+import { TEMPLATE_INFO, AVAILABLE_TEMPLATES, type TemplateId, type LandingPage, type MediaAsset, type PublishedPage, type ClientTemplate } from '@/types/database'
 import { showToast } from '@/lib/demo-toast'
 import { supabase } from '@/lib/supabase'
 
@@ -167,7 +167,7 @@ const labelStyle: React.CSSProperties = {
 // ============================================================
 export default function LandingPagesPage() {
   const store = useAppStore()
-  const { client, avatars, offers, copyComponents, landingPages, publishedPages, mediaAssets, canEdit, isClientRole, refreshLandingPages, refreshPublishedPages, refreshMediaAssets } = store
+  const { client, avatars, offers, copyComponents, landingPages, publishedPages, mediaAssets, clientTemplates, canEdit, isClientRole, refreshLandingPages, refreshPublishedPages, refreshMediaAssets, refreshClientTemplates } = store
   const HUB_URL = 'https://hub.logicalboost.com'
 
   // Pipeline state
@@ -204,6 +204,9 @@ export default function LandingPagesPage() {
   // Lightbox state for full image preview
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
+  // Client template selection (from saved templates)
+  const [selectedClientTemplate, setSelectedClientTemplate] = useState<string | null>(null)
+
   // Tab state: builder vs published pages list
   const [activeView, setActiveView] = useState<'builder' | 'pages'>('builder')
 
@@ -224,6 +227,42 @@ export default function LandingPagesPage() {
     } else {
       showToast(`Page /${slug} deleted`)
       refreshPublishedPages(client!.id)
+    }
+  }
+
+  async function handleSaveAsTemplate(page: PublishedPage) {
+    if (!client) return
+    const name = window.prompt('Template name:', `${client.name} — ${page.slug}`)
+    if (!name) return
+
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+
+    // Extract section structure (types + order, without copy content)
+    const sections = (page.sections as Array<{ type: string }>) || []
+    const sectionStructure = sections.map(s => ({ type: s.type }))
+
+    const { error } = await supabase
+      .from('client_templates')
+      .insert({
+        client_id: client.id,
+        name,
+        slug,
+        base_template_slug: page.template_slug || 'lead-capture-classic',
+        section_structure: sectionStructure,
+        brand_kit_snapshot: page.brand_kit_snapshot || {},
+        media_defaults: page.media_assets || {},
+        source_page_id: page.id,
+      })
+
+    if (error) {
+      if (error.code === '23505') {
+        showToast('A template with that name already exists')
+      } else {
+        showToast('Failed to save template: ' + error.message)
+      }
+    } else {
+      showToast('Template saved! Available in the Builder.')
+      refreshClientTemplates(client.id)
     }
   }
 
@@ -305,6 +344,33 @@ export default function LandingPagesPage() {
     )
     setCopySlots(filled)
     setMissingSlotIds(missing) // Only copy slots — business/media excluded
+    setSlotOptions(options)
+    setSelectedClientTemplate(null)
+    setStep(3)
+  }, [copyComponents, selectedAvatarId, selectedOfferId])
+
+  const handleClientTemplateSelect = useCallback((ct: ClientTemplate) => {
+    setSelectedTemplate(ct.base_template_slug as TemplateId)
+    setSelectedClientTemplate(ct.id)
+
+    // Pre-fill media from template defaults
+    const media = ct.media_defaults as Record<string, string> | null
+    if (media?.hero_image) setHeroImageUrl(media.hero_image)
+    if (media?.parallax_image) setParallaxImageUrl(media.parallax_image)
+
+    // Auto-map copy components to slots
+    const approvedCopy = copyComponents.filter(
+      c =>
+        c.status === 'approved' &&
+        (c.avatar_ids?.includes(selectedAvatarId!) || (c.avatar_ids || []).length === 0) &&
+        (c.offer_ids?.includes(selectedOfferId!) || (c.offer_ids || []).length === 0)
+    )
+    const { filled, missing, options } = mapComponentsToSlots(
+      ct.base_template_slug as TemplateId,
+      approvedCopy.map(c => ({ id: c.id, type: c.type, text: c.text }))
+    )
+    setCopySlots(filled)
+    setMissingSlotIds(missing)
     setSlotOptions(options)
     setStep(3)
   }, [copyComponents, selectedAvatarId, selectedOfferId])
@@ -719,6 +785,21 @@ export default function LandingPagesPage() {
 
                           {/* Actions */}
                           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                            {canEdit && (
+                              <button
+                                onClick={() => handleSaveAsTemplate(page)}
+                                title="Save as Template"
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}
+                                onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')}
+                                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
+                                  <polyline points="17 21 17 13 7 13 7 21" />
+                                  <polyline points="7 3 7 8 15 8" />
+                                </svg>
+                              </button>
+                            )}
                             <button
                               onClick={() => navigator.clipboard.writeText(pageUrl).then(() => showToast('URL copied'))}
                               title="Copy URL"
@@ -925,7 +1006,70 @@ export default function LandingPagesPage() {
       {/* ============================================================ */}
       {step === 2 && (
         <div>
-          <h3 style={{ fontSize: 18, marginBottom: 16 }}>Choose a Template</h3>
+          {/* ── Your Templates (saved from published pages) ── */}
+          {clientTemplates.length > 0 && (
+            <>
+              <h3 style={{ fontSize: 18, marginBottom: 16 }}>Your Templates</h3>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gap: 16,
+                marginBottom: 32,
+              }}>
+                {clientTemplates.map((ct) => {
+                  const isSelected = selectedTemplate === ct.base_template_slug as TemplateId && selectedClientTemplate === ct.id
+                  return (
+                    <button
+                      key={ct.id}
+                      onClick={() => handleClientTemplateSelect(ct)}
+                      style={{
+                        ...card(),
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        border: isSelected
+                          ? '2px solid var(--accent)'
+                          : '1px solid var(--accent)',
+                        borderStyle: isSelected ? 'solid' : 'dashed',
+                        transition: 'all 0.15s',
+                        position: 'relative',
+                      }}
+                    >
+                      {isSelected && (
+                        <span style={{
+                          position: 'absolute', top: 10, right: 10,
+                          background: 'var(--accent)', color: '#fff', borderRadius: '50%',
+                          width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 13, fontWeight: 700,
+                        }}>{'\u2713'}</span>
+                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
+                          padding: '2px 8px', borderRadius: 4,
+                          background: 'var(--accent-muted)', color: 'var(--accent)',
+                        }}>Client Template</span>
+                      </div>
+                      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary)' }}>
+                        {ct.name}
+                      </div>
+                      <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                        Based on {TEMPLATE_INFO[ct.base_template_slug]?.name || ct.base_template_slug}
+                        {' '}&middot;{' '}
+                        {(ct.section_structure as Array<{ type: string }>).length} sections
+                      </div>
+                      <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+                        Saved {new Date(ct.created_at).toLocaleDateString()}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+              <h3 style={{ fontSize: 16, marginBottom: 16, color: 'var(--text-secondary)' }}>Or start from a base template</h3>
+            </>
+          )}
+
+          {/* ── Base Templates ── */}
+          {clientTemplates.length === 0 && <h3 style={{ fontSize: 18, marginBottom: 16 }}>Choose a Template</h3>}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',

@@ -448,6 +448,52 @@ export default function Home() {
 `
       await pushFileToRepo(clientRepoFull, 'src/app/page.tsx', homePageContent, `Update home page with ${slug} link`, branch)
 
+      // 4. Push page data as JSON for webhook-based editing sync
+      const pageJsonData = JSON.stringify({
+        slug,
+        template_slug: template_id || 'lead-capture-classic',
+        sections: sections || copySlotsToSections(copy_slots || {}),
+        copy_slots: copy_slots || {},
+        media_assets: media_assets || {},
+        brand_kit: brand_kit || {},
+        avatar_id: avatar_id || null,
+        offer_id: offer_id || null,
+        updated_at: new Date().toISOString(),
+      }, null, 2)
+      await pushFileToRepo(clientRepoFull, `pages/${slug}.json`, pageJsonData, `Add page data: ${slug}`, branch)
+
+      // 5. Push CLAUDE.md with editing instructions
+      const claudeMd = `# ${client_name || client_slug} Landing Pages
+
+## Editing Pages
+
+Each page has a JSON data file in the \`pages/\` directory. Edit the JSON to update the live page.
+
+### File Structure
+\`\`\`
+pages/
+  ${slug}.json    ← Edit this to update the live page
+\`\`\`
+
+### How It Works
+1. Edit the JSON file (sections, copy, media URLs)
+2. Commit and push to this repo
+3. A webhook automatically syncs changes to the live page at:
+   ${HUB_URL}/p/${client_slug}/${slug}
+
+### Section Types
+- \`hero\` — Headline, subheadline, CTA, trust line
+- \`feature_cards\` — Value prop cards with icons
+- \`two_column_info\` — Details grid with CTA
+- \`steps\` — Process steps (how it works)
+- \`trust_bar\` — Stats overlay on parallax background
+- \`benefits_grid\` — Benefit cards with icons
+- \`testimonials\` — Customer quotes (real only)
+- \`faq\` — Accordion Q&A
+- \`footer\` — Links, phone, social
+`
+      await pushFileToRepo(clientRepoFull, 'CLAUDE.md', claudeMd, `Add editing instructions`, branch)
+
       githubRepo = clientRepoFull
       githubUrl = `https://github.com/${clientRepoFull}`
 

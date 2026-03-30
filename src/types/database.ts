@@ -437,12 +437,28 @@ export interface PublishedPage {
   slug: string
   custom_domain: string | null
   copy_slots: Record<string, string> | null
+  sections: unknown[] | null
   media_assets: Record<string, string> | null
   brand_kit_snapshot: Record<string, unknown> | null
   media_mapping: Record<string, string | string[]> | null
   page_file_path: string | null
   status: 'draft' | 'published' | 'archived'
   published_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+// Client template — saved from a published page for reuse
+export interface ClientTemplate {
+  id: string
+  client_id: string
+  name: string
+  slug: string
+  base_template_slug: string
+  section_structure: unknown[]
+  brand_kit_snapshot: Record<string, unknown>
+  media_defaults: Record<string, unknown> | null
+  source_page_id: string | null
   created_at: string
   updated_at: string
 }
