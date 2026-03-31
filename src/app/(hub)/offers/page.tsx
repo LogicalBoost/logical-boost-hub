@@ -14,6 +14,58 @@ export default function OffersPage() {
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [suggesting, setSuggesting] = useState(false)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [savingOffer, setSavingOffer] = useState(false)
+
+  // Manual add form state
+  const [newName, setNewName] = useState('')
+  const [newOfferType, setNewOfferType] = useState('consultation')
+  const [newHeadline, setNewHeadline] = useState('')
+  const [newSubheadline, setNewSubheadline] = useState('')
+  const [newDescription, setNewDescription] = useState('')
+  const [newCta, setNewCta] = useState('')
+  const [newConversionType, setNewConversionType] = useState('phone_consultation_booking')
+  const [newBenefits, setNewBenefits] = useState('')
+
+  function resetAddForm() {
+    setNewName('')
+    setNewOfferType('consultation')
+    setNewHeadline('')
+    setNewSubheadline('')
+    setNewDescription('')
+    setNewCta('')
+    setNewConversionType('phone_consultation_booking')
+    setNewBenefits('')
+    setShowAddForm(false)
+  }
+
+  async function handleManualAdd() {
+    if (!client || !newName.trim()) return
+    setSavingOffer(true)
+    try {
+      const benefits = newBenefits.split('\n').map(b => b.trim()).filter(Boolean)
+      const { error } = await supabase.from('offers').insert({
+        client_id: client.id,
+        name: newName.trim(),
+        offer_type: newOfferType,
+        headline: newHeadline.trim() || null,
+        subheadline: newSubheadline.trim() || null,
+        description: newDescription.trim() || null,
+        primary_cta: newCta.trim() || null,
+        conversion_type: newConversionType,
+        benefits: benefits.length > 0 ? benefits : null,
+        status: 'approved',
+      })
+      if (error) throw error
+      await refreshOffers(client.id)
+      resetAddForm()
+      showToast('Offer added successfully')
+    } catch (err) {
+      showToast('Error: ' + (err as Error).message)
+    } finally {
+      setSavingOffer(false)
+    }
+  }
 
   const filteredOffers = statusFilter === 'all'
     ? offers
@@ -60,7 +112,7 @@ export default function OffersPage() {
     }
   }
 
-  if (!client || offers.length === 0) {
+  if (!client) {
     return (
       <div>
         <div className="page-header">
@@ -70,7 +122,7 @@ export default function OffersPage() {
           </div>
         </div>
         <div className="empty-state">
-          No offers yet. Analyze your business first to get AI-generated offer suggestions.
+          Select a client to manage offers.
         </div>
       </div>
     )
@@ -84,15 +136,95 @@ export default function OffersPage() {
           <p className="page-subtitle">Conversion propositions for campaigns</p>
         </div>
         {canEdit && (
-          <button
-            className="btn btn-primary"
-            onClick={handleSuggestMore}
-            disabled={suggesting || loading}
-          >
-            {suggesting ? 'Suggesting...' : 'Suggest More Offers'}
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setShowAddForm(true)}
+            >
+              + Add Offer
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleSuggestMore}
+              disabled={suggesting || loading}
+            >
+              {suggesting ? 'Suggesting...' : 'Suggest More Offers'}
+            </button>
+          </div>
         )}
       </div>
+
+      {/* Manual Add Offer Form */}
+      {showAddForm && (
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div className="card-title">Add New Offer</div>
+            <button className="btn btn-secondary btn-sm" onClick={resetAddForm}>Cancel</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="form-group">
+              <label className="form-label">Offer Name *</label>
+              <input className="form-input" value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Free Roof Inspection" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Offer Type</label>
+              <select className="form-input" value={newOfferType} onChange={e => setNewOfferType(e.target.value)}>
+                <option value="consultation">Consultation</option>
+                <option value="lead_magnet">Lead Magnet</option>
+                <option value="discount">Discount</option>
+                <option value="bundle">Bundle</option>
+                <option value="free_trial">Free Trial</option>
+                <option value="assessment">Assessment</option>
+                <option value="application">Application</option>
+                <option value="offer_verification">Offer Verification</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label className="form-label">Headline</label>
+              <input className="form-input" value={newHeadline} onChange={e => setNewHeadline(e.target.value)} placeholder="Compelling headline for the offer" />
+            </div>
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label className="form-label">Subheadline</label>
+              <input className="form-input" value={newSubheadline} onChange={e => setNewSubheadline(e.target.value)} placeholder="Supporting line that expands on the headline" />
+            </div>
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label className="form-label">Description</label>
+              <textarea className="form-textarea" rows={3} value={newDescription} onChange={e => setNewDescription(e.target.value)} placeholder="What does this offer include? Why should someone take it?" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Primary CTA</label>
+              <input className="form-input" value={newCta} onChange={e => setNewCta(e.target.value)} placeholder="e.g. Get My Free Quote" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Conversion Type</label>
+              <select className="form-input" value={newConversionType} onChange={e => setNewConversionType(e.target.value)}>
+                <option value="phone_consultation_booking">Phone Consultation</option>
+                <option value="form_submission">Form Submission</option>
+                <option value="lead_magnet_download">Lead Magnet Download</option>
+                <option value="soft_inquiry_application">Soft Inquiry</option>
+                <option value="loan_application">Application</option>
+                <option value="direct_purchase">Direct Purchase</option>
+                <option value="free_trial_signup">Free Trial</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label className="form-label">Benefits (one per line)</label>
+              <textarea className="form-textarea" rows={4} value={newBenefits} onChange={e => setNewBenefits(e.target.value)} placeholder={"Save $200 on your first service\nNo-obligation, completely free\n30-minute personalized session"} />
+            </div>
+          </div>
+          <div style={{ marginTop: 16 }}>
+            <button
+              className="btn btn-primary"
+              onClick={handleManualAdd}
+              disabled={savingOffer || !newName.trim()}
+            >
+              {savingOffer ? 'Saving...' : 'Add Offer'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
         {(['all', 'approved', 'denied'] as StatusFilter[]).map((filter) => (
