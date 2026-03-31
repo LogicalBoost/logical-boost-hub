@@ -1874,6 +1874,14 @@ select.form-input {
   background: rgba(16, 185, 129, 0.1) !important;
 }
 
+.copy-row-editing {
+  padding: 12px 14px;
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  cursor: default;
+}
+
 .copy-row-text {
   flex: 1;
   font-size: 13px;

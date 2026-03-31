@@ -97,21 +97,27 @@ function AngleBadge({ slug, compact }: { slug: string; compact?: boolean }) {
 function CopyRow({
   item,
   onDeny,
+  onEdit,
   selected,
   onToggleSelect,
   selectionMode,
+  startEditing,
 }: {
   item: CopyComponent
   onDeny: (id: string) => void
+  onEdit?: (id: string, newText: string) => void
   selected?: boolean
   onToggleSelect?: (id: string) => void
   selectionMode?: boolean
+  startEditing?: boolean
 }) {
   const [copied, setCopied] = useState(false)
   const [confirmingDeny, setConfirmingDeny] = useState(false)
+  const [editing, setEditing] = useState(startEditing || false)
+  const [editText, setEditText] = useState(item.text)
 
   const handleCopy = async () => {
-    if (confirmingDeny) return
+    if (confirmingDeny || editing) return
     if (selectionMode && onToggleSelect) {
       onToggleSelect(item.id)
       return
@@ -119,6 +125,44 @@ function CopyRow({
     await copyToClipboard(item.text)
     setCopied(true)
     setTimeout(() => setCopied(false), 1200)
+  }
+
+  const handleSaveEdit = () => {
+    if (editText.trim() && editText !== item.text && onEdit) {
+      onEdit(item.id, editText.trim())
+    }
+    setEditing(false)
+  }
+
+  const handleCancelEdit = () => {
+    setEditText(item.text)
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div className="copy-row copy-row-editing" onClick={e => e.stopPropagation()}>
+        <textarea
+          className="form-textarea"
+          value={editText}
+          onChange={e => setEditText(e.target.value)}
+          rows={Math.max(2, Math.ceil(editText.length / 80))}
+          style={{ width: '100%', fontSize: 13, background: 'var(--bg-input)', resize: 'vertical' }}
+          autoFocus
+          onKeyDown={e => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSaveEdit()
+            if (e.key === 'Escape') handleCancelEdit()
+          }}
+        />
+        <div style={{ display: 'flex', gap: 6, marginTop: 6, justifyContent: 'flex-end' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 'auto', alignSelf: 'center' }}>
+            {editText.length} chars &middot; Ctrl+Enter to save
+          </span>
+          <button className="btn btn-secondary btn-sm" onClick={handleCancelEdit} style={{ fontSize: 11, padding: '4px 10px' }}>Cancel</button>
+          <button className="btn btn-primary btn-sm" onClick={handleSaveEdit} style={{ fontSize: 11, padding: '4px 10px' }} disabled={!editText.trim() || editText === item.text}>Save</button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -145,6 +189,20 @@ function CopyRow({
           ))}
         </span>
         <span className="copy-row-chars">({item.character_count || item.text.length})</span>
+        {/* Edit button */}
+        {onEdit && !confirmingDeny && (
+          <button
+            className="copy-row-deny"
+            title="Edit this item"
+            onClick={(e) => {
+              e.stopPropagation()
+              setEditing(true)
+            }}
+            style={{ padding: 6, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+        )}
         {confirmingDeny ? (
           <span className="copy-row-deny-confirm" onClick={(e) => e.stopPropagation()}>
             <button
@@ -931,6 +989,16 @@ export default function FunnelPage() {
     await refreshCopyComponents(client.id)
   }
 
+  async function handleEdit(componentId: string, newText: string) {
+    if (!client) return
+    await supabase.from('copy_components').update({
+      text: newText,
+      character_count: newText.length,
+    }).eq('id', componentId)
+    await refreshCopyComponents(client.id)
+    showToast('Copy updated')
+  }
+
   async function handleBulkDeny() {
     if (!client || selectedIds.size === 0) return
     const ids = Array.from(selectedIds)
@@ -1246,13 +1314,49 @@ export default function FunnelPage() {
                         <div>
                           <span style={{ fontSize: 11, fontWeight: 600, color: '#ef4444', textTransform: 'uppercase' }}>Weak Items ({latestCopywriterReview.component_reviews.filter(r => (r.score || 100) < 60).length}):</span>
                           <div className="qa-flagged-list">
-                            {latestCopywriterReview.component_reviews.filter(r => (r.score || 100) < 60).slice(0, 10).map((r, i) => (
-                              <div key={i} className="qa-flagged-item">
-                                <span className="qa-flagged-type">{r.type}</span>
-                                <span className="qa-flagged-score" style={{ color: '#ef4444' }}>{r.score}/100</span>
-                                <span className="qa-flagged-text">{(r as QAComponentReview).recommendation || ''}</span>
-                              </div>
-                            ))}
+                            {latestCopywriterReview.component_reviews.filter(r => (r.score || 100) < 60).slice(0, 10).map((r, i) => {
+                              const comp = instanceComponents.find(c => c.id === r.component_id)
+                              return (
+                                <div key={i} className="qa-flagged-item" style={{ flexWrap: 'wrap' }}>
+                                  <span className="qa-flagged-type">{r.type}</span>
+                                  <span className="qa-flagged-score" style={{ color: '#ef4444' }}>{r.score}/100</span>
+                                  <span className="qa-flagged-text">{(r as QAComponentReview).recommendation || ''}</span>
+                                  {comp && (
+                                    <div style={{ width: '100%', marginTop: 4, padding: '6px 8px', background: 'rgba(0,0,0,0.2)', borderRadius: 4, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                                      &ldquo;{comp.text.substring(0, 150)}{comp.text.length > 150 ? '...' : ''}&rdquo;
+                                    </div>
+                                  )}
+                                  {canEdit && comp && (
+                                    <div style={{ width: '100%', display: 'flex', gap: 6, marginTop: 4 }}>
+                                      <button
+                                        className="btn btn-sm"
+                                        style={{ fontSize: 10, padding: '2px 8px' }}
+                                        onClick={() => {
+                                          setShowQAPanel(false)
+                                          // Find the tab for this component type and scroll to it
+                                          const tabKey = comp.type
+                                          setActiveTab(tabKey)
+                                          // Small delay then highlight
+                                          setTimeout(() => {
+                                            const el = document.getElementById(`copy-${comp.id}`)
+                                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                          }, 100)
+                                        }}
+                                      >
+                                        Find &amp; Edit
+                                      </button>
+                                      <button
+                                        className="btn btn-sm"
+                                        style={{ fontSize: 10, padding: '2px 8px', color: '#ef4444', borderColor: '#ef4444' }}
+                                        onClick={() => handleDeny(comp.id)}
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
                       )}
@@ -1285,24 +1389,57 @@ export default function FunnelPage() {
                             Flagged Items ({latestComplianceReview.component_reviews.length}):
                           </span>
                           <div className="qa-flagged-list">
-                            {latestComplianceReview.component_reviews.slice(0, 15).map((r, i) => (
-                              <div key={i} className="qa-flagged-item">
-                                <span className="qa-flagged-type">{r.type}</span>
-                                {r.violations && r.violations.length > 0 && (
-                                  <span
-                                    className="qa-flagged-severity"
-                                    style={{
-                                      color: r.violations[0].severity === 'error' ? '#ef4444' : r.violations[0].severity === 'warning' ? '#f59e0b' : '#3b82f6'
-                                    }}
-                                  >
-                                    {r.violations[0].severity}
+                            {latestComplianceReview.component_reviews.slice(0, 15).map((r, i) => {
+                              const comp = instanceComponents.find(c => c.id === r.component_id)
+                              return (
+                                <div key={i} className="qa-flagged-item" style={{ flexWrap: 'wrap' }}>
+                                  <span className="qa-flagged-type">{r.type}</span>
+                                  {r.violations && r.violations.length > 0 && (
+                                    <span
+                                      className="qa-flagged-severity"
+                                      style={{
+                                        color: r.violations[0].severity === 'error' ? '#ef4444' : r.violations[0].severity === 'warning' ? '#f59e0b' : '#3b82f6'
+                                      }}
+                                    >
+                                      {r.violations[0].severity}
+                                    </span>
+                                  )}
+                                  <span className="qa-flagged-text">
+                                    {r.violations?.[0]?.detail || r.suggestions?.[0] || ''}
                                   </span>
-                                )}
-                                <span className="qa-flagged-text">
-                                  {r.violations?.[0]?.detail || r.suggestions?.[0] || ''}
-                                </span>
-                              </div>
-                            ))}
+                                  {comp && (
+                                    <div style={{ width: '100%', marginTop: 4, padding: '6px 8px', background: 'rgba(0,0,0,0.2)', borderRadius: 4, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                                      &ldquo;{comp.text.substring(0, 150)}{comp.text.length > 150 ? '...' : ''}&rdquo;
+                                    </div>
+                                  )}
+                                  {canEdit && comp && (
+                                    <div style={{ width: '100%', display: 'flex', gap: 6, marginTop: 4 }}>
+                                      <button
+                                        className="btn btn-sm"
+                                        style={{ fontSize: 10, padding: '2px 8px' }}
+                                        onClick={() => {
+                                          setShowQAPanel(false)
+                                          setActiveTab(comp.type)
+                                          setTimeout(() => {
+                                            const el = document.getElementById(`copy-${comp.id}`)
+                                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                          }, 100)
+                                        }}
+                                      >
+                                        Find &amp; Edit
+                                      </button>
+                                      <button
+                                        className="btn btn-sm"
+                                        style={{ fontSize: 10, padding: '2px 8px', color: '#ef4444', borderColor: '#ef4444' }}
+                                        onClick={() => handleDeny(comp.id)}
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
                       )}
@@ -1426,14 +1563,16 @@ export default function FunnelPage() {
               {tabComponents.length > 0 ? (
                 <>
                   {tabComponents.map((item) => (
-                    <CopyRow
-                      key={item.id}
-                      item={item}
-                      onDeny={handleDeny}
-                      selected={selectedIds.has(item.id)}
-                      onToggleSelect={toggleSelect}
-                      selectionMode={selectionMode}
-                    />
+                    <div key={item.id} id={`copy-${item.id}`}>
+                      <CopyRow
+                        item={item}
+                        onDeny={handleDeny}
+                        onEdit={canEdit ? handleEdit : undefined}
+                        selected={selectedIds.has(item.id)}
+                        onToggleSelect={toggleSelect}
+                        selectionMode={selectionMode}
+                      />
+                    </div>
                   ))}
                 </>
               ) : (
