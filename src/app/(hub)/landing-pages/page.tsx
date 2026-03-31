@@ -205,6 +205,7 @@ export default function LandingPagesPage() {
   const [stepsImageUrl, setStepsImageUrl] = useState<string | null>(null)
   const [benefitsImageUrl, setBenefitsImageUrl] = useState<string | null>(null)
   const [uploadingSectionImage, setUploadingSectionImage] = useState<string | null>(null)
+  const [generatingSectionImage, setGeneratingSectionImage] = useState<string | null>(null)
 
   // Lightbox state for full image preview
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
@@ -446,6 +447,40 @@ export default function LandingPagesPage() {
       setGeneratingParallax(false)
     }
   }, [client, selectedAvatarId, selectedOfferId, customParallaxPrompt])
+
+  // Generate section images (steps / benefits) with AI
+  const handleGenerateSectionImage = useCallback(async (sectionType: 'steps' | 'benefits') => {
+    if (!client || !selectedAvatarId) return
+    setGeneratingSectionImage(sectionType)
+    try {
+      const roleMap = { steps: 'process_step', benefits: 'gallery' } as const
+      const result = await generateHeroImage(
+        client.id,
+        selectedAvatarId,
+        'hero',
+        undefined,
+        selectedOfferId || undefined,
+        roleMap[sectionType]
+      )
+      if (result.image_url) {
+        if (sectionType === 'steps') {
+          setStepsImageUrl(result.image_url)
+          setCopySlots(prev => ({ ...prev, steps_image: result.image_url }))
+        } else {
+          setBenefitsImageUrl(result.image_url)
+          setCopySlots(prev => ({ ...prev, benefits_image: result.image_url }))
+        }
+        showToast(`${sectionType === 'steps' ? 'Steps' : 'Benefits'} image generated`)
+        if (client) refreshMediaAssets(client.id)
+      } else {
+        showToast('No image returned. Try again.')
+      }
+    } catch (err) {
+      showToast(`Error: ${(err as Error).message}`)
+    } finally {
+      setGeneratingSectionImage(null)
+    }
+  }, [client, selectedAvatarId, selectedOfferId, refreshMediaAssets])
 
   // Upload an image file to Supabase storage (for hero or parallax)
   const handleImageUpload = useCallback(async (
@@ -2134,6 +2169,24 @@ export default function LandingPagesPage() {
                       />
                     </div>
                   )}
+                  <button
+                    style={{
+                      width: '100%', marginTop: 6, padding: '8px 12px',
+                      fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                      border: 'none', borderRadius: 'var(--radius-sm)',
+                      background: generatingSectionImage === 'steps' ? 'var(--bg-input)' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                      color: '#fff', transition: 'opacity 0.15s',
+                    }}
+                    disabled={generatingSectionImage === 'steps' || !selectedAvatarId}
+                    onClick={() => handleGenerateSectionImage('steps')}
+                  >
+                    {generatingSectionImage === 'steps' ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite', display: 'inline-block' }} />
+                        Generating...
+                      </span>
+                    ) : 'Generate with AI'}
+                  </button>
                 </div>
 
                 {/* Benefits Image */}
@@ -2196,6 +2249,24 @@ export default function LandingPagesPage() {
                       />
                     </div>
                   )}
+                  <button
+                    style={{
+                      width: '100%', marginTop: 6, padding: '8px 12px',
+                      fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                      border: 'none', borderRadius: 'var(--radius-sm)',
+                      background: generatingSectionImage === 'benefits' ? 'var(--bg-input)' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                      color: '#fff', transition: 'opacity 0.15s',
+                    }}
+                    disabled={generatingSectionImage === 'benefits' || !selectedAvatarId}
+                    onClick={() => handleGenerateSectionImage('benefits')}
+                  >
+                    {generatingSectionImage === 'benefits' ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite', display: 'inline-block' }} />
+                        Generating...
+                      </span>
+                    ) : 'Generate with AI'}
+                  </button>
                 </div>
               </div>
             </div>
