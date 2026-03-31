@@ -92,8 +92,26 @@ interface Props {
 }
 
 export default function LeadCaptureClassic({ sections, media }: Props) {
+  // Sanitize all text fields in sections to fix garbled UTF-8
+  const cleanSections = sections.map(sec => ({
+    ...sec,
+    headline: sec.headline ? sanitizeText(sec.headline) : sec.headline,
+    subheadline: sec.subheadline ? sanitizeText(sec.subheadline) : sec.subheadline,
+    content: sec.content ? sanitizeText(sec.content) : sec.content,
+    cta: sec.cta ? sanitizeText(sec.cta) : sec.cta,
+    sub_cta: sec.sub_cta ? sanitizeText(sec.sub_cta) : sec.sub_cta,
+    items: sec.items?.map(item => ({
+      ...item,
+      label: item.label ? sanitizeText(item.label) : item.label,
+      title: item.title ? sanitizeText(item.title) : item.title,
+      text: item.text ? sanitizeText(item.text) : item.text,
+      quote: item.quote ? sanitizeText(item.quote) : item.quote,
+      question: item.question ? sanitizeText(item.question) : item.question,
+      answer: item.answer ? sanitizeText(item.answer) : item.answer,
+    })),
+  }))
   const s = new Map<string, Section>()
-  sections.forEach(sec => s.set(sec.type, sec))
+  cleanSections.forEach(sec => s.set(sec.type, sec))
 
   const hero = s.get('hero')
   const features = s.get('feature_cards')
@@ -109,15 +127,15 @@ export default function LeadCaptureClassic({ sections, media }: Props) {
     <div className="min-h-screen bg-white" style={{ fontFamily: 'var(--font-body)' }}>
       {/* ─── HEADER ─── */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24 flex items-center justify-between py-3">
+        <div className="max-w-7xl mx-auto px-3 md:px-10 lg:px-12 xl:px-24 flex items-center justify-between py-2 md:py-3">
           {media.logo ? (
-            <img src={media.logo} alt="Logo" className="h-8 md:h-10 object-contain" />
+            <img src={media.logo} alt="Logo" className="h-7 md:h-10 max-w-[120px] md:max-w-[180px] object-contain" />
           ) : (
-            <div className="h-8 w-28 rounded bg-gray-200/50" />
+            <div className="h-7 md:h-8 w-24 md:w-28 rounded bg-gray-200/50" />
           )}
           <a
             href="#lead-form"
-            className="btn-textured py-2.5 px-5 md:px-6 rounded-[var(--button-radius)] bg-[var(--color-accent)] text-white font-semibold text-sm transition-all"
+            className="btn-textured py-2 px-4 md:py-2.5 md:px-6 rounded-[var(--button-radius)] bg-[var(--color-accent)] text-white font-semibold text-xs md:text-sm transition-all whitespace-nowrap"
           >
             {hero?.cta || 'Get Started'}
           </a>
@@ -159,6 +177,19 @@ export default function LeadCaptureClassic({ sections, media }: Props) {
   )
 }
 
+/* Helper: fix garbled UTF-8 sequences (e.g. â¢ → •, â → ✓) */
+function sanitizeText(text: string): string {
+  return text
+    .replace(/â¢/g, '•')
+    .replace(/â/g, '✓')
+    .replace(/â/g, '—')
+    .replace(/â/g, '"')
+    .replace(/â/g, '"')
+    .replace(/â/g, "'")
+    .replace(/â/g, "'")
+    .replace(/Â /g, ' ')
+}
+
 /* ═══════════════════════════════════════════════════════
    HERO — White bg, text left, person image right with blob
    ═══════════════════════════════════════════════════════ */
@@ -190,8 +221,8 @@ function HeroBlock({ section, media }: { section: Section; media: MediaAssets })
             </a>
             {section.sub_cta && (
               <div className="mt-4 flex items-center justify-center md:justify-start gap-2">
-                <span className="inline-flex items-center gap-2 bg-gray-100 rounded-full px-4 py-1.5 text-gray-500 text-sm border border-gray-200">
-                  <Clock className="w-3.5 h-3.5 text-[var(--color-primary)]" />
+                <span className="inline-flex items-center gap-2 bg-gray-100 rounded-full px-3 py-1.5 text-gray-500 text-xs md:text-sm border border-gray-200">
+                  <Clock className="w-3 h-3 md:w-3.5 md:h-3.5 text-[var(--color-primary)]" />
                   {section.sub_cta}
                 </span>
               </div>
