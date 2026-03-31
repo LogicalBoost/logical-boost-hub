@@ -201,6 +201,11 @@ export default function LandingPagesPage() {
   const [parallaxError, setParallaxError] = useState<string | null>(null)
   const [customParallaxPrompt, setCustomParallaxPrompt] = useState('')
 
+  // Section images (steps + benefits)
+  const [stepsImageUrl, setStepsImageUrl] = useState<string | null>(null)
+  const [benefitsImageUrl, setBenefitsImageUrl] = useState<string | null>(null)
+  const [uploadingSectionImage, setUploadingSectionImage] = useState<string | null>(null)
+
   // Lightbox state for full image preview
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
@@ -357,6 +362,8 @@ export default function LandingPagesPage() {
     const media = ct.media_defaults as Record<string, string> | null
     if (media?.hero_image) setHeroImageUrl(media.hero_image)
     if (media?.parallax_image) setParallaxImageUrl(media.parallax_image)
+    if (media?.steps_image) setStepsImageUrl(media.steps_image)
+    if (media?.benefits_image) setBenefitsImageUrl(media.benefits_image)
 
     // Auto-map copy components to slots
     const approvedCopy = copyComponents.filter(
@@ -443,11 +450,16 @@ export default function LandingPagesPage() {
   // Upload an image file to Supabase storage (for hero or parallax)
   const handleImageUpload = useCallback(async (
     file: File,
-    type: 'hero' | 'parallax'
+    type: 'hero' | 'parallax' | 'steps' | 'benefits'
   ) => {
     if (!client) return
-    const setter = type === 'hero' ? setHeroImageUrl : setParallaxImageUrl
-    const loadingSetter = type === 'hero' ? setGeneratingImage : setUploadingParallax
+    const setterMap = { hero: setHeroImageUrl, parallax: setParallaxImageUrl, steps: setStepsImageUrl, benefits: setBenefitsImageUrl }
+    const setter = setterMap[type]
+    const loadingSetterMap = { hero: setGeneratingImage, parallax: setUploadingParallax, steps: (v: boolean) => setUploadingSectionImage(v ? 'steps' : null), benefits: (v: boolean) => setUploadingSectionImage(v ? 'benefits' : null) }
+    const loadingSetter = loadingSetterMap[type]
+    const roleMap = { hero: 'hero_image', parallax: 'parallax', steps: 'photo', benefits: 'photo' } as const
+    const slotMap = { hero: 'hero_image', parallax: 'parallax_image', steps: 'steps_image', benefits: 'benefits_image' }
+    const labelMap = { hero: 'Hero', parallax: 'Parallax', steps: 'Steps', benefits: 'Benefits' }
 
     loadingSetter(true)
     try {
@@ -471,27 +483,22 @@ export default function LandingPagesPage() {
         .getPublicUrl(storagePath)
 
       setter(urlData.publicUrl)
-
-      if (type === 'hero') {
-        setCopySlots(prev => ({ ...prev, hero_image: urlData.publicUrl }))
-      } else {
-        setCopySlots(prev => ({ ...prev, parallax_image: urlData.publicUrl }))
-      }
+      setCopySlots(prev => ({ ...prev, [slotMap[type]]: urlData.publicUrl }))
 
       // Save to media_assets table
       await supabase.from('media_assets').insert({
         client_id: client.id,
-        role: type === 'hero' ? 'hero_image' : 'parallax',
+        role: roleMap[type],
         file_url: urlData.publicUrl,
         file_type: 'image',
         storage_path: storagePath,
         filename: file.name,
         display_name: file.name,
-        metadata: { source: 'uploaded' },
+        metadata: { source: 'uploaded', section: type },
       })
       refreshMediaAssets(client.id)
 
-      showToast(`${type === 'hero' ? 'Hero' : 'Parallax'} image uploaded`)
+      showToast(`${labelMap[type]} image uploaded`)
     } catch (err) {
       showToast(`Upload error: ${(err as Error).message}`)
     } finally {
@@ -502,7 +509,7 @@ export default function LandingPagesPage() {
   // Handle drag & drop / file input for images
   const handleImageDrop = useCallback((
     e: React.DragEvent<HTMLDivElement>,
-    type: 'hero' | 'parallax'
+    type: 'hero' | 'parallax' | 'steps' | 'benefits'
   ) => {
     e.preventDefault()
     e.stopPropagation()
@@ -516,7 +523,7 @@ export default function LandingPagesPage() {
 
   const handleImageFileSelect = useCallback((
     e: React.ChangeEvent<HTMLInputElement>,
-    type: 'hero' | 'parallax'
+    type: 'hero' | 'parallax' | 'steps' | 'benefits'
   ) => {
     const file = e.target.files?.[0]
     if (file) handleImageUpload(file, type)
@@ -2042,6 +2049,147 @@ export default function LandingPagesPage() {
               </div>
 
             </div>
+
+            {/* ── Section Images (Steps + Benefits) ── */}
+            <div style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              padding: 20,
+              marginTop: 16,
+            }}>
+              <h4 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Section Images <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></h4>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+                Add images for the Steps and Benefits sections. If left empty, sections will use a clean full-width layout.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                {/* Steps Image */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
+                    Steps Section Image
+                  </label>
+                  {stepsImageUrl ? (
+                    <div style={{ position: 'relative', borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--border)', marginBottom: 8 }}>
+                      <img
+                        src={stepsImageUrl}
+                        alt="Steps"
+                        style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block', cursor: 'pointer' }}
+                        onClick={() => setLightboxUrl(stepsImageUrl)}
+                      />
+                      <button
+                        onClick={() => { setStepsImageUrl(null); setCopySlots(prev => { const n = { ...prev }; delete n.steps_image; return n }) }}
+                        style={{
+                          position: 'absolute', top: 4, right: 4,
+                          width: 22, height: 22, borderRadius: '50%',
+                          background: 'rgba(0,0,0,0.6)', color: '#fff',
+                          border: 'none', cursor: 'pointer', fontSize: 11,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}
+                      >&#10005;</button>
+                    </div>
+                  ) : (
+                    <div
+                      onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#10b981' }}
+                      onDragLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+                      onDrop={e => { e.currentTarget.style.borderColor = 'var(--border)'; handleImageDrop(e, 'steps') }}
+                      onClick={() => document.getElementById('steps-image-input')?.click()}
+                      style={{
+                        border: '2px dashed var(--border)',
+                        borderRadius: 'var(--radius)',
+                        padding: '24px 12px',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        transition: 'border-color 0.2s',
+                      }}
+                    >
+                      {uploadingSectionImage === 'steps' ? (
+                        <div>
+                          <div style={{ width: 24, height: 24, border: '3px solid var(--border)', borderTopColor: '#10b981', borderRadius: '50%', margin: '0 auto 6px', animation: 'spin 1s linear infinite' }} />
+                          <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>Uploading...</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p style={{ fontSize: 20, margin: '0 0 4px' }}>&#128247;</p>
+                          <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>Drop or click to upload</p>
+                          <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '2px 0 0' }}>Appears next to process steps</p>
+                        </div>
+                      )}
+                      <input
+                        id="steps-image-input"
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        style={{ display: 'none' }}
+                        onChange={e => handleImageFileSelect(e, 'steps')}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Benefits Image */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
+                    Benefits Section Image
+                  </label>
+                  {benefitsImageUrl ? (
+                    <div style={{ position: 'relative', borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--border)', marginBottom: 8 }}>
+                      <img
+                        src={benefitsImageUrl}
+                        alt="Benefits"
+                        style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block', cursor: 'pointer' }}
+                        onClick={() => setLightboxUrl(benefitsImageUrl)}
+                      />
+                      <button
+                        onClick={() => { setBenefitsImageUrl(null); setCopySlots(prev => { const n = { ...prev }; delete n.benefits_image; return n }) }}
+                        style={{
+                          position: 'absolute', top: 4, right: 4,
+                          width: 22, height: 22, borderRadius: '50%',
+                          background: 'rgba(0,0,0,0.6)', color: '#fff',
+                          border: 'none', cursor: 'pointer', fontSize: 11,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}
+                      >&#10005;</button>
+                    </div>
+                  ) : (
+                    <div
+                      onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#10b981' }}
+                      onDragLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+                      onDrop={e => { e.currentTarget.style.borderColor = 'var(--border)'; handleImageDrop(e, 'benefits') }}
+                      onClick={() => document.getElementById('benefits-image-input')?.click()}
+                      style={{
+                        border: '2px dashed var(--border)',
+                        borderRadius: 'var(--radius)',
+                        padding: '24px 12px',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        transition: 'border-color 0.2s',
+                      }}
+                    >
+                      {uploadingSectionImage === 'benefits' ? (
+                        <div>
+                          <div style={{ width: 24, height: 24, border: '3px solid var(--border)', borderTopColor: '#10b981', borderRadius: '50%', margin: '0 auto 6px', animation: 'spin 1s linear infinite' }} />
+                          <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>Uploading...</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p style={{ fontSize: 20, margin: '0 0 4px' }}>&#128247;</p>
+                          <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>Drop or click to upload</p>
+                          <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '2px 0 0' }}>Appears next to benefits grid</p>
+                        </div>
+                      )}
+                      <input
+                        id="benefits-image-input"
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        style={{ display: 'none' }}
+                        onChange={e => handleImageFileSelect(e, 'benefits')}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       )}
@@ -2058,6 +2206,8 @@ export default function LandingPagesPage() {
           sections={generatedSections}
           heroImageUrl={heroImageUrl || ''}
           parallaxImageUrl={parallaxImageUrl || ''}
+          stepsImageUrl={stepsImageUrl || ''}
+          benefitsImageUrl={benefitsImageUrl || ''}
           logoUrl={client?.logo_url || ''}
           selectedAvatar={selectedAvatarId || ''}
           selectedOffer={selectedOfferId || ''}
@@ -2167,6 +2317,8 @@ function BuildStep({
   sections,
   heroImageUrl,
   parallaxImageUrl,
+  stepsImageUrl,
+  benefitsImageUrl,
   logoUrl,
   selectedAvatar,
   selectedOffer,
@@ -2182,6 +2334,8 @@ function BuildStep({
   sections?: unknown[] | null
   heroImageUrl: string
   parallaxImageUrl: string
+  stepsImageUrl: string
+  benefitsImageUrl: string
   logoUrl: string
   selectedAvatar: string
   selectedOffer: string
@@ -2241,6 +2395,8 @@ function BuildStep({
         media_assets: {
           hero_image: heroImageUrl || undefined,
           parallax_image: parallaxImageUrl || undefined,
+          steps_image: stepsImageUrl || undefined,
+          benefits_image: benefitsImageUrl || undefined,
           logo: logoUrl || undefined,
           ...(trustpilotWidget ? { trustpilot_widget: trustpilotWidget } : {}),
         },

@@ -395,10 +395,10 @@ function StepsBlock({ section, media }: { section: Section; media: MediaAssets }
           )}
         </div>
 
-        <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-14">
-          {/* Left: image with blob */}
-          <div className="lg:w-4/12 flex justify-center">
-            {img ? (
+        <div className={`flex flex-col lg:flex-row items-center gap-10 lg:gap-14${!img ? ' lg:justify-center' : ''}`}>
+          {/* Left: image with blob (hidden if no image) */}
+          {img && (
+            <div className="lg:w-4/12 flex justify-center">
               <div className="relative w-[280px]">
                 <div
                   className="absolute inset-[-8%] bg-[var(--color-primary)]/8"
@@ -406,13 +406,11 @@ function StepsBlock({ section, media }: { section: Section; media: MediaAssets }
                 />
                 <img src={img} alt="" className="relative z-10 rounded-3xl shadow-xl w-full" />
               </div>
-            ) : (
-              <div className="w-[250px] h-[400px] rounded-3xl bg-gray-100 border border-gray-200" />
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Right: step cards */}
-          <div className="lg:w-8/12 space-y-4">
+          {/* Step cards — full width if no image */}
+          <div className={img ? 'lg:w-8/12 space-y-4' : 'lg:w-10/12 space-y-4'}>
             {items.map((item, i) => (
               <div
                 key={i}
@@ -525,7 +523,7 @@ function BenefitsGrid({ section, media }: { section: Section; media: MediaAssets
 
         <div className="flex flex-col lg:flex-row gap-10 lg:gap-12 items-center">
           {/* Left: 2x2 card grid */}
-          <div className="lg:w-8/12">
+          <div className={img ? 'lg:w-8/12' : 'w-full'}>
             <div className="grid sm:grid-cols-2 gap-4">
               {items.map((item, i) => (
                 <div
@@ -537,11 +535,22 @@ function BenefitsGrid({ section, media }: { section: Section; media: MediaAssets
                 </div>
               ))}
             </div>
+            {/* CTA below cards when no image */}
+            {!img && section.cta && (
+              <div className="text-center mt-8">
+                <a
+                  href={section.cta_url || '#lead-form'}
+                  className="btn-textured inline-block py-3.5 px-8 rounded-full bg-[var(--color-accent)] text-white font-bold text-base transition-all"
+                >
+                  {section.cta}
+                </a>
+              </div>
+            )}
           </div>
 
-          {/* Right: image + CTA */}
-          <div className="lg:w-4/12 flex flex-col items-center gap-6">
-            {img ? (
+          {/* Right: image + CTA (only if image exists) */}
+          {img && (
+            <div className="lg:w-4/12 flex flex-col items-center gap-6">
               <div className="relative w-full max-w-[280px]">
                 <div
                   className="absolute inset-[-6%] bg-[var(--color-primary)]/8"
@@ -549,18 +558,16 @@ function BenefitsGrid({ section, media }: { section: Section; media: MediaAssets
                 />
                 <img src={img} alt="" className="relative z-10 rounded-2xl shadow-lg w-full" />
               </div>
-            ) : (
-              <div className="w-[250px] h-[250px] rounded-2xl bg-gray-100" />
-            )}
-            {section.cta && (
-              <a
-                href={section.cta_url || '#lead-form'}
-                className="btn-textured inline-block py-3.5 px-8 rounded-full bg-[var(--color-accent)] text-white font-bold text-base transition-all"
-              >
-                {section.cta}
-              </a>
-            )}
-          </div>
+              {section.cta && (
+                <a
+                  href={section.cta_url || '#lead-form'}
+                  className="btn-textured inline-block py-3.5 px-8 rounded-full bg-[var(--color-accent)] text-white font-bold text-base transition-all"
+                >
+                  {section.cta}
+                </a>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </section>
