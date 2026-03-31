@@ -86,6 +86,42 @@ export interface MediaAssets {
   [key: string]: string | string[] | TrustpilotWidget | undefined
 }
 
+// Form system types
+export interface FormFieldDef {
+  id: string
+  type: 'text' | 'email' | 'phone' | 'select' | 'textarea' | 'checkbox' | 'hidden'
+  name: string
+  label: string
+  placeholder?: string
+  required?: boolean
+  validation?: { pattern?: string; min_length?: number; max_length?: number }
+  options?: Array<{ value: string; label: string }>
+  width?: 'full' | 'half'
+}
+
+export interface FormStepDef {
+  name: string
+  field_ids: string[]
+}
+
+export interface FormSettings {
+  submit_button_text?: string
+  success_message?: string
+  redirect_url?: string
+  show_progress_bar?: boolean
+  next_button_text?: string
+  back_button_text?: string
+}
+
+export interface FormConfig {
+  id: string
+  form_type: 'standard' | 'multi_step'
+  name?: string
+  fields: FormFieldDef[]
+  steps?: FormStepDef[] | null
+  settings: FormSettings
+}
+
 export interface TemplateInfo {
   slug: string
   name: string

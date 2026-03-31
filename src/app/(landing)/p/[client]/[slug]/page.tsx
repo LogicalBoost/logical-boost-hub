@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import type { Section, MediaAssets, BrandKit, TrustpilotWidget } from '@/components/templates/types'
+import type { Section, MediaAssets, BrandKit, TrustpilotWidget, FormConfig } from '@/components/templates/types'
 import LeadCaptureClassic from '@/components/templates/LeadCaptureClassic'
 
 interface PageRecord {
@@ -15,6 +15,7 @@ interface PageRecord {
   sections: Section[] | null
   media_assets: Record<string, string> | null
   brand_kit_snapshot: BrandKit | null
+  form_snapshot: FormConfig | null
   status: string
 }
 
@@ -192,7 +193,7 @@ export default function LandingPage() {
         // Query published_pages directly by client_slug + slug
         const { data: pages, error } = await supabase
           .from('published_pages')
-          .select('id, slug, client_slug, template_slug, copy_slots, sections, media_assets, brand_kit_snapshot, status')
+          .select('id, slug, client_slug, template_slug, copy_slots, sections, media_assets, brand_kit_snapshot, form_snapshot, status')
           .eq('client_slug', clientSlug)
           .eq('slug', pageSlug)
           .eq('status', 'published')
@@ -332,6 +333,15 @@ export default function LandingPage() {
   switch (templateSlug) {
     case 'lead-capture-classic':
     default:
-      return <LeadCaptureClassic sections={sections} media={media} />
+      return (
+        <LeadCaptureClassic
+          sections={sections}
+          media={media}
+          formConfig={page.form_snapshot || null}
+          pageSlug={pageSlug}
+          clientSlug={clientSlug}
+          publishedPageId={page.id}
+        />
+      )
   }
 }

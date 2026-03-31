@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { supabase } from './supabase'
-import type { Client, Avatar, Offer, IntakeQuestion, CopyComponent, FunnelInstance, CompetitorIntel, LandingPage, MediaAsset, BrandKitRecord, PageTemplate, PublishedPage, PromptTemplate, ClientTemplate, QAReview, UserRole } from '@/types/database'
+import type { Client, Avatar, Offer, IntakeQuestion, CopyComponent, FunnelInstance, CompetitorIntel, LandingPage, MediaAsset, BrandKitRecord, PageTemplate, PublishedPage, PromptTemplate, ClientTemplate, QAReview, Form, FormWebhook, UserRole } from '@/types/database'
 
 interface AppState {
   client: Client | null
@@ -20,6 +20,8 @@ interface AppState {
   promptTemplates: PromptTemplate[]
   clientTemplates: ClientTemplate[]
   qaReviews: QAReview[]
+  forms: Form[]
+  formWebhooks: FormWebhook[]
   loading: boolean
   error: string | null
   userRole: UserRole
@@ -62,6 +64,8 @@ interface AppStore extends AppState {
   refreshPromptTemplates: (clientId?: string) => Promise<void>
   refreshClientTemplates: (clientId: string) => Promise<void>
   refreshQAReviews: (clientId: string) => Promise<void>
+  refreshForms: (clientId: string) => Promise<void>
+  refreshFormWebhooks: (clientId: string) => Promise<void>
   /** Refresh just the client record from DB (e.g. after logo upload or brand kit analysis) */
   refreshClient: (clientId: string) => Promise<void>
   setUserRole: (role: UserRole) => void
@@ -86,6 +90,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([])
   const [clientTemplates, setClientTemplates] = useState<ClientTemplate[]>([])
   const [qaReviews, setQAReviews] = useState<QAReview[]>([])
+  const [forms, setForms] = useState<Form[]>([])
+  const [formWebhooks, setFormWebhooks] = useState<FormWebhook[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<UserRole>('admin')
@@ -138,6 +144,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         { data: templateData },
         { data: clientTemplateData },
         { data: qaReviewData },
+        { data: formsData },
+        { data: formWebhooksData },
       ] = await Promise.all([
         supabase.from('clients').select('*').eq('id', clientId).single(),
         supabase.from('avatars').select('*').eq('client_id', clientId).order('created_at'),
@@ -153,6 +161,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         supabase.from('page_templates').select('*').eq('is_active', true).order('created_at'),
         supabase.from('client_templates').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
         supabase.from('qa_reviews').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+        supabase.from('forms').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+        supabase.from('form_webhooks').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
       ])
       if (clientData) setClient(clientData)
       setAvatars(avatarData || [])
@@ -168,6 +178,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setPageTemplates(templateData || [])
       setClientTemplates(clientTemplateData || [])
       setQAReviews(qaReviewData || [])
+      setForms(formsData || [])
+      setFormWebhooks(formWebhooksData || [])
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -194,6 +206,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         { data: templateData },
         { data: clientTemplateData },
         { data: qaReviewData },
+        { data: formsData },
+        { data: formWebhooksData },
       ] = await Promise.all([
         supabase.from('clients').select('*').eq('id', clientId).single(),
         supabase.from('avatars').select('*').eq('client_id', clientId).order('created_at'),
@@ -209,6 +223,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         supabase.from('page_templates').select('*').eq('is_active', true).order('created_at'),
         supabase.from('client_templates').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
         supabase.from('qa_reviews').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+        supabase.from('forms').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+        supabase.from('form_webhooks').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
       ])
       if (clientData) {
         setClient(clientData)
@@ -227,6 +243,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setPageTemplates(templateData || [])
       setClientTemplates(clientTemplateData || [])
       setQAReviews(qaReviewData || [])
+      setForms(formsData || [])
+      setFormWebhooks(formWebhooksData || [])
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -337,6 +355,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setQAReviews(data || [])
   }, [])
 
+  const refreshForms = useCallback(async (clientId: string) => {
+    const { data } = await supabase.from('forms').select('*').eq('client_id', clientId).order('created_at', { ascending: false })
+    setForms(data || [])
+  }, [])
+
+  const refreshFormWebhooks = useCallback(async (clientId: string) => {
+    const { data } = await supabase.from('form_webhooks').select('*').eq('client_id', clientId).order('created_at', { ascending: false })
+    setFormWebhooks(data || [])
+  }, [])
+
   const refreshClient = useCallback(async (clientId: string) => {
     const { data } = await supabase.from('clients').select('*').eq('id', clientId).single()
     if (data) {
@@ -348,12 +376,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      allClients, client, avatars, offers, intakeQuestions, funnelInstances, copyComponents, competitors, landingPages, publishedPages, mediaAssets, brandKit, pageTemplates, promptTemplates, clientTemplates, qaReviews, loading, error,
+      allClients, client, avatars, offers, intakeQuestions, funnelInstances, copyComponents, competitors, landingPages, publishedPages, mediaAssets, brandKit, pageTemplates, promptTemplates, clientTemplates, qaReviews, forms, formWebhooks, loading, error,
       userRole, canEdit, isClientRole,
       setClient, setAvatars, setOffers, setIntakeQuestions, setCopyComponents, setFunnelInstances, setCompetitors, setLandingPages, setPublishedPages, setMediaAssets, setBrandKit,
       setLoading, setError, loadAllClients, loadClientData, switchClient, createClient: createNewClient,
       updateAvatar, updateOffer, refreshAvatars, refreshOffers, refreshIntake,
-      refreshCopyComponents, refreshFunnelInstances, refreshLandingPages, refreshPublishedPages, refreshMediaAssets, refreshBrandKit, refreshPromptTemplates, refreshClientTemplates, refreshQAReviews, refreshClient, setUserRole,
+      refreshCopyComponents, refreshFunnelInstances, refreshLandingPages, refreshPublishedPages, refreshMediaAssets, refreshBrandKit, refreshPromptTemplates, refreshClientTemplates, refreshQAReviews, refreshForms, refreshFormWebhooks, refreshClient, setUserRole,
     }}>
       {children}
     </AppContext.Provider>

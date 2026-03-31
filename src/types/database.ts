@@ -525,6 +525,82 @@ export interface QAComponentReview {
 }
 
 // Prompt template record (from prompt_templates table)
+// Form record (from forms table)
+export interface Form {
+  id: string
+  client_id: string
+  name: string
+  form_type: 'standard' | 'multi_step'
+  fields: FormField[]
+  steps: FormStep[] | null
+  settings: FormSettingsDb
+  status: 'active' | 'archived'
+  created_at: string
+  updated_at: string
+}
+
+export interface FormField {
+  id: string
+  type: 'text' | 'email' | 'phone' | 'select' | 'textarea' | 'checkbox' | 'hidden'
+  name: string
+  label: string
+  placeholder?: string
+  required?: boolean
+  validation?: { pattern?: string; min_length?: number; max_length?: number }
+  options?: Array<{ value: string; label: string }>
+  width?: 'full' | 'half'
+}
+
+export interface FormStep {
+  name: string
+  field_ids: string[]
+}
+
+export interface FormSettingsDb {
+  submit_button_text?: string
+  success_message?: string
+  redirect_url?: string
+  show_progress_bar?: boolean
+  next_button_text?: string
+  back_button_text?: string
+}
+
+// Form webhook (from form_webhooks table)
+export interface FormWebhook {
+  id: string
+  client_id: string
+  form_id: string
+  webhook_url: string
+  name: string | null
+  headers: Record<string, string>
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+// Form submission (from form_submissions table)
+export interface FormSubmission {
+  id: string
+  form_id: string
+  client_id: string
+  published_page_id: string | null
+  form_data: Record<string, string>
+  page_slug: string | null
+  client_slug: string | null
+  page_url: string | null
+  utm_source: string | null
+  utm_medium: string | null
+  utm_campaign: string | null
+  utm_content: string | null
+  utm_term: string | null
+  referrer: string | null
+  traffic_source: string | null
+  user_agent: string | null
+  webhook_status: Array<{ webhook_id: string; status: string; response_code: number | null }>
+  created_at: string
+}
+
+// Prompt template record (from prompt_templates table)
 export interface PromptTemplate {
   id: string
   client_id: string | null

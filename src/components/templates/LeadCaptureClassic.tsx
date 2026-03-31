@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import type { Section, SectionItem, MediaAssets, TrustpilotWidget } from './types'
+import type { Section, SectionItem, MediaAssets, TrustpilotWidget, FormConfig } from './types'
+import LeadFormDynamic from './LeadFormDynamic'
 import AnimatedBackground from '../shared/AnimatedBackground'
 import {
   ChevronDown,
@@ -89,9 +90,13 @@ const SOCIALS: Record<string, React.ComponentType<{ className?: string }>> = {
 interface Props {
   sections: Section[]
   media: MediaAssets
+  formConfig?: FormConfig | null
+  pageSlug?: string
+  clientSlug?: string
+  publishedPageId?: string
 }
 
-export default function LeadCaptureClassic({ sections, media }: Props) {
+export default function LeadCaptureClassic({ sections, media, formConfig, pageSlug, clientSlug, publishedPageId }: Props) {
   // Sanitize all text fields in sections to fix garbled UTF-8
   const cleanSections = sections.map(sec => ({
     ...sec,
@@ -170,6 +175,16 @@ export default function LeadCaptureClassic({ sections, media }: Props) {
 
       {/* ─── FAQ ─── */}
       {faq && <FaqBlock section={faq} />}
+
+      {/* ─── LEAD FORM ─── */}
+      {formConfig && (
+        <LeadFormDynamic
+          formConfig={formConfig}
+          pageSlug={pageSlug}
+          clientSlug={clientSlug}
+          publishedPageId={publishedPageId}
+        />
+      )}
 
       {/* ─── FOOTER ─── */}
       <FooterBlock section={footer} media={media} />
