@@ -3,7 +3,7 @@
 // Generates N avatars based on business context + user guidance
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { callClaude, parseJsonResponse, corsHeaders, jsonResponse, errorResponse } from '../_shared/ai-client.ts'
+import { callClaude, parseJsonResponse, corsHeaders, jsonResponse, errorResponse, getCustomPrompt } from '../_shared/ai-client.ts'
 
 const ANGLE_DEFINITIONS = `Available angles (use slug values):
 - problem: Pain Point. Focus on a pain the audience is currently experiencing.
@@ -70,7 +70,10 @@ Deno.serve(async (req: Request) => {
       ? `\n\nUSER DIRECTION (follow this guidance closely):\n${user_prompt}`
       : ''
 
-    const systemPrompt = `You are a senior audience strategist at a performance marketing agency. Your specialty is building deeply researched, psychographically rich customer avatars that drive high-converting ad campaigns.
+    // Try custom prompt first, fall back to hardcoded default
+    const customPrompt = await getCustomPrompt(supabase, client_id, 'generate_avatars')
+
+    const defaultSystemPrompt = `You are a senior audience strategist at a performance marketing agency. Your specialty is building deeply researched, psychographically rich customer avatars that drive high-converting ad campaigns.
 
 You are generating ${generateCount} NEW audience avatars for a client. These avatars represent distinct people in different life situations, at different awareness stages, with different triggers that make them ready to buy NOW.
 
@@ -102,6 +105,8 @@ RESPONSE FORMAT:
 Respond ONLY with valid JSON: { "avatars": [{ "name": "...", "avatar_type": "...", "description": "...", "pain_points": "...", "motivations": "...", "objections": "...", "desired_outcome": "...", "trigger_events": "...", "messaging_style": "...", "preferred_platforms": ["..."], "recommended_angles": ["..."] }] }
 
 No markdown, no explanation outside the JSON.`
+
+    const systemPrompt = customPrompt || defaultSystemPrompt
 
     const userMessage = `BUSINESS CONTEXT:
 Company: ${client.name}

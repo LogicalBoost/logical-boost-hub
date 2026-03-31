@@ -262,9 +262,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setError(err.message)
       return null
     }
+    // Reset all data for the new (empty) client
     setClient(data)
     saveClientId(data.id)
     setAllClients(prev => [data as Client, ...prev])
+    setAvatars([])
+    setOffers([])
+    setIntakeQuestions([])
+    setFunnelInstances([])
+    setCopyComponents([])
+    setCompetitors([])
+    setLandingPages([])
+    setPublishedPages([])
+    setMediaAssets([])
+    setBrandKit(null)
+    setClientTemplates([])
+    setQAReviews([])
+    setForms([])
+    setFormWebhooks([])
     return data as Client
   }, [saveClientId])
 

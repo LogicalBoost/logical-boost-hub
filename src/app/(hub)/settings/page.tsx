@@ -31,16 +31,20 @@ type SettingsTab = 'business' | 'intake' | 'profile' | 'team' | 'clients' | 'pro
 export default function SettingsPage() {
   const { profile, user } = useAuth()
   const {
-    client, loading, allClients, canEdit,
+    client, loading, allClients, canEdit, isClientRole,
     setClient, setLoading, setError, createClient, loadClientData, loadAllClients,
     intakeQuestions, refreshIntake, refreshClient,
   } = useAppStore()
 
-  const [activeTab, setActiveTab] = useState<SettingsTab>(client ? 'business' : 'profile')
+  const [activeTab, setActiveTab] = useState<SettingsTab>(isClientRole ? 'profile' : (client ? 'business' : 'profile'))
 
   // ─── Profile form ───
   const [editName, setEditName] = useState(profile?.name || '')
   const [savingProfile, setSavingProfile] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [savingPassword, setSavingPassword] = useState(false)
+  const [passwordMessage, setPasswordMessage] = useState('')
 
   // ─── Team management ───
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
@@ -128,13 +132,13 @@ export default function SettingsPage() {
 
   const isAdmin = profile?.role === 'admin'
 
-  // Switch to business tab when client is selected
+  // Switch to business tab when client is selected (agency only)
   useEffect(() => {
-    if (client && activeTab === 'profile') {
+    if (client && activeTab === 'profile' && !isClientRole) {
       setActiveTab('business')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client?.id])
+  }, [client?.id, isClientRole])
 
   useEffect(() => {
     setEditName(profile?.name || '')
@@ -1926,46 +1930,127 @@ export default function SettingsPage() {
     )
   }
 
+  async function handleChangePassword() {
+    if (!newPassword || !confirmPassword) {
+      setPasswordMessage('Please fill in both password fields.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage('Passwords do not match.')
+      return
+    }
+    if (newPassword.length < 8) {
+      setPasswordMessage('Password must be at least 8 characters.')
+      return
+    }
+    setSavingPassword(true)
+    setPasswordMessage('')
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) throw error
+      setPasswordMessage('Password updated successfully.')
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (err) {
+      setPasswordMessage('Failed to update password: ' + (err as Error).message)
+    } finally {
+      setSavingPassword(false)
+    }
+  }
+
   function renderProfileTab() {
     return (
-      <div className="funnel-section-card">
-        <div className="funnel-section-header">
-          <h3>My Profile</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <div className="funnel-section-card">
+          <div className="funnel-section-header">
+            <h3>My Profile</h3>
+          </div>
+          <div style={{ padding: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, maxWidth: 600 }}>
+              <div className="form-group">
+                <label className="form-label">Name</label>
+                <input
+                  className="form-input"
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Email</label>
+                <input
+                  className="form-input"
+                  value={profile?.email || ''}
+                  disabled
+                  style={{ opacity: 0.6 }}
+                />
+              </div>
+              {!isClientRole && (
+                <div className="form-group">
+                  <label className="form-label">Role</label>
+                  <div style={{ padding: '8px 0' }}>
+                    <span className="tag" style={{ fontSize: 13 }}>{profile?.role || 'admin'}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <button
+              className="btn btn-primary"
+              onClick={handleSaveProfile}
+              disabled={savingProfile}
+              style={{ marginTop: 12 }}
+            >
+              {savingProfile ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
         </div>
-        <div style={{ padding: 24 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, maxWidth: 600 }}>
-            <div className="form-group">
-              <label className="form-label">Name</label>
-              <input
-                className="form-input"
-                value={editName}
-                onChange={e => setEditName(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Email</label>
-              <input
-                className="form-input"
-                value={profile?.email || ''}
-                disabled
-                style={{ opacity: 0.6 }}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Role</label>
-              <div style={{ padding: '8px 0' }}>
-                <span className="tag" style={{ fontSize: 13 }}>{profile?.role || 'admin'}</span>
+
+        {/* Password Change */}
+        <div className="funnel-section-card">
+          <div className="funnel-section-header">
+            <h3>Change Password</h3>
+          </div>
+          <div style={{ padding: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, maxWidth: 600 }}>
+              <div className="form-group">
+                <label className="form-label">New Password</label>
+                <input
+                  className="form-input"
+                  type="password"
+                  placeholder="Min 8 characters"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Confirm Password</label>
+                <input
+                  className="form-input"
+                  type="password"
+                  placeholder="Re-enter password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                />
               </div>
             </div>
+            {passwordMessage && (
+              <div style={{
+                marginTop: 12, padding: '8px 12px', borderRadius: 'var(--radius-sm)',
+                fontSize: 13,
+                background: passwordMessage.includes('success') ? 'var(--success-muted)' : 'var(--danger-muted)',
+                color: passwordMessage.includes('success') ? 'var(--success)' : 'var(--danger)',
+              }}>
+                {passwordMessage}
+              </div>
+            )}
+            <button
+              className="btn btn-primary"
+              onClick={handleChangePassword}
+              disabled={savingPassword}
+              style={{ marginTop: 12 }}
+            >
+              {savingPassword ? 'Updating...' : 'Update Password'}
+            </button>
           </div>
-          <button
-            className="btn btn-primary"
-            onClick={handleSaveProfile}
-            disabled={savingProfile}
-            style={{ marginTop: 12 }}
-          >
-            {savingProfile ? 'Saving...' : 'Save Changes'}
-          </button>
         </div>
       </div>
     )
@@ -2422,18 +2507,22 @@ export default function SettingsPage() {
 
       {/* Tabs */}
       <div className="funnel-tabs" style={{ marginBottom: 24 }}>
-        <button
-          className={`funnel-tab ${activeTab === 'business' ? 'funnel-tab-active' : ''}`}
-          onClick={() => setActiveTab('business')}
-        >
-          Business
-        </button>
-        <button
-          className={`funnel-tab ${activeTab === 'intake' ? 'funnel-tab-active' : ''}`}
-          onClick={() => setActiveTab('intake')}
-        >
-          Intake
-        </button>
+        {!isClientRole && (
+          <>
+            <button
+              className={`funnel-tab ${activeTab === 'business' ? 'funnel-tab-active' : ''}`}
+              onClick={() => setActiveTab('business')}
+            >
+              Business
+            </button>
+            <button
+              className={`funnel-tab ${activeTab === 'intake' ? 'funnel-tab-active' : ''}`}
+              onClick={() => setActiveTab('intake')}
+            >
+              Intake
+            </button>
+          </>
+        )}
         <button
           className={`funnel-tab ${activeTab === 'profile' ? 'funnel-tab-active' : ''}`}
           onClick={() => setActiveTab('profile')}
@@ -2465,8 +2554,8 @@ export default function SettingsPage() {
       </div>
 
       {/* Tab content */}
-      {activeTab === 'business' && renderBusinessTab()}
-      {activeTab === 'intake' && renderIntakeTab()}
+      {activeTab === 'business' && !isClientRole && renderBusinessTab()}
+      {activeTab === 'intake' && !isClientRole && renderIntakeTab()}
       {activeTab === 'profile' && renderProfileTab()}
       {activeTab === 'team' && isAdmin && renderTeamTab()}
       {activeTab === 'clients' && isAdmin && renderClientAccessTab()}

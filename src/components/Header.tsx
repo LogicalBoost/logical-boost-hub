@@ -6,7 +6,7 @@ import { useAppStore } from '@/lib/store'
 import { useAuth } from './AuthProvider'
 
 export default function Header() {
-  const { client, allClients, loadAllClients, switchClient, setUserRole } = useAppStore()
+  const { client, allClients, loadAllClients, switchClient, setUserRole, isClientRole } = useAppStore()
   const { profile, signOut } = useAuth()
   const router = useRouter()
   const restoredRef = useRef(false)
@@ -19,11 +19,17 @@ export default function Header() {
     }
   }, [profile, setUserRole])
 
+  // Track whether createClient has set a client before initial restore runs
+  const clientRef = useRef(client)
+  clientRef.current = client
+
   useEffect(() => {
     loadAllClients().then((clients) => {
       // Auto-restore last selected client from localStorage
+      // Skip if a client is already set (e.g., just created via createClient)
       if (!restoredRef.current && clients.length > 0) {
         restoredRef.current = true
+        if (clientRef.current) return // A client was already set (e.g., just created)
         try {
           const savedId = localStorage.getItem('lbh_selected_client_id')
           if (savedId && clients.some(c => c.id === savedId)) {
@@ -34,12 +40,13 @@ export default function Header() {
         } catch { /* storage unavailable */ }
       }
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadAllClients, switchClient])
 
   async function handleClientChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const value = e.target.value
     if (value === '__new__') {
-      router.push('/business-overview/')
+      router.push('/business-overview/?new=1')
       return
     }
     if (value) {
@@ -66,18 +73,28 @@ export default function Header() {
             }}
           />
         )}
-        <label>Client:</label>
-        <select
-          value={client?.id || ''}
-          onChange={handleClientChange}
-          style={{ minWidth: 220 }}
-        >
-          {!client && <option value="">Select a client...</option>}
-          {allClients.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-          <option value="__new__">+ Add New Client</option>
-        </select>
+        {isClientRole ? (
+          /* Client role: just show their client name, no switcher */
+          <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}>
+            {client?.name || 'My Account'}
+          </span>
+        ) : (
+          /* Agency roles: full client switcher dropdown */
+          <>
+            <label>Client:</label>
+            <select
+              value={client?.id || ''}
+              onChange={handleClientChange}
+              style={{ minWidth: 220 }}
+            >
+              {!client && <option value="">Select a client...</option>}
+              {allClients.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+              <option value="__new__">+ Add New Client</option>
+            </select>
+          </>
+        )}
       </div>
       <div className="user-menu" style={{ position: 'relative' }}>
         <button
@@ -100,9 +117,9 @@ export default function Header() {
             />
             <div style={{
               position: 'absolute', top: '100%', right: 0, marginTop: 8,
-              background: 'var(--bg-card)', border: '1px solid var(--border)',
+              background: '#141e1b', border: '1px solid var(--border)',
               borderRadius: 8, minWidth: 200, zIndex: 100,
-              boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
             }}>
               <div style={{
                 padding: '12px 16px', borderBottom: '1px solid var(--border)',
@@ -110,9 +127,11 @@ export default function Header() {
               }}>
                 <div style={{ fontWeight: 600, marginBottom: 2 }}>{displayName}</div>
                 <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>{profile?.email}</div>
-                <div style={{ marginTop: 4 }}>
-                  <span className="tag" style={{ fontSize: 11 }}>{profile?.role || 'admin'}</span>
-                </div>
+                {!isClientRole && (
+                  <div style={{ marginTop: 4 }}>
+                    <span className="tag" style={{ fontSize: 11 }}>{profile?.role || 'admin'}</span>
+                  </div>
+                )}
               </div>
               <div style={{ padding: 4 }}>
                 <button

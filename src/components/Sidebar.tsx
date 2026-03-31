@@ -3,22 +3,29 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect, useCallback } from 'react'
+import { useAppStore } from '@/lib/store'
 
 const COLLAPSED_KEY = 'lbh_sidebar_collapsed'
 
-const navItems = [
-  { href: '/dashboard/', label: 'Dashboard', icon: '◫' },
-  { href: '/stats/', label: 'Stats', icon: '◩' },
-  { href: '/copy/', label: 'Copy', icon: '◬' },
-  { href: '/landing-pages/', label: 'Landing Pages', icon: '◰' },
-  { href: '/avatars/', label: 'Avatars', icon: '◪' },
-  { href: '/offers/', label: 'Offers', icon: '◭' },
-  { href: '/competitor-intel/', label: 'Competitor Intel', icon: '◮' },
-  { href: '/settings/', label: 'Settings', icon: '◷' },
+const allNavItems = [
+  { href: '/dashboard/', label: 'Dashboard', icon: '◫', clientVisible: true },
+  { href: '/stats/', label: 'Stats', icon: '◩', clientVisible: false },
+  { href: '/copy/', label: 'Copy', icon: '◬', clientVisible: false },
+  { href: '/landing-pages/', label: 'Landing Pages', icon: '◰', clientVisible: true },
+  { href: '/avatars/', label: 'Avatars', icon: '◪', clientVisible: false },
+  { href: '/offers/', label: 'Offers', icon: '◭', clientVisible: false },
+  { href: '/competitor-intel/', label: 'Competitor Intel', icon: '◮', clientVisible: false },
+  { href: '/settings/', label: 'Settings', icon: '◷', clientVisible: true },
 ]
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const { isClientRole } = useAppStore()
+
+  // Filter nav items based on role — clients only see Dashboard, Landing Pages, Settings
+  const navItems = isClientRole
+    ? allNavItems.filter(item => item.clientVisible)
+    : allNavItems
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
 

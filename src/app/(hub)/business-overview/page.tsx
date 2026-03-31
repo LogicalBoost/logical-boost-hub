@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useAppStore } from '@/lib/store'
 import { analyzeBusiness } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
@@ -10,9 +11,17 @@ import LogoUpload from '@/components/LogoUpload'
 
 export default function BusinessOverviewPage() {
   const { client, loading, setClient, setLoading, setError, createClient, loadClientData, loadAllClients, canEdit, refreshClient, mediaAssets, refreshMediaAssets } = useAppStore()
+  const searchParams = useSearchParams()
 
-  // New client setup form state
+  // New client setup form state — auto-show if ?new=1 query param
   const [showNewForm, setShowNewForm] = useState(false)
+
+  // Auto-show the new client form when navigating with ?new=1
+  useEffect(() => {
+    if (searchParams?.get('new') === '1') {
+      setShowNewForm(true)
+    }
+  }, [searchParams])
   const [setupName, setSetupName] = useState('')
   const [setupWebsite, setSetupWebsite] = useState('')
   const [setupNotes, setSetupNotes] = useState('')

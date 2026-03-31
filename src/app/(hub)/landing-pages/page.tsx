@@ -212,8 +212,8 @@ export default function LandingPagesPage() {
   // Client template selection (from saved templates)
   const [selectedClientTemplate, setSelectedClientTemplate] = useState<string | null>(null)
 
-  // Tab state: builder vs published pages list
-  const [activeView, setActiveView] = useState<'builder' | 'pages'>('builder')
+  // Tab state: builder vs published pages list — clients default to pages view
+  const [activeView, setActiveView] = useState<'builder' | 'pages'>(isClientRole ? 'pages' : 'builder')
 
   // Delete a published page with confirmation
   async function handleDeletePublishedPage(pageId: string, slug: string) {
@@ -641,72 +641,76 @@ export default function LandingPagesPage() {
       {/* Page header */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 26, marginBottom: 4 }}>Landing Pages</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
-          Build, preview, and deploy high-converting landing pages
-        </p>
+        {!isClientRole && (
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
+            Build, preview, and deploy high-converting landing pages
+          </p>
+        )}
       </div>
 
       {/* ============================================================ */}
-      {/* View Tabs: Builder / Published Pages */}
+      {/* View Tabs: Builder / Published Pages — hide Builder for client role */}
       {/* ============================================================ */}
-      <div style={{
-        display: 'flex',
-        gap: 0,
-        marginBottom: 24,
-        borderBottom: '2px solid var(--border)',
-      }}>
-        <button
-          onClick={() => setActiveView('builder')}
-          style={{
-            padding: '12px 24px',
-            fontSize: 15,
-            fontWeight: 600,
-            background: 'none',
-            border: 'none',
-            borderBottom: activeView === 'builder' ? '2px solid var(--accent)' : '2px solid transparent',
-            color: activeView === 'builder' ? 'var(--accent)' : 'var(--text-muted)',
-            cursor: 'pointer',
-            marginBottom: -2,
-            transition: 'color 0.15s, border-color 0.15s',
-          }}
-        >
-          Builder
-        </button>
-        <button
-          onClick={() => setActiveView('pages')}
-          style={{
-            padding: '12px 24px',
-            fontSize: 15,
-            fontWeight: 600,
-            background: 'none',
-            border: 'none',
-            borderBottom: activeView === 'pages' ? '2px solid var(--accent)' : '2px solid transparent',
-            color: activeView === 'pages' ? 'var(--accent)' : 'var(--text-muted)',
-            cursor: 'pointer',
-            marginBottom: -2,
-            transition: 'color 0.15s, border-color 0.15s',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-          }}
-        >
-          Published Pages
-          {livePageCount > 0 && (
-            <span style={{
-              fontSize: 11,
-              fontWeight: 700,
-              background: 'var(--accent)',
-              color: 'var(--bg-card)',
-              borderRadius: 10,
-              padding: '2px 8px',
-              minWidth: 20,
-              textAlign: 'center',
-            }}>
-              {livePageCount}
-            </span>
-          )}
-        </button>
-      </div>
+      {!isClientRole && (
+        <div style={{
+          display: 'flex',
+          gap: 0,
+          marginBottom: 24,
+          borderBottom: '2px solid var(--border)',
+        }}>
+          <button
+            onClick={() => setActiveView('builder')}
+            style={{
+              padding: '12px 24px',
+              fontSize: 15,
+              fontWeight: 600,
+              background: 'none',
+              border: 'none',
+              borderBottom: activeView === 'builder' ? '2px solid var(--accent)' : '2px solid transparent',
+              color: activeView === 'builder' ? 'var(--accent)' : 'var(--text-muted)',
+              cursor: 'pointer',
+              marginBottom: -2,
+              transition: 'color 0.15s, border-color 0.15s',
+            }}
+          >
+            Builder
+          </button>
+          <button
+            onClick={() => setActiveView('pages')}
+            style={{
+              padding: '12px 24px',
+              fontSize: 15,
+              fontWeight: 600,
+              background: 'none',
+              border: 'none',
+              borderBottom: activeView === 'pages' ? '2px solid var(--accent)' : '2px solid transparent',
+              color: activeView === 'pages' ? 'var(--accent)' : 'var(--text-muted)',
+              cursor: 'pointer',
+              marginBottom: -2,
+              transition: 'color 0.15s, border-color 0.15s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            Published Pages
+            {livePageCount > 0 && (
+              <span style={{
+                fontSize: 11,
+                fontWeight: 700,
+                background: 'var(--accent)',
+                color: 'var(--bg-card)',
+                borderRadius: 10,
+                padding: '2px 8px',
+                minWidth: 20,
+                textAlign: 'center',
+              }}>
+                {livePageCount}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* ============================================================ */}
       {/* Published Pages List — grouped by avatar + offer */}
@@ -878,20 +882,26 @@ export default function LandingPagesPage() {
         }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>&#128196;</div>
           <h3 style={{ fontSize: 16, color: 'var(--text-primary)', marginBottom: 8 }}>No published pages yet</h3>
-          <p style={{ fontSize: 13, marginBottom: 16 }}>Use the Builder tab to create and publish your first landing page.</p>
-          <button
-            className="btn btn-primary"
-            onClick={() => setActiveView('builder')}
-          >
-            Go to Builder
-          </button>
+          {isClientRole ? (
+            <p style={{ fontSize: 13 }}>Your landing pages will appear here once they are published.</p>
+          ) : (
+            <>
+              <p style={{ fontSize: 13, marginBottom: 16 }}>Use the Builder tab to create and publish your first landing page.</p>
+              <button
+                className="btn btn-primary"
+                onClick={() => setActiveView('builder')}
+              >
+                Go to Builder
+              </button>
+            </>
+          )}
         </div>
       )}
 
       {/* ============================================================ */}
       {/* Builder View */}
       {/* ============================================================ */}
-      {activeView === 'builder' && <>
+      {activeView === 'builder' && !isClientRole && <>
 
       {/* Step indicator */}
       <div style={{
