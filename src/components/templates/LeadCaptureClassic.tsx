@@ -177,17 +177,21 @@ export default function LeadCaptureClassic({ sections, media }: Props) {
   )
 }
 
-/* Helper: fix garbled UTF-8 sequences (e.g. â¢ → •, â → ✓) */
+/* Helper: fix garbled UTF-8 sequences (mojibake — UTF-8 bytes read as Latin-1) */
 function sanitizeText(text: string): string {
   return text
-    .replace(/â¢/g, '•')
-    .replace(/â/g, '✓')
-    .replace(/â/g, '—')
-    .replace(/â/g, '"')
-    .replace(/â/g, '"')
-    .replace(/â/g, "'")
-    .replace(/â/g, "'")
-    .replace(/Â /g, ' ')
+    // 3-byte UTF-8 mojibake patterns (most common)
+    .replace(/\u00e2\u0080\u00a2/g, '•')    // • bullet
+    .replace(/\u00e2\u0080\u0099/g, '\u2019') // ' right single quote
+    .replace(/\u00e2\u0080\u009c/g, '\u201c') // " left double quote
+    .replace(/\u00e2\u0080\u009d/g, '\u201d') // " right double quote
+    .replace(/\u00e2\u0080\u0093/g, '\u2013') // – en dash
+    .replace(/\u00e2\u0080\u0094/g, '\u2014') // — em dash
+    .replace(/\u00e2\u009c\u0093/g, '✓')      // ✓ check mark
+    .replace(/\u00e2\u009c\u0085/g, '✅')     // ✅ white check mark
+    .replace(/\u00c2\u00a0/g, ' ')            // non-breaking space
+    // Catch any remaining 3-byte \u00e2 sequences as bullet fallback
+    .replace(/\u00e2[\u0080-\u009f][\u0080-\u00bf]/g, '•')
 }
 
 /* ═══════════════════════════════════════════════════════
