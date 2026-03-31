@@ -198,6 +198,20 @@ export async function editLandingPageSection(
   })
 }
 
+// QA Review: Run copywriter quality review on all copy components
+export async function runQACopywriterReview(funnelInstanceId: string) {
+  return callEdgeFunction('qa-copywriter-review', {
+    funnel_instance_id: funnelInstanceId,
+  })
+}
+
+// QA Review: Run compliance review on all copy components
+export async function runQAComplianceReview(funnelInstanceId: string) {
+  return callEdgeFunction('qa-compliance-review', {
+    funnel_instance_id: funnelInstanceId,
+  })
+}
+
 // Workflow 10: AI-powered competitor discovery
 export async function discoverCompetitors(
   clientId: string,

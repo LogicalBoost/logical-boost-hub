@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAppStore } from '@/lib/store'
-import { generateFunnel, generateMore } from '@/lib/api'
+import { generateFunnel, generateMore, runQACopywriterReview, runQAComplianceReview } from '@/lib/api'
 import { showToast } from '@/lib/demo-toast'
 import { ANGLES, getAngleLabel, ANGLE_COLORS, TEMPLATE_INFO } from '@/types/database'
-import type { CopyComponent, CopyComponentType, BrandKit, TemplateId } from '@/types/database'
+import type { CopyComponent, CopyComponentType, BrandKit, TemplateId, QAReview, QAComponentReview } from '@/types/database'
 import { supabase } from '@/lib/supabase'
 import { TEMPLATE_SLOTS, mapComponentsToSlots } from '@/lib/template-slots'
 import type { CopySlotDef } from '@/lib/template-slots'
@@ -593,8 +593,10 @@ export default function FunnelPage() {
     offers,
     funnelInstances,
     copyComponents,
+    qaReviews,
     refreshCopyComponents,
     refreshFunnelInstances,
+    refreshQAReviews,
     setLoading,
     loading,
     canEdit,
@@ -614,6 +616,8 @@ export default function FunnelPage() {
   const [promptQuantity, setPromptQuantity] = useState(5)
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [runningQA, setRunningQA] = useState(false)
+  const [showQAPanel, setShowQAPanel] = useState(false)
 
   const approvedAvatars = avatars
     .filter((a) => a.status === 'approved')
@@ -757,6 +761,59 @@ export default function FunnelPage() {
     },
     [funnelInstances, copyComponents]
   )
+
+  // ── QA Review data ──────────────────────────────────────────────────────
+
+  // Latest QA reviews for current funnel instance
+  const latestCopywriterReview = useMemo(() => {
+    if (!currentInstance) return null
+    return qaReviews.find(r => r.funnel_instance_id === currentInstance.id && r.review_type === 'copywriter' && r.status === 'completed') || null
+  }, [qaReviews, currentInstance])
+
+  const latestComplianceReview = useMemo(() => {
+    if (!currentInstance) return null
+    return qaReviews.find(r => r.funnel_instance_id === currentInstance.id && r.review_type === 'compliance' && r.status === 'completed') || null
+  }, [qaReviews, currentInstance])
+
+  // Build lookup map: component_id → QA reviews
+  const qaComponentMap = useMemo(() => {
+    const map = new Map<string, { copywriter?: QAComponentReview; compliance?: QAComponentReview }>()
+    if (latestCopywriterReview) {
+      for (const r of latestCopywriterReview.component_reviews) {
+        const entry = map.get(r.component_id) || {}
+        entry.copywriter = r
+        map.set(r.component_id, entry)
+      }
+    }
+    if (latestComplianceReview) {
+      for (const r of latestComplianceReview.component_reviews) {
+        const entry = map.get(r.component_id) || {}
+        entry.compliance = r
+        map.set(r.component_id, entry)
+      }
+    }
+    return map
+  }, [latestCopywriterReview, latestComplianceReview])
+
+  async function handleRunQAReview() {
+    if (!currentInstance || !client) return
+    setRunningQA(true)
+    setShowQAPanel(true)
+    try {
+      // Run both reviews in parallel
+      const [copyResult, complianceResult] = await Promise.allSettled([
+        runQACopywriterReview(currentInstance.id),
+        runQAComplianceReview(currentInstance.id),
+      ])
+      await refreshQAReviews(client.id)
+      const successCount = [copyResult, complianceResult].filter(r => r.status === 'fulfilled').length
+      showToast(`QA Review complete! ${successCount}/2 agents finished successfully.`)
+    } catch (err) {
+      showToast(`QA Review failed: ${(err as Error).message}`)
+    } finally {
+      setRunningQA(false)
+    }
+  }
 
   // ── Handlers ────────────────────────────────────────────────────────────
 
@@ -1081,6 +1138,170 @@ export default function FunnelPage() {
                     {!hasVideoContent ? ' No video scripts yet.' : ''}
                   </span>
                 </>
+              )}
+            </div>
+          )}
+
+          {/* ── QA Review Panel ──────────────────────────────────── */}
+          {canEdit && instanceComponents.length > 0 && (
+            <div className="qa-review-section">
+              <div className="qa-review-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>QA Review</h3>
+                  {latestCopywriterReview && (
+                    <span
+                      className="qa-score-badge"
+                      style={{
+                        background: (latestCopywriterReview.overall_score || 0) >= 80 ? '#10b981' : (latestCopywriterReview.overall_score || 0) >= 60 ? '#f59e0b' : '#ef4444',
+                      }}
+                    >
+                      {latestCopywriterReview.overall_score}/100
+                    </span>
+                  )}
+                  {latestComplianceReview && (
+                    <span
+                      className="qa-compliance-badge"
+                      style={{
+                        background: (latestComplianceReview.flagged_count || 0) === 0 ? '#10b981' : (latestComplianceReview.flagged_count || 0) <= 5 ? '#f59e0b' : '#ef4444',
+                      }}
+                    >
+                      {(() => {
+                        const meta = latestComplianceReview.metadata as Record<string, number> | null
+                        return meta ? `${meta.passing || 0}/${meta.total_components || 0} passing` : `${latestComplianceReview.flagged_count} flagged`
+                      })()}
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {(latestCopywriterReview || latestComplianceReview) && (
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => setShowQAPanel(!showQAPanel)}
+                      style={{ fontSize: 12 }}
+                    >
+                      {showQAPanel ? 'Hide Details' : 'Show Details'}
+                    </button>
+                  )}
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={handleRunQAReview}
+                    disabled={runningQA || generating}
+                    style={{ fontSize: 12 }}
+                  >
+                    {runningQA ? (
+                      <><span className="generating-spinner" style={{ width: 14, height: 14, marginRight: 6 }} /> Running QA...</>
+                    ) : latestCopywriterReview ? (
+                      <>&#128269; Re-run QA Review</>
+                    ) : (
+                      <>&#128269; Run QA Review</>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {showQAPanel && (latestCopywriterReview || latestComplianceReview || runningQA) && (
+                <div className="qa-review-details">
+                  {runningQA && !latestCopywriterReview && (
+                    <div className="qa-running-message">
+                      <div className="generating-spinner" style={{ width: 20, height: 20 }} />
+                      <span>Running copywriter quality + compliance review on {instanceComponents.length} components... This takes 30-60 seconds.</span>
+                    </div>
+                  )}
+
+                  {/* Copywriter Review */}
+                  {latestCopywriterReview && (
+                    <div className="qa-review-block">
+                      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: 'var(--text-secondary)' }}>&#9997; Copywriter Review</h4>
+                      <p style={{ margin: '0 0 12px 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                        {latestCopywriterReview.overall_assessment}
+                      </p>
+                      {(() => {
+                        const meta = latestCopywriterReview.metadata as Record<string, unknown> | null
+                        const issues = meta?.variety_issues as string[] | undefined
+                        if (!issues || issues.length === 0) return null
+                        return (
+                          <div style={{ marginBottom: 10 }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: '#f59e0b', textTransform: 'uppercase' }}>Variety Issues:</span>
+                            <ul style={{ margin: '4px 0 0 16px', padding: 0, fontSize: 12, color: 'var(--text-muted)' }}>
+                              {issues.map((issue: string, i: number) => (
+                                <li key={i}>{issue}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )
+                      })()}
+                      {/* Per-component weak items */}
+                      {latestCopywriterReview.component_reviews.filter(r => (r.score || 100) < 60).length > 0 && (
+                        <div>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: '#ef4444', textTransform: 'uppercase' }}>Weak Items ({latestCopywriterReview.component_reviews.filter(r => (r.score || 100) < 60).length}):</span>
+                          <div className="qa-flagged-list">
+                            {latestCopywriterReview.component_reviews.filter(r => (r.score || 100) < 60).slice(0, 10).map((r, i) => (
+                              <div key={i} className="qa-flagged-item">
+                                <span className="qa-flagged-type">{r.type}</span>
+                                <span className="qa-flagged-score" style={{ color: '#ef4444' }}>{r.score}/100</span>
+                                <span className="qa-flagged-text">{(r as QAComponentReview).recommendation || ''}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Compliance Review */}
+                  {latestComplianceReview && (
+                    <div className="qa-review-block">
+                      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: 'var(--text-secondary)' }}>&#9888; Compliance Review</h4>
+                      <p style={{ margin: '0 0 12px 0', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                        {latestComplianceReview.overall_assessment}
+                      </p>
+                      {(() => {
+                        const meta = latestComplianceReview.metadata as Record<string, unknown> | null
+                        const sev = meta?.severity_breakdown as Record<string, number> | undefined
+                        if (!sev) return null
+                        return (
+                          <div style={{ display: 'flex', gap: 12, marginBottom: 10, fontSize: 12 }}>
+                            <span style={{ color: '#ef4444' }}>&#9679; {sev.error || 0} errors</span>
+                            <span style={{ color: '#f59e0b' }}>&#9679; {sev.warning || 0} warnings</span>
+                            <span style={{ color: '#3b82f6' }}>&#9679; {sev.info || 0} info</span>
+                          </div>
+                        )
+                      })()}
+                      {/* Flagged items */}
+                      {latestComplianceReview.component_reviews.length > 0 && (
+                        <div>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: '#ef4444', textTransform: 'uppercase' }}>
+                            Flagged Items ({latestComplianceReview.component_reviews.length}):
+                          </span>
+                          <div className="qa-flagged-list">
+                            {latestComplianceReview.component_reviews.slice(0, 15).map((r, i) => (
+                              <div key={i} className="qa-flagged-item">
+                                <span className="qa-flagged-type">{r.type}</span>
+                                {r.violations && r.violations.length > 0 && (
+                                  <span
+                                    className="qa-flagged-severity"
+                                    style={{
+                                      color: r.violations[0].severity === 'error' ? '#ef4444' : r.violations[0].severity === 'warning' ? '#f59e0b' : '#3b82f6'
+                                    }}
+                                  >
+                                    {r.violations[0].severity}
+                                  </span>
+                                )}
+                                <span className="qa-flagged-text">
+                                  {r.violations?.[0]?.detail || r.suggestions?.[0] || ''}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, fontStyle: 'italic' }}>
+                    Prompts for both QA agents can be customized in Settings &gt; Prompts
+                  </div>
+                </div>
               )}
             </div>
           )}

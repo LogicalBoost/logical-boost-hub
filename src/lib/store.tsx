@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { supabase } from './supabase'
-import type { Client, Avatar, Offer, IntakeQuestion, CopyComponent, FunnelInstance, CompetitorIntel, LandingPage, MediaAsset, BrandKitRecord, PageTemplate, PublishedPage, PromptTemplate, ClientTemplate, UserRole } from '@/types/database'
+import type { Client, Avatar, Offer, IntakeQuestion, CopyComponent, FunnelInstance, CompetitorIntel, LandingPage, MediaAsset, BrandKitRecord, PageTemplate, PublishedPage, PromptTemplate, ClientTemplate, QAReview, UserRole } from '@/types/database'
 
 interface AppState {
   client: Client | null
@@ -19,6 +19,7 @@ interface AppState {
   pageTemplates: PageTemplate[]
   promptTemplates: PromptTemplate[]
   clientTemplates: ClientTemplate[]
+  qaReviews: QAReview[]
   loading: boolean
   error: string | null
   userRole: UserRole
@@ -60,6 +61,7 @@ interface AppStore extends AppState {
   refreshBrandKit: (clientId: string) => Promise<void>
   refreshPromptTemplates: (clientId?: string) => Promise<void>
   refreshClientTemplates: (clientId: string) => Promise<void>
+  refreshQAReviews: (clientId: string) => Promise<void>
   /** Refresh just the client record from DB (e.g. after logo upload or brand kit analysis) */
   refreshClient: (clientId: string) => Promise<void>
   setUserRole: (role: UserRole) => void
@@ -83,6 +85,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [pageTemplates, setPageTemplates] = useState<PageTemplate[]>([])
   const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([])
   const [clientTemplates, setClientTemplates] = useState<ClientTemplate[]>([])
+  const [qaReviews, setQAReviews] = useState<QAReview[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<UserRole>('admin')
@@ -134,6 +137,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         { data: brandKitData },
         { data: templateData },
         { data: clientTemplateData },
+        { data: qaReviewData },
       ] = await Promise.all([
         supabase.from('clients').select('*').eq('id', clientId).single(),
         supabase.from('avatars').select('*').eq('client_id', clientId).order('created_at'),
@@ -148,6 +152,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         supabase.from('brand_kits').select('*').eq('client_id', clientId).single(),
         supabase.from('page_templates').select('*').eq('is_active', true).order('created_at'),
         supabase.from('client_templates').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+        supabase.from('qa_reviews').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
       ])
       if (clientData) setClient(clientData)
       setAvatars(avatarData || [])
@@ -162,6 +167,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setBrandKit(brandKitData || null)
       setPageTemplates(templateData || [])
       setClientTemplates(clientTemplateData || [])
+      setQAReviews(qaReviewData || [])
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -187,6 +193,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         { data: brandKitData },
         { data: templateData },
         { data: clientTemplateData },
+        { data: qaReviewData },
       ] = await Promise.all([
         supabase.from('clients').select('*').eq('id', clientId).single(),
         supabase.from('avatars').select('*').eq('client_id', clientId).order('created_at'),
@@ -201,6 +208,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         supabase.from('brand_kits').select('*').eq('client_id', clientId).single(),
         supabase.from('page_templates').select('*').eq('is_active', true).order('created_at'),
         supabase.from('client_templates').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+        supabase.from('qa_reviews').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
       ])
       if (clientData) {
         setClient(clientData)
@@ -218,6 +226,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setBrandKit(brandKitData || null)
       setPageTemplates(templateData || [])
       setClientTemplates(clientTemplateData || [])
+      setQAReviews(qaReviewData || [])
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -323,6 +332,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setClientTemplates(data || [])
   }, [])
 
+  const refreshQAReviews = useCallback(async (clientId: string) => {
+    const { data } = await supabase.from('qa_reviews').select('*').eq('client_id', clientId).order('created_at', { ascending: false })
+    setQAReviews(data || [])
+  }, [])
+
   const refreshClient = useCallback(async (clientId: string) => {
     const { data } = await supabase.from('clients').select('*').eq('id', clientId).single()
     if (data) {
@@ -334,12 +348,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      allClients, client, avatars, offers, intakeQuestions, funnelInstances, copyComponents, competitors, landingPages, publishedPages, mediaAssets, brandKit, pageTemplates, promptTemplates, clientTemplates, loading, error,
+      allClients, client, avatars, offers, intakeQuestions, funnelInstances, copyComponents, competitors, landingPages, publishedPages, mediaAssets, brandKit, pageTemplates, promptTemplates, clientTemplates, qaReviews, loading, error,
       userRole, canEdit, isClientRole,
       setClient, setAvatars, setOffers, setIntakeQuestions, setCopyComponents, setFunnelInstances, setCompetitors, setLandingPages, setPublishedPages, setMediaAssets, setBrandKit,
       setLoading, setError, loadAllClients, loadClientData, switchClient, createClient: createNewClient,
       updateAvatar, updateOffer, refreshAvatars, refreshOffers, refreshIntake,
-      refreshCopyComponents, refreshFunnelInstances, refreshLandingPages, refreshPublishedPages, refreshMediaAssets, refreshBrandKit, refreshPromptTemplates, refreshClientTemplates, refreshClient, setUserRole,
+      refreshCopyComponents, refreshFunnelInstances, refreshLandingPages, refreshPublishedPages, refreshMediaAssets, refreshBrandKit, refreshPromptTemplates, refreshClientTemplates, refreshQAReviews, refreshClient, setUserRole,
     }}>
       {children}
     </AppContext.Provider>

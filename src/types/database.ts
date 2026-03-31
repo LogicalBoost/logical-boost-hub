@@ -492,6 +492,38 @@ export function getAngleLabel(slug: string): string {
   return ANGLES.find(a => a.slug === slug)?.label ?? slug
 }
 
+// QA Review (from qa_reviews table)
+export interface QAReview {
+  id: string
+  client_id: string
+  funnel_instance_id: string
+  review_type: 'copywriter' | 'compliance'
+  status: 'running' | 'completed' | 'failed'
+  overall_score: number | null
+  overall_assessment: string | null
+  component_reviews: QAComponentReview[]
+  flagged_count: number
+  metadata: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+  created_by: string | null
+}
+
+export interface QAComponentReview {
+  component_id: string
+  type: string
+  text?: string
+  // Copywriter fields
+  score?: number
+  strengths?: string[]
+  weaknesses?: string[]
+  recommendation?: string
+  // Compliance fields
+  pass?: boolean
+  violations?: { rule: string; severity: 'error' | 'warning' | 'info'; detail: string }[]
+  suggestions?: string[]
+}
+
 // Prompt template record (from prompt_templates table)
 export interface PromptTemplate {
   id: string
