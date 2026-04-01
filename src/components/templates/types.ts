@@ -89,7 +89,7 @@ export interface MediaAssets {
 // Form system types
 export interface FormFieldDef {
   id: string
-  type: 'text' | 'email' | 'phone' | 'select' | 'textarea' | 'checkbox' | 'hidden'
+  type: 'text' | 'email' | 'phone' | 'select' | 'textarea' | 'checkbox' | 'hidden' | 'radio' | 'number'
   name: string
   label: string
   placeholder?: string
@@ -100,6 +100,7 @@ export interface FormFieldDef {
 }
 
 export interface FormStepDef {
+  id: string
   name: string
   field_ids: string[]
 }

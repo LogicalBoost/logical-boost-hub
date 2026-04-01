@@ -541,7 +541,7 @@ export interface Form {
 
 export interface FormField {
   id: string
-  type: 'text' | 'email' | 'phone' | 'select' | 'textarea' | 'checkbox' | 'hidden'
+  type: 'text' | 'email' | 'phone' | 'select' | 'textarea' | 'checkbox' | 'hidden' | 'radio' | 'number'
   name: string
   label: string
   placeholder?: string
@@ -552,6 +552,7 @@ export interface FormField {
 }
 
 export interface FormStep {
+  id: string
   name: string
   field_ids: string[]
 }

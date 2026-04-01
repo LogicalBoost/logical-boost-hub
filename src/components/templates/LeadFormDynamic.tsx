@@ -211,14 +211,51 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                   key={field.id}
                   className={field.width === 'half' ? 'col-span-1' : 'col-span-2'}
                 >
-                  {field.type !== 'checkbox' && (
+                  {field.type !== 'checkbox' && field.type !== 'radio' && (
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       {field.label}
                       {field.required && <span className="text-red-500 ml-0.5">*</span>}
                     </label>
                   )}
 
-                  {field.type === 'textarea' ? (
+                  {field.type === 'radio' ? (
+                    <fieldset>
+                      <legend className="block text-sm font-medium text-gray-700 mb-2">
+                        {field.label}
+                        {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                      </legend>
+                      <div className="space-y-2">
+                        {(field.options || []).map((opt) => (
+                          <label key={opt.value} className={`flex items-center gap-3 cursor-pointer px-4 py-3 rounded-lg border transition ${
+                            formData[field.name] === opt.value
+                              ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/5 ring-2 ring-[var(--color-accent)]/20'
+                              : 'border-gray-300 hover:border-gray-400'
+                          }`}>
+                            <input
+                              type="radio"
+                              name={field.name}
+                              value={opt.value}
+                              checked={formData[field.name] === opt.value}
+                              onChange={(e) => handleChange(field.name, e.target.value)}
+                              className="w-5 h-5 text-[var(--color-accent)] focus:ring-[var(--color-accent)]"
+                            />
+                            <span className="text-sm text-gray-700 font-medium">{opt.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  ) : field.type === 'number' ? (
+                    <input
+                      type="number"
+                      name={field.name}
+                      value={formData[field.name] || ''}
+                      onChange={(e) => handleChange(field.name, e.target.value)}
+                      placeholder={field.placeholder || ''}
+                      className={`w-full px-4 py-3 rounded-lg border ${
+                        errors[field.name] ? 'border-red-400' : 'border-gray-300'
+                      } focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 outline-none transition text-gray-800`}
+                    />
+                  ) : field.type === 'textarea' ? (
                     <textarea
                       name={field.name}
                       value={formData[field.name] || ''}
