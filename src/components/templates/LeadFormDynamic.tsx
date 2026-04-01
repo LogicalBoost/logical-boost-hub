@@ -186,12 +186,12 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
       <div>
         {/* Multi-step progress — segmented pill bar */}
         {isMultiStep && settings.show_progress_bar !== false && (
-          <div className="mb-5">
-            <div className="flex gap-1.5 mb-2">
+          <div className="mb-4">
+            <div className="flex gap-1 mb-1.5">
               {steps!.map((_step, i) => (
                 <div
                   key={i}
-                  className="flex-1 h-1.5 rounded-full transition-all duration-300"
+                  className="flex-1 h-1 rounded-full transition-all duration-300"
                   style={{
                     background: i <= currentStep ? 'var(--color-accent)' : '#e5e7eb',
                     opacity: i < currentStep ? 0.5 : 1,
@@ -199,26 +199,21 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                 />
               ))}
             </div>
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Step {currentStep + 1} of {totalSteps}
-              </p>
-              <p className="text-xs font-medium text-gray-400">
-                {steps![currentStep].name}
-              </p>
-            </div>
+            <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wider">
+              Step {currentStep + 1} of {totalSteps}
+            </p>
           </div>
         )}
 
         <form onSubmit={isLastStep ? handleSubmit : (e) => { e.preventDefault(); handleNext() }}>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2.5">
             {currentFields.map((field) => (
               <div
                 key={field.id}
                 className={field.width === 'half' ? 'col-span-1' : 'col-span-2'}
               >
                 {field.type !== 'checkbox' && field.type !== 'radio' && (
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
                     {field.label}
                     {field.required && <span className="text-red-500 ml-0.5">*</span>}
                   </label>
@@ -226,16 +221,16 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
 
                 {field.type === 'radio' ? (
                   <fieldset>
-                    <legend className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    <legend className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
                       {field.label}
                       {field.required && <span className="text-red-500 ml-0.5">*</span>}
                     </legend>
                     <div className="grid grid-cols-2 gap-1.5">
                       {(field.options || []).map((opt) => (
-                        <label key={opt.value} className={`cursor-pointer px-3 py-2 rounded-lg border text-center transition-all text-sm font-medium ${
+                        <label key={opt.value} className={`cursor-pointer px-2.5 py-1.5 rounded-lg border text-center transition-all text-[13px] font-medium ${
                           formData[field.name] === opt.value
                             ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-white shadow-sm'
-                            : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100'
+                            : 'border-gray-200 bg-gray-50/80 text-gray-600 hover:border-gray-300 hover:bg-gray-100'
                         }`}>
                           <input
                             type="radio" name={field.name} value={opt.value}
@@ -252,18 +247,18 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                   <input type="number" name={field.name} value={formData[field.name] || ''}
                     onChange={(e) => handleChange(field.name, e.target.value)}
                     placeholder={field.placeholder || ''}
-                    className={`w-full px-4 py-3 rounded-xl border-2 ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-accent)] focus:ring-0 outline-none transition bg-gray-50 text-gray-800 text-sm`}
+                    className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 outline-none transition bg-white/80 text-gray-800 text-sm`}
                   />
                 ) : field.type === 'textarea' ? (
                   <textarea name={field.name} value={formData[field.name] || ''}
                     onChange={(e) => handleChange(field.name, e.target.value)}
                     placeholder={field.placeholder || ''} rows={3}
-                    className={`w-full px-4 py-3 rounded-xl border-2 ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-accent)] focus:ring-0 outline-none transition bg-gray-50 text-gray-800 text-sm`}
+                    className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 outline-none transition bg-white/80 text-gray-800 text-sm`}
                   />
                 ) : field.type === 'select' ? (
                   <select name={field.name} value={formData[field.name] || ''}
                     onChange={(e) => handleChange(field.name, e.target.value)}
-                    className={`w-full px-4 py-3 rounded-xl border-2 ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-accent)] focus:ring-0 outline-none transition bg-gray-50 text-gray-800 text-sm`}
+                    className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 outline-none transition bg-white/80 text-gray-800 text-sm`}
                   >
                     <option value="">{field.placeholder || 'Select...'}</option>
                     {(field.options || []).map((opt) => (
@@ -271,7 +266,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                     ))}
                   </select>
                 ) : field.type === 'checkbox' ? (
-                  <label className="flex items-start gap-2.5 cursor-pointer py-1">
+                  <label className="flex items-start gap-2 cursor-pointer py-0.5">
                     <input type="checkbox" checked={formData[field.name] === 'true'}
                       onChange={(e) => handleChange(field.name, e.target.checked ? 'true' : '')}
                       className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[var(--color-accent)] focus:ring-[var(--color-accent)]"
@@ -286,38 +281,38 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                     name={field.name} value={formData[field.name] || ''}
                     onChange={(e) => handleChange(field.name, e.target.value)}
                     placeholder={field.placeholder || ''}
-                    className={`w-full px-4 py-3 rounded-xl border-2 ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-accent)] focus:ring-0 outline-none transition bg-gray-50 text-gray-800 text-sm`}
+                    className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 outline-none transition bg-white/80 text-gray-800 text-sm`}
                   />
                 )}
 
                 {errors[field.name] && (
-                  <p className="text-red-500 text-xs mt-1">{errors[field.name]}</p>
+                  <p className="text-red-500 text-xs mt-0.5">{errors[field.name]}</p>
                 )}
               </div>
             ))}
           </div>
 
           {submitError && (
-            <div className="mt-3 p-2.5 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs">{submitError}</div>
+            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs">{submitError}</div>
           )}
 
-          <div className={`mt-5 flex ${isMultiStep && currentStep > 0 ? 'gap-3' : 'flex-col items-center'}`}>
+          <div className={`mt-4 flex ${isMultiStep && currentStep > 0 ? 'gap-2.5' : 'flex-col items-center'}`}>
             {isMultiStep && currentStep > 0 && (
               <button type="button" onClick={handleBack}
-                className="px-5 py-3 rounded-xl border-2 border-gray-200 text-gray-500 font-semibold hover:bg-gray-50 transition text-sm"
+                className="px-4 py-2.5 rounded-lg border border-gray-200 text-gray-500 font-semibold hover:bg-gray-50 transition text-sm"
               >{backText}</button>
             )}
             <button
               type="submit" disabled={submitting}
-              className="btn-textured py-3.5 rounded-[var(--button-radius)] bg-[var(--color-accent)] text-white font-bold text-sm md:text-base transition-all disabled:opacity-60 w-full shadow-lg hover:shadow-xl"
+              className="btn-textured py-3 rounded-[var(--button-radius)] bg-[var(--color-accent)] text-white font-bold text-sm transition-all disabled:opacity-60 w-full shadow-lg hover:shadow-xl"
             >
               {submitting ? 'Submitting...' : isLastStep ? submitText : nextText}
             </button>
           </div>
 
           {/* Trust micro-copy */}
-          <p className="text-center text-[11px] text-gray-400 mt-3 flex items-center justify-center gap-1">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          <p className="text-center text-[10px] text-gray-400 mt-2 flex items-center justify-center gap-1">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
             Secure &amp; confidential
           </p>
         </form>

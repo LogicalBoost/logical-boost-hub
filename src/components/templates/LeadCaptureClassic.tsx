@@ -384,73 +384,108 @@ function HeroBlock({ section, media, primaryColor, accentColor, formConfig, page
         }}
       />
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24 py-16 md:py-20">
-        <div className={`flex flex-col ${hasForm ? 'lg:flex-row' : 'md:flex-row'} items-center gap-10 ${hasForm ? 'lg:gap-10' : 'md:gap-6'}`}>
-          {/* Left: text */}
-          <div className={`flex-1 text-center md:text-left ${hasForm ? 'lg:max-w-[50%]' : 'md:max-w-[55%]'}`}>
-            <h1
-              className="text-4xl sm:text-5xl lg:text-[3.5rem] font-bold text-[var(--color-text)] leading-[1.1] mb-5"
-              style={{ fontFamily: 'var(--font-heading)' }}
-            >
-              <AH text={section.headline || ''} word={section.accent_word} />
-            </h1>
-            {(section.subheadline || section.content) && (
-              <p className="text-base md:text-lg text-gray-500 leading-relaxed mb-8 max-w-lg mx-auto md:mx-0">
-                {section.subheadline || section.content}
-              </p>
-            )}
-            {!hasForm && (
+      <div className={`relative z-10 max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24 ${hasForm ? 'py-10 md:py-12' : 'py-16 md:py-20'}`}>
+        {hasForm ? (
+          /* ─── Form layout: headline top, then image + form side by side ─── */
+          <>
+            {/* Headline area — full width, centered */}
+            <div className="text-center mb-6 md:mb-8">
+              <h1
+                className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[var(--color-text)] leading-[1.1] mb-3"
+                style={{ fontFamily: 'var(--font-heading)' }}
+              >
+                <AH text={section.headline || ''} word={section.accent_word} />
+              </h1>
+              {(section.subheadline || section.content) && (
+                <p className="text-sm md:text-base text-gray-500 leading-relaxed max-w-2xl mx-auto">
+                  {section.subheadline || section.content}
+                </p>
+              )}
+            </div>
+
+            {/* Image + Form row */}
+            <div className="flex flex-col lg:flex-row items-center gap-5 lg:gap-6">
+              {/* Left: hero image */}
+              {img && (
+                <div className="hidden lg:flex flex-1 items-center justify-center lg:max-w-[42%]">
+                  <div className="relative w-full">
+                    <div
+                      className="absolute -top-3 -right-3 w-[75%] h-[75%] rounded-3xl"
+                      style={{ transform: 'rotate(5deg)', background: `${primaryColor}14` }}
+                    />
+                    <img
+                      src={img}
+                      alt=""
+                      className="relative z-10 w-full rounded-2xl shadow-xl object-cover"
+                      style={{ aspectRatio: '3/4', maxHeight: '420px' }}
+                    />
+                    {section.sub_cta && (
+                      <div className="absolute bottom-3 left-3 right-3 z-20">
+                        <span className="inline-flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 text-gray-600 text-xs border border-gray-200/60 shadow-sm">
+                          <PhClock size={12} weight="duotone" color="var(--color-primary)" />
+                          {section.sub_cta}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Right: form card — frosted glass */}
+              <div className={`w-full ${img ? 'lg:w-[54%]' : 'lg:max-w-xl lg:mx-auto'}`}>
+                <div
+                  className="rounded-2xl overflow-hidden"
+                  style={{
+                    background: 'rgba(255,255,255,0.85)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(255,255,255,0.6)',
+                    boxShadow: '0 25px 60px rgba(0,0,0,0.1), 0 8px 24px rgba(0,0,0,0.05)',
+                  }}
+                >
+                  <div className="px-5 py-5 md:px-6 md:py-6">
+                    <LeadFormDynamic
+                      formConfig={formConfig!}
+                      pageSlug={pageSlug}
+                      clientSlug={clientSlug}
+                      publishedPageId={publishedPageId}
+                      embedded
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          /* ─── Standard layout: text left, image right ─── */
+          <div className="flex flex-col md:flex-row items-center gap-10 md:gap-6">
+            <div className="flex-1 text-center md:text-left md:max-w-[55%]">
+              <h1
+                className="text-4xl sm:text-5xl lg:text-[3.5rem] font-bold text-[var(--color-text)] leading-[1.1] mb-5"
+                style={{ fontFamily: 'var(--font-heading)' }}
+              >
+                <AH text={section.headline || ''} word={section.accent_word} />
+              </h1>
+              {(section.subheadline || section.content) && (
+                <p className="text-base md:text-lg text-gray-500 leading-relaxed mb-8 max-w-lg mx-auto md:mx-0">
+                  {section.subheadline || section.content}
+                </p>
+              )}
               <a
                 href={section.cta_url || '#lead-form'}
                 className="btn-textured cta-button inline-block py-4 px-10 rounded-full bg-[var(--color-accent)] font-bold text-base md:text-lg transition-all shadow-xl"
               >
                 {section.cta}
               </a>
-            )}
-            {section.sub_cta && (
-              <div className="mt-4 flex items-center justify-center md:justify-start gap-2">
-                <span className="inline-flex items-center gap-2 bg-gray-100/80 backdrop-blur-sm rounded-full px-4 py-2 text-gray-500 text-xs md:text-sm border border-gray-200/60">
-                  <PhClock size={14} weight="duotone" color="var(--color-primary)" />
-                  {section.sub_cta}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Right: form (if configured) OR hero image */}
-          {hasForm ? (
-            <div className="flex-shrink-0 w-full lg:max-w-[46%]">
-              <div
-                className="rounded-2xl overflow-hidden shadow-2xl"
-                style={{
-                  background: '#ffffff',
-                  border: '1px solid rgba(0,0,0,0.06)',
-                  boxShadow: '0 25px 60px rgba(0,0,0,0.12), 0 8px 24px rgba(0,0,0,0.06)',
-                }}
-              >
-                {/* Branded header strip */}
-                <div
-                  className="px-6 py-4 text-center"
-                  style={{
-                    background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd)`,
-                  }}
-                >
-                  <p className="text-white font-bold text-base md:text-lg tracking-tight" style={{ fontFamily: 'var(--font-heading)' }}>
-                    {formConfig!.name || section.cta || 'Get Started'}
-                  </p>
+              {section.sub_cta && (
+                <div className="mt-4 flex items-center justify-center md:justify-start gap-2">
+                  <span className="inline-flex items-center gap-2 bg-gray-100/80 backdrop-blur-sm rounded-full px-4 py-2 text-gray-500 text-xs md:text-sm border border-gray-200/60">
+                    <PhClock size={14} weight="duotone" color="var(--color-primary)" />
+                    {section.sub_cta}
+                  </span>
                 </div>
-                <div className="px-5 py-5 md:px-7 md:py-6">
-                  <LeadFormDynamic
-                    formConfig={formConfig!}
-                    pageSlug={pageSlug}
-                    clientSlug={clientSlug}
-                    publishedPageId={publishedPageId}
-                    embedded
-                  />
-                </div>
-              </div>
+              )}
             </div>
-          ) : (
             <div className="flex-shrink-0 md:max-w-[45%] flex justify-center">
               {img ? (
                 <div className="relative w-[300px] md:w-[380px] lg:w-[420px]">
@@ -515,8 +550,8 @@ function HeroBlock({ section, media, primaryColor, accentColor, formConfig, page
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </section>
   )
