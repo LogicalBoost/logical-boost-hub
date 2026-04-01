@@ -25,7 +25,7 @@ function PageThumbnail({ url, width = 80, height = 100 }: { url: string; width?:
         src={url}
         title="Page preview"
         loading="lazy"
-        sandbox="allow-same-origin"
+        sandbox="allow-same-origin allow-scripts"
         tabIndex={-1}
         style={{
           width: iframeWidth, height: iframeHeight,

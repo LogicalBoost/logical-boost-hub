@@ -1216,7 +1216,7 @@ export default function FunnelPage() {
                         src={pageUrl}
                         title="Page preview"
                         loading="lazy"
-                        sandbox="allow-same-origin"
+                        sandbox="allow-same-origin allow-scripts"
                         tabIndex={-1}
                         style={{
                           width: iframeW, height: iframeH,
