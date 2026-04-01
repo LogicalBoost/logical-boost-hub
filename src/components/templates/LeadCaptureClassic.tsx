@@ -421,22 +421,33 @@ function HeroBlock({ section, media, primaryColor, accentColor, formConfig, page
           {hasForm ? (
             <div className="flex-shrink-0 w-full lg:max-w-[46%]">
               <div
-                className="rounded-2xl p-6 md:p-8 shadow-xl"
+                className="rounded-2xl overflow-hidden shadow-2xl"
                 style={{
-                  background: 'rgba(255,255,255,0.85)',
-                  backdropFilter: 'blur(20px)',
-                  WebkitBackdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(255,255,255,0.6)',
-                  boxShadow: '0 20px 60px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04)',
+                  background: '#ffffff',
+                  border: '1px solid rgba(0,0,0,0.06)',
+                  boxShadow: '0 25px 60px rgba(0,0,0,0.12), 0 8px 24px rgba(0,0,0,0.06)',
                 }}
               >
-                <LeadFormDynamic
-                  formConfig={formConfig!}
-                  pageSlug={pageSlug}
-                  clientSlug={clientSlug}
-                  publishedPageId={publishedPageId}
-                  embedded
-                />
+                {/* Branded header strip */}
+                <div
+                  className="px-6 py-4 text-center"
+                  style={{
+                    background: `linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd)`,
+                  }}
+                >
+                  <p className="text-white font-bold text-base md:text-lg tracking-tight" style={{ fontFamily: 'var(--font-heading)' }}>
+                    {formConfig!.name || section.cta || 'Get Started'}
+                  </p>
+                </div>
+                <div className="px-5 py-5 md:px-7 md:py-6">
+                  <LeadFormDynamic
+                    formConfig={formConfig!}
+                    pageSlug={pageSlug}
+                    clientSlug={clientSlug}
+                    publishedPageId={publishedPageId}
+                    embedded
+                  />
+                </div>
               </div>
             </div>
           ) : (
