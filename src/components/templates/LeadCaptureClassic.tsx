@@ -263,13 +263,18 @@ export default function LeadCaptureClassic({ sections, media, brandKit, formConf
   const ctaBgColor = accentIsLight ? 'var(--color-secondary)' : 'var(--color-accent)'
   const ctaTextColor = accentIsLight ? '#ffffff' : getContrastTextColor(resolvedAccent)
 
+  // Safety: if text_color is too light for white/light backgrounds, force it to dark
+  // This prevents white-on-white text when the brand kit extracts a light text color
+  const rawTextColor = brandKit?.text_color || '#1a202c'
+  const safeTextColor = isLightColor(rawTextColor) ? '#1a202c' : rawTextColor
+
   // CSS custom properties to inject on the template root (ensures colors are available immediately)
   const cssVars: Record<string, string> = {
     '--color-primary': brandKit?.primary_color || primaryColor,
     '--color-secondary': brandKit?.secondary_color || secondaryColor,
     '--color-accent': brandKit?.accent_color || accentColor,
     '--color-background': brandKit?.background_color || '#ffffff',
-    '--color-text': brandKit?.text_color || '#1a202c',
+    '--color-text': safeTextColor,
     '--font-heading': brandKit?.heading_font || 'Inter, sans-serif',
     '--font-body': brandKit?.body_font || 'Inter, sans-serif',
     '--button-radius': brandKit?.button_style?.borderRadius || '9999px',

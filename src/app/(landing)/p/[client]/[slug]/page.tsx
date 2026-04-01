@@ -6,6 +6,17 @@ import { supabase } from '@/lib/supabase'
 import type { Section, MediaAssets, BrandKit, TrustpilotWidget, FormConfig } from '@/components/templates/types'
 import LeadCaptureClassic from '@/components/templates/LeadCaptureClassic'
 
+/** Check if a hex color is too light for white/light backgrounds */
+function isLightColor(color: string): boolean {
+  const hex = color.replace('#', '')
+  if (hex.length < 6) return false
+  const r = parseInt(hex.substring(0, 2), 16)
+  const g = parseInt(hex.substring(2, 4), 16)
+  const b = parseInt(hex.substring(4, 6), 16)
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance > 0.6
+}
+
 interface PageRecord {
   id: string
   slug: string
@@ -235,7 +246,9 @@ export default function LandingPage() {
     root.style.setProperty('--color-secondary', bk.secondary_color || '#1a202c')
     root.style.setProperty('--color-accent', bk.accent_color || '#10b981')
     root.style.setProperty('--color-background', bk.background_color || '#ffffff')
-    root.style.setProperty('--color-text', bk.text_color || '#1a202c')
+    // Safety: if text_color is too light for white backgrounds, force dark
+    const safeTextColor = isLightColor(bk.text_color || '') ? '#1a202c' : (bk.text_color || '#1a202c')
+    root.style.setProperty('--color-text', safeTextColor)
     root.style.setProperty('--font-heading', bk.heading_font || 'Inter, sans-serif')
     root.style.setProperty('--font-body', bk.body_font || 'Inter, sans-serif')
     root.style.setProperty('--button-radius', bk.button_style?.borderRadius || '9999px')
@@ -253,7 +266,7 @@ export default function LandingPage() {
 
     // Override Hub dark theme for landing pages
     document.body.style.background = '#ffffff'
-    document.body.style.color = bk.text_color || '#1a202c'
+    document.body.style.color = safeTextColor
 
     return () => {
       document.body.style.background = ''
