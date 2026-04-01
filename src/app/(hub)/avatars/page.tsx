@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import { generateAvatars } from '@/lib/api'
@@ -9,6 +9,35 @@ import { getAngleLabel, ANGLE_COLORS } from '@/types/database'
 import { showToast } from '@/lib/demo-toast'
 
 const HUB_URL = 'https://hub.logicalboost.com'
+
+// ── Page Thumbnail (iframe-based live preview) ───────────────────────────
+function PageThumbnail({ url, width = 80, height = 100 }: { url: string; width?: number; height?: number }) {
+  const iframeWidth = 390  // mobile viewport
+  const iframeHeight = Math.round((height / width) * iframeWidth)
+  const scale = width / iframeWidth
+
+  return (
+    <div style={{
+      width, height, overflow: 'hidden', borderRadius: 4,
+      position: 'relative', background: '#0d1117',
+    }}>
+      <iframe
+        src={url}
+        title="Page preview"
+        loading="lazy"
+        sandbox="allow-same-origin"
+        tabIndex={-1}
+        style={{
+          width: iframeWidth, height: iframeHeight,
+          transform: `scale(${scale})`,
+          transformOrigin: 'top left',
+          border: 'none',
+          pointerEvents: 'none',
+        }}
+      />
+    </div>
+  )
+}
 
 type StatusFilter = 'all' | 'approved' | 'denied'
 
@@ -21,6 +50,13 @@ export default function AvatarsPage() {
   const [generating, setGenerating] = useState(false)
   const [promptText, setPromptText] = useState('')
   const [promptQuantity, setPromptQuantity] = useState(5)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
+
+  // All hooks must be above early returns (React Rules of Hooks)
+  const categories = useMemo(() => {
+    const types = avatars.map(a => a.avatar_type || 'Uncategorized')
+    return Array.from(new Set(types)).sort()
+  }, [avatars])
 
   async function handleGenerateAvatars() {
     if (!client) return
@@ -96,12 +132,6 @@ export default function AvatarsPage() {
     )
   }
 
-  // Extract unique avatar categories from avatar_type field
-  const categories = useMemo(() => {
-    const types = avatars.map(a => a.avatar_type || 'Uncategorized')
-    return Array.from(new Set(types)).sort()
-  }, [avatars])
-
   const filtered = avatars
     .filter(a => filter === 'all' || a.status === filter)
     .filter(a => categoryFilter === 'all' || (a.avatar_type || 'Uncategorized') === categoryFilter)
@@ -123,8 +153,6 @@ export default function AvatarsPage() {
       setSelectedAvatar({ ...selectedAvatar, status: 'denied' })
     }
   }
-
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
 
   async function handleDelete(id: string) {
     if (!client) return
@@ -295,9 +323,6 @@ export default function AvatarsPage() {
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
                     {getAvatarPages(avatar.id).map(page => {
                       const pageUrl = `${HUB_URL}/p/${page.client_slug}/${page.slug}`
-                      const heroImg = page.media_assets?.hero_image
-                      const brandColors = page.brand_kit_snapshot as Record<string, string> | null
-                      const primaryColor = brandColors?.primary_color || '#1a365d'
                       return (
                         <a
                           key={page.id}
@@ -320,19 +345,7 @@ export default function AvatarsPage() {
                             e.currentTarget.style.transform = 'translateY(0)'
                           }}
                         >
-                          <div style={{
-                            width: '100%', height: 56, position: 'relative',
-                            background: heroImg ? `url(${heroImg}) center/cover` : `linear-gradient(135deg, ${primaryColor}, ${primaryColor}cc)`,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          }}>
-                            {!heroImg && (
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5">
-                                <rect x="3" y="3" width="18" height="18" rx="2" />
-                                <circle cx="8.5" cy="8.5" r="1.5" />
-                                <polyline points="21 15 16 10 5 21" />
-                              </svg>
-                            )}
-                          </div>
+                          <PageThumbnail url={pageUrl} width={80} height={100} />
                           <div style={{
                             padding: '4px 6px', background: 'var(--bg-secondary)',
                             fontSize: 10, color: 'var(--text-secondary)',
@@ -479,12 +492,9 @@ export default function AvatarsPage() {
                   <div className="detail-item">
                     <div className="detail-label">Landing Pages</div>
                     <div className="detail-value">
-                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                         {getAvatarPages(selectedAvatar.id).map(page => {
                           const pageUrl = `${HUB_URL}/p/${page.client_slug}/${page.slug}`
-                          const heroImg = page.media_assets?.hero_image
-                          const brandColors = page.brand_kit_snapshot as Record<string, string> | null
-                          const primaryColor = brandColors?.primary_color || '#1a365d'
                           return (
                             <div key={page.id} style={{ width: 140 }}>
                               <a
@@ -507,19 +517,7 @@ export default function AvatarsPage() {
                                   e.currentTarget.style.boxShadow = 'none'
                                 }}
                               >
-                                <div style={{
-                                  width: '100%', height: 90, position: 'relative',
-                                  background: heroImg ? `url(${heroImg}) center/cover` : `linear-gradient(135deg, ${primaryColor}, ${primaryColor}cc)`,
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                }}>
-                                  {!heroImg && (
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5">
-                                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                                      <circle cx="8.5" cy="8.5" r="1.5" />
-                                      <polyline points="21 15 16 10 5 21" />
-                                    </svg>
-                                  )}
-                                </div>
+                                <PageThumbnail url={pageUrl} width={140} height={180} />
                                 <div style={{
                                   padding: '6px 8px', background: 'var(--bg-secondary)',
                                 }}>

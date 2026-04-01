@@ -1181,9 +1181,11 @@ export default function FunnelPage() {
               {avatarPages.map(page => {
                 const pageUrl = `${HUB_URL}/p/${page.client_slug}/${page.slug}`
                 const offerMatch = offers.find(o => o.id === page.offer_id)
-                const heroImg = page.media_assets?.hero_image
-                const brandColors = page.brand_kit_snapshot as Record<string, string> | null
-                const primaryColor = brandColors?.primary_color || '#1a365d'
+                const iframeW = 390
+                const thumbW = 110
+                const thumbH = 140
+                const iframeH = Math.round((thumbH / thumbW) * iframeW)
+                const scale = thumbW / iframeW
                 return (
                   <a
                     key={page.id}
@@ -1192,7 +1194,7 @@ export default function FunnelPage() {
                     rel="noopener noreferrer"
                     title={`/${page.slug}${offerMatch ? ` — ${offerMatch.name}` : ''}`}
                     style={{
-                      display: 'block', width: 110, textDecoration: 'none',
+                      display: 'block', width: thumbW, textDecoration: 'none',
                       borderRadius: 6, overflow: 'hidden',
                       border: '1px solid var(--border)',
                       transition: 'border-color 0.15s, transform 0.15s',
@@ -1207,17 +1209,23 @@ export default function FunnelPage() {
                     }}
                   >
                     <div style={{
-                      width: '100%', height: 68, position: 'relative',
-                      background: heroImg ? `url(${heroImg}) center/cover` : `linear-gradient(135deg, ${primaryColor}, ${primaryColor}cc)`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: thumbW, height: thumbH, overflow: 'hidden',
+                      position: 'relative', background: '#0d1117',
                     }}>
-                      {!heroImg && (
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5">
-                          <rect x="3" y="3" width="18" height="18" rx="2" />
-                          <circle cx="8.5" cy="8.5" r="1.5" />
-                          <polyline points="21 15 16 10 5 21" />
-                        </svg>
-                      )}
+                      <iframe
+                        src={pageUrl}
+                        title="Page preview"
+                        loading="lazy"
+                        sandbox="allow-same-origin"
+                        tabIndex={-1}
+                        style={{
+                          width: iframeW, height: iframeH,
+                          transform: `scale(${scale})`,
+                          transformOrigin: 'top left',
+                          border: 'none',
+                          pointerEvents: 'none',
+                        }}
+                      />
                     </div>
                     <div style={{
                       padding: '4px 6px', background: 'var(--bg-secondary)',
