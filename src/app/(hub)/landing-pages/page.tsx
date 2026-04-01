@@ -109,7 +109,8 @@ const STEPS = [
   { num: 1, label: 'Select Avatar + Offer' },
   { num: 2, label: 'Choose Template' },
   { num: 3, label: 'Review Copy Slots' },
-  { num: 4, label: 'Build Page' },
+  { num: 4, label: 'Form + Phone' },
+  { num: 5, label: 'Build Page' },
 ]
 
 // ============================================================
@@ -167,7 +168,7 @@ const labelStyle: React.CSSProperties = {
 // ============================================================
 export default function LandingPagesPage() {
   const store = useAppStore()
-  const { client, avatars, offers, copyComponents, landingPages, publishedPages, mediaAssets, clientTemplates, canEdit, isClientRole, refreshLandingPages, refreshPublishedPages, refreshMediaAssets, refreshClientTemplates } = store
+  const { client, avatars, offers, copyComponents, landingPages, publishedPages, mediaAssets, clientTemplates, forms, formWebhooks, clientPhoneNumbers, canEdit, isClientRole, refreshLandingPages, refreshPublishedPages, refreshMediaAssets, refreshClientTemplates, refreshForms, refreshFormWebhooks, refreshClientPhoneNumbers } = store
   const HUB_URL = 'https://hub.logicalboost.com'
 
   // Pipeline state
@@ -212,6 +213,18 @@ export default function LandingPagesPage() {
 
   // Client template selection (from saved templates)
   const [selectedClientTemplate, setSelectedClientTemplate] = useState<string | null>(null)
+
+  // Step 4: Form + Phone state
+  const [selectedFormId, setSelectedFormId] = useState<string | null>(null)
+  const [formMode, setFormMode] = useState<'none' | 'existing' | 'new'>('none')
+  const [formType, setFormType] = useState<'standard' | 'multi_step'>('standard')
+  const [formFields, setFormFields] = useState<Array<{ id: string; type: string; name: string; label: string; placeholder?: string; required?: boolean; width?: 'full' | 'half'; options?: Array<{ value: string; label: string }> }>>([])
+  const [formSteps, setFormSteps] = useState<Array<{ name: string; field_ids: string[] }>>([])
+  const [formSettings, setFormSettings] = useState<{ submit_button_text?: string; success_message?: string; redirect_url?: string; show_progress_bar?: boolean }>({})
+  const [formWebhookUrl, setFormWebhookUrl] = useState('')
+  const [formName, setFormName] = useState('')
+  const [selectedPhoneId, setSelectedPhoneId] = useState<string | null>(null)
+  const [savingForm, setSavingForm] = useState(false)
 
   // Tab state: builder vs published pages list — clients default to pages view
   const [activeView, setActiveView] = useState<'builder' | 'pages'>(isClientRole ? 'pages' : 'builder')
@@ -1285,7 +1298,7 @@ export default function LandingPagesPage() {
                 disabled={!generatedSections && !allSlotsFilled}
                 onClick={() => setStep(4)}
               >
-                Proceed to Build &#x2192;
+                Form + Phone &#x2192;
               </button>
             </div>
           </div>
@@ -2446,9 +2459,344 @@ export default function LandingPagesPage() {
       )}
 
       {/* ============================================================ */}
-      {/* STEP 4: Build & Deploy Landing Page */}
+      {/* STEP 4: Form + Phone Configuration */}
       {/* ============================================================ */}
       {step === 4 && (
+        <div style={card()}>
+          <h3 style={{ fontSize: 16, marginBottom: 16 }}>Configure Form + Phone</h3>
+
+          {/* Phone Number Selection */}
+          <div style={{ marginBottom: 24 }}>
+            <label style={labelStyle}>Phone Number (optional)</label>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+              Assign a phone number to show in the landing page header, footer, and CTAs.
+            </p>
+            {clientPhoneNumbers.length > 0 ? (
+              <select
+                className="form-input"
+                value={selectedPhoneId || ''}
+                onChange={(e) => setSelectedPhoneId(e.target.value || null)}
+                style={{ maxWidth: 400 }}
+              >
+                <option value="">No phone number</option>
+                {clientPhoneNumbers.map(pn => (
+                  <option key={pn.id} value={pn.id}>
+                    {pn.phone_number} — {pn.label}{pn.is_default ? ' (default)' : ''}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '10px 14px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                No phone numbers configured. Add them in Settings &rarr; Phone Numbers.
+              </div>
+            )}
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20, marginBottom: 20 }}>
+            <label style={labelStyle}>Lead Capture Form</label>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+              Add a form to capture leads. Choose an existing form or build a new one.
+            </p>
+
+            {/* Form Mode Selector */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              {(['none', 'existing', 'new'] as const).map(mode => (
+                <button
+                  key={mode}
+                  className={`btn btn-sm ${formMode === mode ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => {
+                    setFormMode(mode)
+                    if (mode === 'none') { setSelectedFormId(null) }
+                    if (mode === 'new') {
+                      setFormName('')
+                      setFormFields([
+                        { id: 'f1', type: 'text', name: 'first_name', label: 'First Name', placeholder: 'John', required: true, width: 'half' },
+                        { id: 'f2', type: 'text', name: 'last_name', label: 'Last Name', placeholder: 'Doe', required: true, width: 'half' },
+                        { id: 'f3', type: 'email', name: 'email', label: 'Email', placeholder: 'john@example.com', required: true, width: 'full' },
+                        { id: 'f4', type: 'phone', name: 'phone', label: 'Phone', placeholder: '(555) 123-4567', required: false, width: 'full' },
+                      ])
+                      setFormType('standard')
+                      setFormSettings({ submit_button_text: 'Get Started', success_message: 'Thanks! We\'ll be in touch shortly.' })
+                      setFormWebhookUrl('')
+                    }
+                  }}
+                >
+                  {mode === 'none' ? 'No Form' : mode === 'existing' ? 'Use Existing' : 'Build New'}
+                </button>
+              ))}
+            </div>
+
+            {/* Existing Form Selector */}
+            {formMode === 'existing' && (
+              <div style={{ marginBottom: 16 }}>
+                {forms.length > 0 ? (
+                  <select
+                    className="form-input"
+                    value={selectedFormId || ''}
+                    onChange={(e) => setSelectedFormId(e.target.value || null)}
+                    style={{ maxWidth: 400 }}
+                  >
+                    <option value="">Select a form...</option>
+                    {forms.map(f => (
+                      <option key={f.id} value={f.id}>
+                        {f.name} ({f.form_type === 'multi_step' ? 'Multi-Step' : 'Standard'} — {f.fields.length} fields)
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '10px 14px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                    No forms created yet. Switch to "Build New" to create one.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* New Form Builder */}
+            {formMode === 'new' && (
+              <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, padding: 16 }}>
+                {/* Form Name */}
+                <div style={{ marginBottom: 16 }}>
+                  <label style={labelStyle}>Form Name</label>
+                  <input
+                    className="form-input"
+                    value={formName}
+                    onChange={e => setFormName(e.target.value)}
+                    placeholder="e.g. Lead Capture, Quote Request"
+                    style={{ maxWidth: 300 }}
+                  />
+                </div>
+
+                {/* Form Type Toggle */}
+                <div style={{ marginBottom: 16 }}>
+                  <label style={labelStyle}>Form Type</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      className={`btn btn-sm ${formType === 'standard' ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setFormType('standard')}
+                    >Standard</button>
+                    <button
+                      className={`btn btn-sm ${formType === 'multi_step' ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setFormType('multi_step')}
+                    >Multi-Step</button>
+                  </div>
+                </div>
+
+                {/* Quick Add Presets */}
+                <div style={{ marginBottom: 12 }}>
+                  <label style={labelStyle}>Quick Add</label>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {[
+                      { type: 'text', name: 'name', label: 'Name' },
+                      { type: 'email', name: 'email', label: 'Email' },
+                      { type: 'phone', name: 'phone', label: 'Phone' },
+                      { type: 'textarea', name: 'message', label: 'Message' },
+                      { type: 'select', name: 'service', label: 'Service Needed' },
+                      { type: 'checkbox', name: 'consent', label: 'I agree to be contacted' },
+                    ].map(preset => (
+                      <button
+                        key={preset.name}
+                        className="btn btn-sm btn-secondary"
+                        style={{ fontSize: 11 }}
+                        onClick={() => {
+                          const id = `f${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+                          setFormFields(prev => [...prev, {
+                            id,
+                            type: preset.type,
+                            name: preset.name + (prev.some(f => f.name === preset.name) ? `_${prev.length}` : ''),
+                            label: preset.label,
+                            placeholder: preset.type === 'textarea' ? 'Tell us more...' : '',
+                            required: preset.type === 'email',
+                            width: (preset.type === 'textarea' || preset.type === 'checkbox') ? 'full' : 'half',
+                            ...(preset.type === 'select' ? { options: [{ value: '', label: 'Select...' }, { value: 'option1', label: 'Option 1' }, { value: 'option2', label: 'Option 2' }] } : {}),
+                          }])
+                        }}
+                      >+ {preset.label}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Field List */}
+                <div style={{ marginBottom: 16 }}>
+                  <label style={labelStyle}>Fields ({formFields.length})</label>
+                  {formFields.length === 0 ? (
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: 12, textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 6 }}>
+                      No fields yet. Use Quick Add above or click below.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {formFields.map((field, idx) => (
+                        <div key={field.id} style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '8px 12px', borderRadius: 6,
+                          background: 'var(--bg-card)', border: '1px solid var(--border)',
+                        }}>
+                          {/* Reorder */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <button
+                              disabled={idx === 0}
+                              onClick={() => {
+                                const arr = [...formFields]; [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]]; setFormFields(arr)
+                              }}
+                              style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', color: idx === 0 ? 'var(--border)' : 'var(--text-muted)', fontSize: 10, padding: 0, lineHeight: 1 }}
+                            >&#9650;</button>
+                            <button
+                              disabled={idx === formFields.length - 1}
+                              onClick={() => {
+                                const arr = [...formFields]; [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]]; setFormFields(arr)
+                              }}
+                              style={{ background: 'none', border: 'none', cursor: idx === formFields.length - 1 ? 'default' : 'pointer', color: idx === formFields.length - 1 ? 'var(--border)' : 'var(--text-muted)', fontSize: 10, padding: 0, lineHeight: 1 }}
+                            >&#9660;</button>
+                          </div>
+                          {/* Type badge */}
+                          <span style={{
+                            fontSize: 10, padding: '2px 6px', borderRadius: 4,
+                            background: 'var(--accent-muted)', color: 'var(--accent)',
+                            textTransform: 'uppercase', fontWeight: 600, flexShrink: 0,
+                          }}>{field.type}</span>
+                          {/* Label (editable) */}
+                          <input
+                            value={field.label}
+                            onChange={e => setFormFields(prev => prev.map(f => f.id === field.id ? { ...f, label: e.target.value, name: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '_') } : f))}
+                            style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, minWidth: 80 }}
+                          />
+                          {/* Width toggle */}
+                          <button
+                            onClick={() => setFormFields(prev => prev.map(f => f.id === field.id ? { ...f, width: f.width === 'half' ? 'full' : 'half' } : f))}
+                            title={field.width === 'half' ? 'Half width' : 'Full width'}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11, padding: '2px 4px' }}
+                          >{field.width === 'half' ? '½' : '▬'}</button>
+                          {/* Required toggle */}
+                          <button
+                            onClick={() => setFormFields(prev => prev.map(f => f.id === field.id ? { ...f, required: !f.required } : f))}
+                            title={field.required ? 'Required' : 'Optional'}
+                            style={{
+                              background: field.required ? 'rgba(239,68,68,0.15)' : 'transparent',
+                              border: field.required ? '1px solid rgba(239,68,68,0.3)' : '1px solid var(--border)',
+                              borderRadius: 4, cursor: 'pointer',
+                              color: field.required ? '#ef4444' : 'var(--text-muted)',
+                              fontSize: 10, padding: '2px 6px', fontWeight: 600,
+                            }}
+                          >{field.required ? 'REQ' : 'OPT'}</button>
+                          {/* Remove */}
+                          <button
+                            onClick={() => setFormFields(prev => prev.filter(f => f.id !== field.id))}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, padding: '0 4px' }}
+                            onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
+                            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+                          >&#10005;</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Form Settings */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }} className="grid-2col-responsive">
+                  <div>
+                    <label style={labelStyle}>Submit Button Text</label>
+                    <input
+                      className="form-input"
+                      value={formSettings.submit_button_text || ''}
+                      onChange={e => setFormSettings(prev => ({ ...prev, submit_button_text: e.target.value }))}
+                      placeholder="Get Started"
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Success Message</label>
+                    <input
+                      className="form-input"
+                      value={formSettings.success_message || ''}
+                      onChange={e => setFormSettings(prev => ({ ...prev, success_message: e.target.value }))}
+                      placeholder="Thanks! We'll be in touch."
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Redirect URL (optional)</label>
+                    <input
+                      className="form-input"
+                      value={formSettings.redirect_url || ''}
+                      onChange={e => setFormSettings(prev => ({ ...prev, redirect_url: e.target.value }))}
+                      placeholder="https://example.com/thank-you"
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Webhook URL</label>
+                    <input
+                      className="form-input"
+                      value={formWebhookUrl}
+                      onChange={e => setFormWebhookUrl(e.target.value)}
+                      placeholder="https://hooks.zapier.com/..."
+                    />
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                      Form data will be POSTed to this URL on submission.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Navigation */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20 }}>
+            <button className="btn btn-secondary" onClick={() => setStep(3)}>
+              &#x2190; Back to Copy
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={async () => {
+                // Save new form if building one
+                if (formMode === 'new' && formFields.length > 0 && client) {
+                  setSavingForm(true)
+                  try {
+                    const { data: newForm, error } = await supabase
+                      .from('forms')
+                      .insert({
+                        client_id: client.id,
+                        name: formName || 'Lead Capture Form',
+                        form_type: formType,
+                        fields: formFields,
+                        steps: formType === 'multi_step' ? formSteps : null,
+                        settings: formSettings,
+                      })
+                      .select()
+                      .single()
+
+                    if (error) throw error
+                    if (newForm) {
+                      setSelectedFormId(newForm.id)
+                      // Save webhook if provided
+                      if (formWebhookUrl.trim()) {
+                        await supabase.from('form_webhooks').insert({
+                          client_id: client.id,
+                          form_id: newForm.id,
+                          webhook_url: formWebhookUrl.trim(),
+                          name: 'Primary Webhook',
+                        })
+                      }
+                      refreshForms(client.id)
+                      refreshFormWebhooks(client.id)
+                      showToast('Form saved!')
+                    }
+                  } catch (err) {
+                    showToast('Error saving form: ' + (err as Error).message)
+                  } finally {
+                    setSavingForm(false)
+                  }
+                }
+                setStep(5)
+              }}
+              disabled={savingForm}
+            >
+              {savingForm ? 'Saving Form...' : 'Proceed to Build \u2192'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* STEP 5: Build & Deploy Landing Page */}
+      {/* ============================================================ */}
+      {step === 5 && (
         <BuildStep
           clientId={client?.id || ''}
           clientName={client?.name || ''}
@@ -2464,7 +2812,9 @@ export default function LandingPagesPage() {
           selectedOffer={selectedOfferId || ''}
           brandKit={(client?.brand_kit as Record<string, unknown>) || undefined}
           trustpilotWidget={(client?.metadata as Record<string, unknown>)?.trustpilot as Record<string, unknown> | undefined}
-          onBack={() => setStep(3)}
+          formId={selectedFormId}
+          phoneNumber={selectedPhoneId ? clientPhoneNumbers.find(p => p.id === selectedPhoneId)?.phone_number : undefined}
+          onBack={() => setStep(4)}
           onPublished={() => { if (client?.id) refreshPublishedPages(client.id) }}
         />
       )}
@@ -2575,6 +2925,8 @@ function BuildStep({
   selectedOffer,
   brandKit,
   trustpilotWidget,
+  formId,
+  phoneNumber,
   onBack,
   onPublished,
 }: {
@@ -2592,6 +2944,8 @@ function BuildStep({
   selectedOffer: string
   brandKit?: Record<string, unknown>
   trustpilotWidget?: Record<string, unknown>
+  formId?: string | null
+  phoneNumber?: string
   onBack: () => void
   onPublished?: () => void
 }) {
@@ -2653,6 +3007,8 @@ function BuildStep({
         },
         avatar_id: selectedAvatar || undefined,
         offer_id: selectedOffer || undefined,
+        form_id: formId || undefined,
+        phone_number: phoneNumber || undefined,
       })
       setBuildResult(result)
       showToast('Landing page published!')
@@ -2703,6 +3059,18 @@ function BuildStep({
               <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Trustpilot</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: trustpilotWidget?.businessUnitId ? 'var(--accent)' : 'var(--text-muted)' }}>
                 {trustpilotWidget?.businessUnitId ? '✓ Widget included' : 'Not detected'}
+              </div>
+            </div>
+            <div style={{ padding: 12, borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg-input)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Lead Form</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: formId ? 'var(--accent)' : 'var(--text-muted)' }}>
+                {formId ? '✓ Form attached' : 'No form'}
+              </div>
+            </div>
+            <div style={{ padding: 12, borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg-input)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Phone</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: phoneNumber ? 'var(--accent)' : 'var(--text-muted)' }}>
+                {phoneNumber || 'Not set'}
               </div>
             </div>
           </div>

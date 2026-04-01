@@ -179,6 +179,8 @@ export async function deployLandingPage(params: {
   media_assets?: Record<string, unknown>
   avatar_id?: string
   offer_id?: string
+  form_id?: string
+  phone_number?: string
 }) {
   return callEdgeFunction('deploy-landing-page', params)
 }

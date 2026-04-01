@@ -6,7 +6,7 @@ import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import { showToast } from '@/lib/demo-toast'
 import { analyzeBusiness, analyzeBrandKit, generateIntake, refineSystem } from '@/lib/api'
-import type { UserRole, Competitor, PromptTemplate } from '@/types/database'
+import type { UserRole, Competitor, PromptTemplate, ClientPhoneNumber } from '@/types/database'
 import TagInput from '@/components/TagInput'
 import LogoUpload from '@/components/LogoUpload'
 
@@ -26,7 +26,7 @@ interface ClientAssignment {
   client_id: string
 }
 
-type SettingsTab = 'business' | 'intake' | 'profile' | 'team' | 'clients' | 'prompts'
+type SettingsTab = 'business' | 'intake' | 'profile' | 'team' | 'clients' | 'prompts' | 'phones'
 
 export default function SettingsPage() {
   const { profile, user } = useAuth()
@@ -34,6 +34,7 @@ export default function SettingsPage() {
     client, loading, allClients, canEdit, isClientRole,
     setClient, setLoading, setError, createClient, loadClientData, loadAllClients,
     intakeQuestions, refreshIntake, refreshClient,
+    clientPhoneNumbers, refreshClientPhoneNumbers,
   } = useAppStore()
 
   const [activeTab, setActiveTab] = useState<SettingsTab>(isClientRole ? 'profile' : (client ? 'business' : 'profile'))
@@ -104,6 +105,20 @@ export default function SettingsPage() {
   const [editPromptText, setEditPromptText] = useState('')
   const [savingPrompt, setSavingPrompt] = useState(false)
 
+  // ─── Phone Numbers state ───
+  const [showPhoneForm, setShowPhoneForm] = useState(false)
+  const [phoneNumber, setPhoneNumber] = useState('')
+  const [phoneLabel, setPhoneLabel] = useState('Main')
+  const [phoneNotes, setPhoneNotes] = useState('')
+  const [phoneIsDefault, setPhoneIsDefault] = useState(false)
+  const [savingPhone, setSavingPhone] = useState(false)
+  const [editingPhoneId, setEditingPhoneId] = useState<string | null>(null)
+  const [editPhoneNumber, setEditPhoneNumber] = useState('')
+  const [editPhoneLabel, setEditPhoneLabel] = useState('')
+  const [editPhoneNotes, setEditPhoneNotes] = useState('')
+  const [editPhoneIsDefault, setEditPhoneIsDefault] = useState(false)
+  const [deletingPhoneId, setDeletingPhoneId] = useState<string | null>(null)
+
   // ─── Company Assets state ───
   interface ClientContentItem {
     id: string
@@ -173,6 +188,14 @@ export default function SettingsPage() {
   useEffect(() => {
     if (activeTab === 'prompts') {
       loadPromptTemplates()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, client?.id])
+
+  // Load phone numbers when phones tab is activated or client changes
+  useEffect(() => {
+    if (activeTab === 'phones' && client?.id) {
+      refreshClientPhoneNumbers(client.id)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, client?.id])
@@ -2287,6 +2310,319 @@ export default function SettingsPage() {
   }
 
   // ═══════════════════════════════════════
+  // Phone Numbers tab render
+  // ═══════════════════════════════════════
+
+  function renderPhoneNumbersTab() {
+    if (!client) {
+      return (
+        <div className="funnel-section-card">
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-secondary)' }}>
+            Select a client to manage phone numbers.
+          </div>
+        </div>
+      )
+    }
+
+    async function handleAddPhone() {
+      if (!client?.id || !phoneNumber.trim()) return
+      setSavingPhone(true)
+      try {
+        // If setting as default, unset other defaults first
+        if (phoneIsDefault) {
+          await supabase
+            .from('client_phone_numbers')
+            .update({ is_default: false })
+            .eq('client_id', client.id)
+        }
+        const { error } = await supabase.from('client_phone_numbers').insert({
+          client_id: client.id,
+          phone_number: phoneNumber.trim(),
+          label: phoneLabel.trim() || 'Main',
+          notes: phoneNotes.trim() || null,
+          is_default: phoneIsDefault || clientPhoneNumbers.length === 0,
+        })
+        if (error) throw error
+        showToast('Phone number added')
+        setPhoneNumber('')
+        setPhoneLabel('Main')
+        setPhoneNotes('')
+        setPhoneIsDefault(false)
+        setShowPhoneForm(false)
+        await refreshClientPhoneNumbers(client.id)
+      } catch (err: unknown) {
+        showToast(`Failed to add phone number: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      } finally {
+        setSavingPhone(false)
+      }
+    }
+
+    async function handleUpdatePhone(phone: ClientPhoneNumber) {
+      if (!client?.id || !editPhoneNumber.trim()) return
+      setSavingPhone(true)
+      try {
+        if (editPhoneIsDefault && !phone.is_default) {
+          await supabase
+            .from('client_phone_numbers')
+            .update({ is_default: false })
+            .eq('client_id', client.id)
+        }
+        const { error } = await supabase.from('client_phone_numbers').update({
+          phone_number: editPhoneNumber.trim(),
+          label: editPhoneLabel.trim() || 'Main',
+          notes: editPhoneNotes.trim() || null,
+          is_default: editPhoneIsDefault,
+        }).eq('id', phone.id)
+        if (error) throw error
+        showToast('Phone number updated')
+        setEditingPhoneId(null)
+        await refreshClientPhoneNumbers(client.id)
+      } catch (err: unknown) {
+        showToast(`Failed to update: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      } finally {
+        setSavingPhone(false)
+      }
+    }
+
+    async function handleDeletePhone(id: string) {
+      if (!client?.id) return
+      setSavingPhone(true)
+      try {
+        const { error } = await supabase.from('client_phone_numbers').delete().eq('id', id)
+        if (error) throw error
+        showToast('Phone number deleted')
+        setDeletingPhoneId(null)
+        await refreshClientPhoneNumbers(client.id)
+      } catch (err: unknown) {
+        showToast(`Failed to delete: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      } finally {
+        setSavingPhone(false)
+      }
+    }
+
+    async function handleSetDefault(id: string) {
+      if (!client?.id) return
+      try {
+        await supabase
+          .from('client_phone_numbers')
+          .update({ is_default: false })
+          .eq('client_id', client.id)
+        const { error } = await supabase
+          .from('client_phone_numbers')
+          .update({ is_default: true })
+          .eq('id', id)
+        if (error) throw error
+        showToast('Default phone number updated')
+        await refreshClientPhoneNumbers(client.id)
+      } catch (err: unknown) {
+        showToast(`Failed to set default: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      }
+    }
+
+    function startEditing(phone: ClientPhoneNumber) {
+      setEditingPhoneId(phone.id)
+      setEditPhoneNumber(phone.phone_number)
+      setEditPhoneLabel(phone.label)
+      setEditPhoneNotes(phone.notes || '')
+      setEditPhoneIsDefault(phone.is_default)
+    }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <div className="funnel-section-card">
+          <div className="funnel-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3>Phone Numbers</h3>
+            {!showPhoneForm && (
+              <button className="btn btn-primary" onClick={() => setShowPhoneForm(true)} style={{ fontSize: 13, padding: '6px 14px' }}>
+                + Add Phone Number
+              </button>
+            )}
+          </div>
+          <div style={{ padding: 24 }}>
+            {/* Add form */}
+            {showPhoneForm && (
+              <div style={{ marginBottom: 24, padding: 16, background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-primary)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, maxWidth: 600 }}>
+                  <div className="form-group">
+                    <label className="form-label">Phone Number</label>
+                    <input
+                      className="form-input"
+                      placeholder="(555) 123-4567"
+                      value={phoneNumber}
+                      onChange={e => setPhoneNumber(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Label</label>
+                    <input
+                      className="form-input"
+                      placeholder="Main"
+                      value={phoneLabel}
+                      onChange={e => setPhoneLabel(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="form-group" style={{ marginTop: 12, maxWidth: 600 }}>
+                  <label className="form-label">Notes (optional)</label>
+                  <textarea
+                    className="form-input"
+                    placeholder="e.g., Hours: Mon-Fri 9-5"
+                    value={phoneNotes}
+                    onChange={e => setPhoneNotes(e.target.value)}
+                    rows={2}
+                    style={{ resize: 'vertical' }}
+                  />
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={phoneIsDefault}
+                    onChange={e => setPhoneIsDefault(e.target.checked)}
+                  />
+                  Set as default phone number
+                </label>
+                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                  <button className="btn btn-primary" onClick={handleAddPhone} disabled={savingPhone || !phoneNumber.trim()}>
+                    {savingPhone ? 'Adding...' : 'Add Phone Number'}
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => { setShowPhoneForm(false); setPhoneNumber(''); setPhoneLabel('Main'); setPhoneNotes(''); setPhoneIsDefault(false) }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Phone list */}
+            {clientPhoneNumbers.length === 0 && !showPhoneForm ? (
+              <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-secondary)', fontSize: 14 }}>
+                No phone numbers added yet. Click &quot;+ Add Phone Number&quot; to get started.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {clientPhoneNumbers.map(phone => (
+                  <div key={phone.id} style={{ padding: 16, background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-primary)' }}>
+                    {editingPhoneId === phone.id ? (
+                      /* Inline edit mode */
+                      <div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, maxWidth: 600 }}>
+                          <div className="form-group">
+                            <label className="form-label">Phone Number</label>
+                            <input
+                              className="form-input"
+                              value={editPhoneNumber}
+                              onChange={e => setEditPhoneNumber(e.target.value)}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Label</label>
+                            <input
+                              className="form-input"
+                              value={editPhoneLabel}
+                              onChange={e => setEditPhoneLabel(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <div className="form-group" style={{ marginTop: 12, maxWidth: 600 }}>
+                          <label className="form-label">Notes</label>
+                          <textarea
+                            className="form-input"
+                            value={editPhoneNotes}
+                            onChange={e => setEditPhoneNotes(e.target.value)}
+                            rows={2}
+                            style={{ resize: 'vertical' }}
+                          />
+                        </div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={editPhoneIsDefault}
+                            onChange={e => setEditPhoneIsDefault(e.target.checked)}
+                          />
+                          Default phone number
+                        </label>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                          <button className="btn btn-primary" onClick={() => handleUpdatePhone(phone)} disabled={savingPhone || !editPhoneNumber.trim()}>
+                            {savingPhone ? 'Saving...' : 'Save'}
+                          </button>
+                          <button className="btn btn-secondary" onClick={() => setEditingPhoneId(null)}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : deletingPhoneId === phone.id ? (
+                      /* Inline delete confirmation */
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--danger)', fontSize: 14 }}>
+                          Delete this phone number?
+                        </span>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            className="btn"
+                            style={{ background: 'var(--danger)', color: '#fff', fontSize: 13, padding: '6px 14px' }}
+                            onClick={() => handleDeletePhone(phone.id)}
+                            disabled={savingPhone}
+                          >
+                            {savingPhone ? 'Deleting...' : 'Yes, Delete'}
+                          </button>
+                          <button className="btn btn-secondary" onClick={() => setDeletingPhoneId(null)} style={{ fontSize: 13, padding: '6px 14px' }}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Display mode */
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: 15, fontWeight: 600 }}>{phone.phone_number}</span>
+                            <span className="tag" style={{ fontSize: 11 }}>{phone.label}</span>
+                            {phone.is_default && (
+                              <span className="tag" style={{ fontSize: 11, background: 'var(--success-muted)', color: 'var(--success)' }}>Default</span>
+                            )}
+                          </div>
+                          {phone.notes && (
+                            <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{phone.notes}</span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          {!phone.is_default && (
+                            <button
+                              className="btn btn-secondary"
+                              onClick={() => handleSetDefault(phone.id)}
+                              style={{ fontSize: 12, padding: '4px 10px' }}
+                              title="Set as default"
+                            >
+                              Set Default
+                            </button>
+                          )}
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() => startEditing(phone)}
+                            style={{ fontSize: 12, padding: '4px 10px' }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() => setDeletingPhoneId(phone.id)}
+                            style={{ fontSize: 12, padding: '4px 10px', color: 'var(--danger)' }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ═══════════════════════════════════════
   // Prompts tab render
   // ═══════════════════════════════════════
 
@@ -2551,6 +2887,14 @@ export default function SettingsPage() {
             </button>
           </>
         )}
+        {!isClientRole && (
+          <button
+            className={`funnel-tab ${activeTab === 'phones' ? 'funnel-tab-active' : ''}`}
+            onClick={() => setActiveTab('phones')}
+          >
+            Phone Numbers
+          </button>
+        )}
       </div>
 
       {/* Tab content */}
@@ -2560,6 +2904,7 @@ export default function SettingsPage() {
       {activeTab === 'team' && isAdmin && renderTeamTab()}
       {activeTab === 'clients' && isAdmin && renderClientAccessTab()}
       {activeTab === 'prompts' && isAdmin && renderPromptsTab()}
+      {activeTab === 'phones' && !isClientRole && renderPhoneNumbersTab()}
     </div>
   )
 }

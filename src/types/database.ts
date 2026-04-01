@@ -600,6 +600,18 @@ export interface FormSubmission {
   created_at: string
 }
 
+// Client phone number record (from client_phone_numbers table)
+export interface ClientPhoneNumber {
+  id: string
+  client_id: string
+  phone_number: string
+  label: string
+  notes: string | null
+  is_default: boolean
+  created_at: string
+  updated_at: string
+}
+
 // Prompt template record (from prompt_templates table)
 export interface PromptTemplate {
   id: string
