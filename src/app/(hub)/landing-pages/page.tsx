@@ -207,6 +207,8 @@ export default function LandingPagesPage() {
   const [benefitsImageUrl, setBenefitsImageUrl] = useState<string | null>(null)
   const [uploadingSectionImage, setUploadingSectionImage] = useState<string | null>(null)
   const [generatingSectionImage, setGeneratingSectionImage] = useState<string | null>(null)
+  const [customStepsPrompt, setCustomStepsPrompt] = useState('')
+  const [customBenefitsPrompt, setCustomBenefitsPrompt] = useState('')
 
   // Lightbox state for full image preview
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
@@ -461,7 +463,7 @@ export default function LandingPagesPage() {
   }, [client, selectedAvatarId, selectedOfferId, customParallaxPrompt])
 
   // Generate section images (steps / benefits) with AI
-  const handleGenerateSectionImage = useCallback(async (sectionType: 'steps' | 'benefits') => {
+  const handleGenerateSectionImage = useCallback(async (sectionType: 'steps' | 'benefits', customPrompt?: string) => {
     if (!client || !selectedAvatarId) return
     setGeneratingSectionImage(sectionType)
     try {
@@ -470,7 +472,7 @@ export default function LandingPagesPage() {
         client.id,
         selectedAvatarId,
         'hero',
-        undefined,
+        customPrompt?.trim() || undefined,
         selectedOfferId || undefined,
         roleMap[sectionType]
       )
@@ -2307,6 +2309,18 @@ export default function LandingPagesPage() {
                       />
                     </div>
                   )}
+                  <textarea
+                    value={customStepsPrompt}
+                    onChange={e => setCustomStepsPrompt(e.target.value)}
+                    placeholder="Optional: describe the scene (e.g. 'modern office with team collaborating on laptops')"
+                    rows={2}
+                    style={{
+                      width: '100%', marginTop: 6, padding: '8px 10px',
+                      borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)',
+                      background: 'var(--bg-input)', color: 'var(--text-primary)',
+                      fontSize: 11, resize: 'vertical', lineHeight: 1.5,
+                    }}
+                  />
                   <button
                     style={{
                       width: '100%', marginTop: 6, padding: '8px 12px',
@@ -2316,7 +2330,7 @@ export default function LandingPagesPage() {
                       color: '#fff', transition: 'opacity 0.15s',
                     }}
                     disabled={generatingSectionImage === 'steps' || !selectedAvatarId}
-                    onClick={() => handleGenerateSectionImage('steps')}
+                    onClick={() => handleGenerateSectionImage('steps', customStepsPrompt)}
                   >
                     {generatingSectionImage === 'steps' ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -2432,6 +2446,18 @@ export default function LandingPagesPage() {
                       />
                     </div>
                   )}
+                  <textarea
+                    value={customBenefitsPrompt}
+                    onChange={e => setCustomBenefitsPrompt(e.target.value)}
+                    placeholder="Optional: describe the scene (e.g. 'happy family in new home, warm lighting')"
+                    rows={2}
+                    style={{
+                      width: '100%', marginTop: 6, padding: '8px 10px',
+                      borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)',
+                      background: 'var(--bg-input)', color: 'var(--text-primary)',
+                      fontSize: 11, resize: 'vertical', lineHeight: 1.5,
+                    }}
+                  />
                   <button
                     style={{
                       width: '100%', marginTop: 6, padding: '8px 12px',
@@ -2441,7 +2467,7 @@ export default function LandingPagesPage() {
                       color: '#fff', transition: 'opacity 0.15s',
                     }}
                     disabled={generatingSectionImage === 'benefits' || !selectedAvatarId}
-                    onClick={() => handleGenerateSectionImage('benefits')}
+                    onClick={() => handleGenerateSectionImage('benefits', customBenefitsPrompt)}
                   >
                     {generatingSectionImage === 'benefits' ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
