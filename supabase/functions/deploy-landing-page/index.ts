@@ -306,6 +306,8 @@ serve(async (req: Request) => {
       media_assets,
       avatar_id,
       offer_id,
+      form_id,
+      phone_number,
     } = await req.json()
 
     if (!client_id || !client_slug || !template_id || !slug) {
@@ -337,6 +339,36 @@ serve(async (req: Request) => {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     if (avatar_id && uuidRegex.test(avatar_id)) insertPayload.avatar_id = avatar_id
     if (offer_id && uuidRegex.test(offer_id)) insertPayload.offer_id = offer_id
+
+    // ─── Look up form and snapshot it ───
+    if (form_id && uuidRegex.test(form_id)) {
+      const { data: formRecord } = await supabase
+        .from('forms')
+        .select('id, form_type, name, fields, steps, settings')
+        .eq('id', form_id)
+        .single()
+
+      if (formRecord) {
+        insertPayload.form_id = form_id
+        insertPayload.form_snapshot = {
+          id: formRecord.id,
+          form_type: formRecord.form_type,
+          name: formRecord.name,
+          fields: formRecord.fields || [],
+          steps: formRecord.steps || null,
+          settings: formRecord.settings || {},
+        }
+      }
+    }
+
+    // ─── Inject phone number into footer section ───
+    if (phone_number && sections && Array.isArray(sections)) {
+      const footerSection = sections.find((s: Record<string, unknown>) => s.type === 'footer')
+      if (footerSection) {
+        footerSection.phone = phone_number
+      }
+      insertPayload.sections = sections
+    }
 
     const { data: savedPage, error: saveError } = await supabase
       .from('published_pages')
