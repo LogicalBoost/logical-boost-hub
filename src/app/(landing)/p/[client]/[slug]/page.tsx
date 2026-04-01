@@ -337,6 +337,7 @@ export default function LandingPage() {
         <LeadCaptureClassic
           sections={sections}
           media={media}
+          brandKit={page.brand_kit_snapshot}
           formConfig={page.form_snapshot || null}
           pageSlug={pageSlug}
           clientSlug={clientSlug}

@@ -164,16 +164,28 @@ function isLightColor(color: string): boolean {
    MAIN TEMPLATE
    ═══════════════════════════════════════════════════════ */
 
+interface BrandKitColors {
+  primary_color?: string
+  secondary_color?: string
+  accent_color?: string
+  background_color?: string
+  text_color?: string
+  heading_font?: string
+  body_font?: string
+  button_style?: { borderRadius?: string }
+}
+
 interface Props {
   sections: Section[]
   media: MediaAssets
+  brandKit?: BrandKitColors | null
   formConfig?: FormConfig | null
   pageSlug?: string
   clientSlug?: string
   publishedPageId?: string
 }
 
-export default function LeadCaptureClassic({ sections, media, formConfig, pageSlug, clientSlug, publishedPageId }: Props) {
+export default function LeadCaptureClassic({ sections, media, brandKit, formConfig, pageSlug, clientSlug, publishedPageId }: Props) {
   // Sanitize all text fields in sections to fix garbled UTF-8
   const cleanSections = sections.map(sec => ({
     ...sec,
@@ -205,28 +217,68 @@ export default function LeadCaptureClassic({ sections, media, formConfig, pageSl
   const faq = s.get('faq')
   const footer = s.get('footer')
 
-  // Read brand colors from CSS variables for contrast calculations
-  const [accentColor, setAccentColor] = useState('#e67e22')
-  const [primaryColor, setPrimaryColor] = useState('#2d6a4f')
+  // Brand colors — use props directly (no useEffect race condition)
+  const accentColor = brandKit?.accent_color || '#10b981'
+  const primaryColor = brandKit?.primary_color || '#1a365d'
+  const secondaryColor = brandKit?.secondary_color || '#1a202c'
+
+  // Also read from CSS variables as fallback (for client repos that set CSS vars)
+  const [resolvedAccent, setResolvedAccent] = useState(accentColor)
+  const [resolvedPrimary, setResolvedPrimary] = useState(primaryColor)
   useEffect(() => {
+    // If brandKit was provided, use it directly — no need to read CSS vars
+    if (brandKit?.accent_color) {
+      setResolvedAccent(brandKit.accent_color)
+      setResolvedPrimary(brandKit.primary_color || primaryColor)
+      return
+    }
+    // Fallback: read from CSS custom properties (for standalone/repo usage)
     const root = document.documentElement
     const styles = getComputedStyle(root)
     const acc = styles.getPropertyValue('--color-accent').trim()
     const pri = styles.getPropertyValue('--color-primary').trim()
-    if (acc) setAccentColor(acc)
-    if (pri) setPrimaryColor(pri)
-  }, [])
+    if (acc) setResolvedAccent(acc)
+    if (pri) setResolvedPrimary(pri)
+  }, [brandKit, accentColor, primaryColor])
 
-  const accentIsLight = isLightColor(accentColor)
+  // Load Google Fonts if brandKit specifies custom fonts
+  useEffect(() => {
+    if (!brandKit) return
+    const fonts = [brandKit.heading_font, brandKit.body_font].filter(Boolean) as string[]
+    const uniqueFonts = [...new Set(fonts)].filter(f => f && !f.includes('sans-serif') && !f.includes('serif'))
+    if (uniqueFonts.length > 0) {
+      const existing = document.querySelector('link[data-brand-fonts]')
+      if (existing) existing.remove()
+      const families = uniqueFonts.map(f => `family=${encodeURIComponent(f)}:wght@400;500;600;700;800;900`).join('&')
+      const link = document.createElement('link')
+      link.rel = 'stylesheet'
+      link.href = `https://fonts.googleapis.com/css2?${families}&display=swap`
+      link.setAttribute('data-brand-fonts', 'true')
+      document.head.appendChild(link)
+    }
+  }, [brandKit])
+
+  const accentIsLight = isLightColor(resolvedAccent)
   // If accent is too light for white bg, use secondary (dark) for buttons on light sections
   const ctaBgColor = accentIsLight ? 'var(--color-secondary)' : 'var(--color-accent)'
-  const ctaTextColor = accentIsLight ? '#ffffff' : getContrastTextColor(accentColor)
+  const ctaTextColor = accentIsLight ? '#ffffff' : getContrastTextColor(resolvedAccent)
+
+  // CSS custom properties to inject on the template root (ensures colors are available immediately)
+  const cssVars: Record<string, string> = {
+    '--color-primary': brandKit?.primary_color || primaryColor,
+    '--color-secondary': brandKit?.secondary_color || secondaryColor,
+    '--color-accent': brandKit?.accent_color || accentColor,
+    '--color-background': brandKit?.background_color || '#ffffff',
+    '--color-text': brandKit?.text_color || '#1a202c',
+    '--font-heading': brandKit?.heading_font || 'Inter, sans-serif',
+    '--font-body': brandKit?.body_font || 'Inter, sans-serif',
+    '--button-radius': brandKit?.button_style?.borderRadius || '9999px',
+  }
 
   return (
-    <div className="min-h-screen bg-white" style={{ fontFamily: 'var(--font-body)' }}>
+    <div className="min-h-screen bg-white" style={{ fontFamily: 'var(--font-body)', ...cssVars } as React.CSSProperties}>
       {/* Inject CTA button styles — ensures extreme contrast */}
       <style>{`
-        :root { --cta-text-color: ${ctaTextColor}; --cta-bg: ${ctaBgColor}; }
         .cta-button {
           background-color: ${ctaBgColor} !important;
           color: ${ctaTextColor} !important;
@@ -235,7 +287,7 @@ export default function LeadCaptureClassic({ sections, media, formConfig, pageSl
         /* Keep accent for buttons on dark sections where it provides contrast */
         .cta-button-on-dark {
           background-color: var(--color-accent) !important;
-          color: ${getContrastTextColor(accentColor)} !important;
+          color: ${getContrastTextColor(resolvedAccent)} !important;
         }
       `}</style>
 
@@ -257,22 +309,22 @@ export default function LeadCaptureClassic({ sections, media, formConfig, pageSl
       </header>
 
       {/* ─── HERO ─── */}
-      {hero && <HeroBlock section={hero} media={media} primaryColor={primaryColor} accentColor={accentColor} />}
+      {hero && <HeroBlock section={hero} media={media} primaryColor={resolvedPrimary} accentColor={resolvedAccent} />}
 
       {/* ─── FEATURE CARDS BAR ─── */}
-      {features && <FeatureCardsBar section={features} primaryColor={primaryColor} accentColor={accentColor} />}
+      {features && <FeatureCardsBar section={features} primaryColor={resolvedPrimary} accentColor={resolvedAccent} />}
 
       {/* ─── TWO COLUMN INFO ─── */}
       {info && <TwoColumnInfo section={info} />}
 
       {/* ─── STEPS ─── */}
-      {steps && <StepsBlock section={steps} media={media} primaryColor={primaryColor} accentColor={accentColor} />}
+      {steps && <StepsBlock section={steps} media={media} primaryColor={resolvedPrimary} accentColor={resolvedAccent} />}
 
       {/* ─── TRUST BAR ─── */}
       {trust && <TrustBar section={trust} media={media} />}
 
       {/* ─── BENEFITS GRID ─── */}
-      {benefits && <BenefitsGrid section={benefits} media={media} primaryColor={primaryColor} accentColor={accentColor} />}
+      {benefits && <BenefitsGrid section={benefits} media={media} primaryColor={resolvedPrimary} accentColor={resolvedAccent} />}
 
       {/* ─── TESTIMONIALS ─── */}
       {testimonials && <TestimonialsBlock section={testimonials} media={media} />}
