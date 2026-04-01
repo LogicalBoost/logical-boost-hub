@@ -10,9 +10,10 @@ interface Props {
   pageSlug?: string
   clientSlug?: string
   publishedPageId?: string
+  embedded?: boolean
 }
 
-export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publishedPageId }: Props) {
+export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publishedPageId, embedded }: Props) {
   const { fields, steps, settings, form_type } = formConfig
   const isMultiStep = form_type === 'multi_step' && steps && steps.length > 0
 
@@ -147,6 +148,16 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
 
   // Success state
   if (submitted) {
+    if (embedded) {
+      return (
+        <div className="text-center py-6">
+          <div className="text-5xl mb-4">&#10003;</div>
+          <h3 className="text-xl font-bold text-[var(--color-text)] mb-3" style={{ fontFamily: 'var(--font-heading)' }}>
+            {settings.success_message || 'Thank you! We\'ll be in touch shortly.'}
+          </h3>
+        </div>
+      )
+    }
     return (
       <section id="lead-form" className="py-16 md:py-20 bg-gray-50">
         <div className="max-w-xl mx-auto px-4 text-center">
@@ -166,6 +177,150 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
   const submitText = settings.submit_button_text || 'Submit'
   const nextText = settings.next_button_text || 'Next'
   const backText = settings.back_button_text || 'Back'
+
+  if (embedded) {
+    return (
+      <div>
+        {/* Multi-step progress bar */}
+        {isMultiStep && settings.show_progress_bar !== false && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              {steps!.map((step, i) => (
+                <div key={i} className="flex items-center flex-1">
+                  <div
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                      i < currentStep
+                        ? 'bg-[var(--color-primary)] text-white'
+                        : i === currentStep
+                          ? 'bg-[var(--color-accent)] text-white'
+                          : 'bg-gray-200 text-gray-500'
+                    }`}
+                  >
+                    {i < currentStep ? '\u2713' : i + 1}
+                  </div>
+                  {i < totalSteps - 1 && (
+                    <div className={`flex-1 h-0.5 mx-1.5 rounded transition-colors ${
+                      i < currentStep ? 'bg-[var(--color-primary)]' : 'bg-gray-200'
+                    }`} />
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="text-center text-sm font-semibold text-[var(--color-text)]">
+              {steps![currentStep].name}
+            </p>
+          </div>
+        )}
+
+        <form onSubmit={isLastStep ? handleSubmit : (e) => { e.preventDefault(); handleNext() }}>
+          <div className="grid grid-cols-2 gap-3">
+            {currentFields.map((field) => (
+              <div
+                key={field.id}
+                className={field.width === 'half' ? 'col-span-1' : 'col-span-2'}
+              >
+                {field.type !== 'checkbox' && field.type !== 'radio' && (
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {field.label}
+                    {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                  </label>
+                )}
+
+                {field.type === 'radio' ? (
+                  <fieldset>
+                    <legend className="block text-sm font-medium text-gray-700 mb-1.5">
+                      {field.label}
+                      {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                    </legend>
+                    <div className="space-y-1.5">
+                      {(field.options || []).map((opt) => (
+                        <label key={opt.value} className={`flex items-center gap-2.5 cursor-pointer px-3 py-2.5 rounded-lg border transition text-sm ${
+                          formData[field.name] === opt.value
+                            ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/5 ring-1 ring-[var(--color-accent)]/20'
+                            : 'border-gray-300 hover:border-gray-400'
+                        }`}>
+                          <input
+                            type="radio" name={field.name} value={opt.value}
+                            checked={formData[field.name] === opt.value}
+                            onChange={(e) => handleChange(field.name, e.target.value)}
+                            className="w-4 h-4 text-[var(--color-accent)] focus:ring-[var(--color-accent)]"
+                          />
+                          <span className="text-gray-700 font-medium">{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                ) : field.type === 'number' ? (
+                  <input type="number" name={field.name} value={formData[field.name] || ''}
+                    onChange={(e) => handleChange(field.name, e.target.value)}
+                    placeholder={field.placeholder || ''}
+                    className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-300'} focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 outline-none transition text-gray-800 text-sm`}
+                  />
+                ) : field.type === 'textarea' ? (
+                  <textarea name={field.name} value={formData[field.name] || ''}
+                    onChange={(e) => handleChange(field.name, e.target.value)}
+                    placeholder={field.placeholder || ''} rows={3}
+                    className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-300'} focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 outline-none transition text-gray-800 text-sm`}
+                  />
+                ) : field.type === 'select' ? (
+                  <select name={field.name} value={formData[field.name] || ''}
+                    onChange={(e) => handleChange(field.name, e.target.value)}
+                    className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-300'} focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 outline-none transition text-gray-800 bg-white text-sm`}
+                  >
+                    <option value="">{field.placeholder || 'Select...'}</option>
+                    {(field.options || []).map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : field.type === 'checkbox' ? (
+                  <label className="flex items-start gap-2.5 cursor-pointer py-1">
+                    <input type="checkbox" checked={formData[field.name] === 'true'}
+                      onChange={(e) => handleChange(field.name, e.target.checked ? 'true' : '')}
+                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[var(--color-accent)] focus:ring-[var(--color-accent)]"
+                    />
+                    <span className="text-sm text-gray-700">
+                      {field.label}{field.required && <span className="text-red-500 ml-0.5">*</span>}
+                    </span>
+                  </label>
+                ) : (
+                  <input
+                    type={field.type === 'email' ? 'email' : field.type === 'phone' ? 'tel' : 'text'}
+                    name={field.name} value={formData[field.name] || ''}
+                    onChange={(e) => handleChange(field.name, e.target.value)}
+                    placeholder={field.placeholder || ''}
+                    className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-300'} focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 outline-none transition text-gray-800 text-sm`}
+                  />
+                )}
+
+                {errors[field.name] && (
+                  <p className="text-red-500 text-xs mt-1">{errors[field.name]}</p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {submitError && (
+            <div className="mt-3 p-2.5 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs">{submitError}</div>
+          )}
+
+          <div className={`mt-5 flex ${isMultiStep && currentStep > 0 ? 'justify-between' : 'justify-center'}`}>
+            {isMultiStep && currentStep > 0 && (
+              <button type="button" onClick={handleBack}
+                className="px-5 py-2.5 rounded-lg border border-gray-300 text-gray-600 font-medium hover:bg-gray-50 transition text-sm"
+              >{backText}</button>
+            )}
+            <button
+              type="submit" disabled={submitting}
+              className="btn-textured px-8 py-3 rounded-[var(--button-radius)] bg-[var(--color-accent)] text-white font-bold text-sm transition-all disabled:opacity-60 w-full max-w-sm"
+              style={isMultiStep && currentStep > 0 ? { maxWidth: 'none', flex: 1, marginLeft: 12 } : {}}
+            >
+              {submitting ? 'Submitting...' : isLastStep ? submitText : nextText}
+            </button>
+          </div>
+        </form>
+      </div>
+    )
+  }
 
   return (
     <section id="lead-form" className="py-16 md:py-20 bg-gray-50">

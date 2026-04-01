@@ -314,7 +314,7 @@ export default function LeadCaptureClassic({ sections, media, brandKit, formConf
       </header>
 
       {/* ─── HERO ─── */}
-      {hero && <HeroBlock section={hero} media={media} primaryColor={resolvedPrimary} accentColor={resolvedAccent} />}
+      {hero && <HeroBlock section={hero} media={media} primaryColor={resolvedPrimary} accentColor={resolvedAccent} formConfig={formConfig || undefined} pageSlug={pageSlug} clientSlug={clientSlug} publishedPageId={publishedPageId} />}
 
       {/* ─── FEATURE CARDS BAR ─── */}
       {features && <FeatureCardsBar section={features} primaryColor={resolvedPrimary} accentColor={resolvedAccent} />}
@@ -342,15 +342,7 @@ export default function LeadCaptureClassic({ sections, media, brandKit, formConf
       {/* ─── FAQ ─── */}
       {faq && <FaqBlock section={faq} />}
 
-      {/* ─── LEAD FORM ─── */}
-      {formConfig && (
-        <LeadFormDynamic
-          formConfig={formConfig}
-          pageSlug={pageSlug}
-          clientSlug={clientSlug}
-          publishedPageId={publishedPageId}
-        />
-      )}
+      {/* Lead form is now embedded in the hero section */}
 
       {/* ─── FOOTER ─── */}
       <FooterBlock section={footer} media={media} />
@@ -377,10 +369,11 @@ function sanitizeText(text: string): string {
    HERO — Gradient bg, text left, person image right with
    frosted glass callout bubble on bottom-right of image
    ═══════════════════════════════════════════════════════ */
-function HeroBlock({ section, media, primaryColor, accentColor }: { section: Section; media: MediaAssets; primaryColor: string; accentColor: string }) {
+function HeroBlock({ section, media, primaryColor, accentColor, formConfig, pageSlug, clientSlug, publishedPageId }: { section: Section; media: MediaAssets; primaryColor: string; accentColor: string; formConfig?: FormConfig; pageSlug?: string; clientSlug?: string; publishedPageId?: string }) {
   const img = media.hero_image
+  const hasForm = !!formConfig
   return (
-    <section className="relative overflow-hidden bg-[#fafbfa]">
+    <section id="lead-form" className="relative overflow-hidden bg-[#fafbfa]">
       <AnimatedBackground />
 
       {/* Very subtle single-color wash — stationary, not distracting */}
@@ -392,9 +385,9 @@ function HeroBlock({ section, media, primaryColor, accentColor }: { section: Sec
       />
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24 py-16 md:py-20">
-        <div className="flex flex-col md:flex-row items-center gap-10 md:gap-6">
+        <div className={`flex flex-col ${hasForm ? 'lg:flex-row' : 'md:flex-row'} items-center gap-10 ${hasForm ? 'lg:gap-10' : 'md:gap-6'}`}>
           {/* Left: text */}
-          <div className="flex-1 text-center md:text-left md:max-w-[55%]">
+          <div className={`flex-1 text-center md:text-left ${hasForm ? 'lg:max-w-[50%]' : 'md:max-w-[55%]'}`}>
             <h1
               className="text-4xl sm:text-5xl lg:text-[3.5rem] font-bold text-[var(--color-text)] leading-[1.1] mb-5"
               style={{ fontFamily: 'var(--font-heading)' }}
@@ -406,12 +399,14 @@ function HeroBlock({ section, media, primaryColor, accentColor }: { section: Sec
                 {section.subheadline || section.content}
               </p>
             )}
-            <a
-              href={section.cta_url || '#lead-form'}
-              className="btn-textured cta-button inline-block py-4 px-10 rounded-full bg-[var(--color-accent)] font-bold text-base md:text-lg transition-all shadow-xl"
-            >
-              {section.cta}
-            </a>
+            {!hasForm && (
+              <a
+                href={section.cta_url || '#lead-form'}
+                className="btn-textured cta-button inline-block py-4 px-10 rounded-full bg-[var(--color-accent)] font-bold text-base md:text-lg transition-all shadow-xl"
+              >
+                {section.cta}
+              </a>
+            )}
             {section.sub_cta && (
               <div className="mt-4 flex items-center justify-center md:justify-start gap-2">
                 <span className="inline-flex items-center gap-2 bg-gray-100/80 backdrop-blur-sm rounded-full px-4 py-2 text-gray-500 text-xs md:text-sm border border-gray-200/60">
@@ -422,71 +417,94 @@ function HeroBlock({ section, media, primaryColor, accentColor }: { section: Sec
             )}
           </div>
 
-          {/* Right: hero image with decorative shapes + frosted glass callout */}
-          <div className="flex-shrink-0 md:max-w-[45%] flex justify-center">
-            {img ? (
-              <div className="relative w-[300px] md:w-[380px] lg:w-[420px]">
-                {/* Decorative shapes behind the image */}
-                <div
-                  className="absolute -top-4 -right-4 w-[85%] h-[85%] rounded-3xl"
-                  style={{ transform: 'rotate(6deg)', background: `${primaryColor}18` }}
+          {/* Right: form (if configured) OR hero image */}
+          {hasForm ? (
+            <div className="flex-shrink-0 w-full lg:max-w-[46%]">
+              <div
+                className="rounded-2xl p-6 md:p-8 shadow-xl"
+                style={{
+                  background: 'rgba(255,255,255,0.85)',
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(255,255,255,0.6)',
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04)',
+                }}
+              >
+                <LeadFormDynamic
+                  formConfig={formConfig!}
+                  pageSlug={pageSlug}
+                  clientSlug={clientSlug}
+                  publishedPageId={publishedPageId}
+                  embedded
                 />
-                <div
-                  className="absolute -bottom-3 -left-3 w-20 h-20 rounded-2xl"
-                  style={{ transform: 'rotate(-12deg)', background: `${primaryColor}22` }}
-                />
-                <div
-                  className="absolute top-[20%] -right-6 w-12 h-12 rounded-full"
-                  style={{ background: `${primaryColor}20` }}
-                />
-                <div
-                  className="absolute -bottom-2 right-[15%] w-8 h-8 rounded-full"
-                  style={{ background: `${primaryColor}20` }}
-                />
-                {/* The actual image */}
-                <img
-                  src={img}
-                  alt=""
-                  className="relative z-10 w-full rounded-2xl shadow-2xl object-cover"
-                  style={{ aspectRatio: '4/5' }}
-                />
-                {/* Frosted glass callout — bottom right on top of image */}
-                {section.sub_cta && (
+              </div>
+            </div>
+          ) : (
+            <div className="flex-shrink-0 md:max-w-[45%] flex justify-center">
+              {img ? (
+                <div className="relative w-[300px] md:w-[380px] lg:w-[420px]">
+                  {/* Decorative shapes behind the image */}
                   <div
-                    className="absolute bottom-4 right-4 z-20 max-w-[200px] md:max-w-[220px] rounded-xl px-4 py-3"
-                    style={{
-                      background: 'rgba(255,255,255,0.18)',
-                      backdropFilter: 'blur(24px)',
-                      WebkitBackdropFilter: 'blur(24px)',
-                      border: '1px solid rgba(255,255,255,0.25)',
-                      boxShadow: '0 8px 32px rgba(0,0,0,0.06)',
-                    }}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: `${accentColor}30` }}>
-                        <PhCheckCircle size={12} weight="duotone" color={accentColor} />
+                    className="absolute -top-4 -right-4 w-[85%] h-[85%] rounded-3xl"
+                    style={{ transform: 'rotate(6deg)', background: `${primaryColor}18` }}
+                  />
+                  <div
+                    className="absolute -bottom-3 -left-3 w-20 h-20 rounded-2xl"
+                    style={{ transform: 'rotate(-12deg)', background: `${primaryColor}22` }}
+                  />
+                  <div
+                    className="absolute top-[20%] -right-6 w-12 h-12 rounded-full"
+                    style={{ background: `${primaryColor}20` }}
+                  />
+                  <div
+                    className="absolute -bottom-2 right-[15%] w-8 h-8 rounded-full"
+                    style={{ background: `${primaryColor}20` }}
+                  />
+                  {/* The actual image */}
+                  <img
+                    src={img}
+                    alt=""
+                    className="relative z-10 w-full rounded-2xl shadow-2xl object-cover"
+                    style={{ aspectRatio: '4/5' }}
+                  />
+                  {/* Frosted glass callout — bottom right on top of image */}
+                  {section.sub_cta && (
+                    <div
+                      className="absolute bottom-4 right-4 z-20 max-w-[200px] md:max-w-[220px] rounded-xl px-4 py-3"
+                      style={{
+                        background: 'rgba(255,255,255,0.18)',
+                        backdropFilter: 'blur(24px)',
+                        WebkitBackdropFilter: 'blur(24px)',
+                        border: '1px solid rgba(255,255,255,0.25)',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.06)',
+                      }}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: `${accentColor}30` }}>
+                          <PhCheckCircle size={12} weight="duotone" color={accentColor} />
+                        </div>
+                        <span className="text-[10px] uppercase tracking-wider font-semibold text-white/80">Quick Fact</span>
                       </div>
-                      <span className="text-[10px] uppercase tracking-wider font-semibold text-white/80">Quick Fact</span>
+                      <p className="text-xs font-semibold text-white leading-snug" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
+                        {section.sub_cta}
+                      </p>
                     </div>
-                    <p className="text-xs font-semibold text-white leading-snug" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
-                      {section.sub_cta}
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="relative w-[300px] md:w-[380px]">
-                <div
-                  className="absolute -top-4 -right-4 w-[85%] h-[85%] rounded-3xl"
-                  style={{ transform: 'rotate(6deg)', background: `${primaryColor}15` }}
-                />
-                <div
-                  className="w-full rounded-2xl bg-gray-100 border border-gray-200"
-                  style={{ aspectRatio: '4/5' }}
-                />
-              </div>
-            )}
-          </div>
+                  )}
+                </div>
+              ) : (
+                <div className="relative w-[300px] md:w-[380px]">
+                  <div
+                    className="absolute -top-4 -right-4 w-[85%] h-[85%] rounded-3xl"
+                    style={{ transform: 'rotate(6deg)', background: `${primaryColor}15` }}
+                  />
+                  <div
+                    className="w-full rounded-2xl bg-gray-100 border border-gray-200"
+                    style={{ aspectRatio: '4/5' }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </section>
