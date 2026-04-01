@@ -292,30 +292,50 @@ export default function AvatarsPage() {
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Landing Pages
                   </div>
-                  {getAvatarPages(avatar.id).map(page => (
-                    <a
-                      key={page.id}
-                      href={`${HUB_URL}/p/${page.client_slug}/${page.slug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 6,
-                        fontSize: 12, color: 'var(--accent)', textDecoration: 'none',
-                        padding: '3px 0',
-                      }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-                        <polyline points="15 3 21 3 21 9" />
-                        <line x1="10" y1="14" x2="21" y2="3" />
-                      </svg>
-                      /{page.slug}
-                      <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-                        &middot; {getOfferName(page.offer_id)}
-                      </span>
-                    </a>
-                  ))}
+                  {getAvatarPages(avatar.id).map(page => {
+                    const pageUrl = `${HUB_URL}/p/${page.client_slug}/${page.slug}`
+                    return (
+                      <div
+                        key={page.id}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          fontSize: 12, padding: '3px 0',
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <a
+                          href={pageUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--accent)', textDecoration: 'none' }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                            <polyline points="15 3 21 3 21 9" />
+                            <line x1="10" y1="14" x2="21" y2="3" />
+                          </svg>
+                          /{page.slug}
+                        </a>
+                        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                          &middot; {getOfferName(page.offer_id)}
+                        </span>
+                        <button
+                          onClick={() => window.open(pageUrl, '_blank', 'width=390,height=844,scrollbars=yes')}
+                          title="Mobile preview"
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                            color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center',
+                            marginLeft: 2,
+                          }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                            <line x1="12" y1="18" x2="12" y2="18" strokeLinecap="round" />
+                          </svg>
+                        </button>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -470,6 +490,19 @@ export default function AvatarsPage() {
                                 {getOfferName(page.offer_id)} &middot; {page.template_slug || 'Template'}
                               </div>
                             </div>
+                            <button
+                              onClick={() => window.open(pageUrl, '_blank', 'width=390,height=844,scrollbars=yes')}
+                              title="Mobile preview"
+                              style={{
+                                background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                                color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', flexShrink: 0,
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                                <line x1="12" y1="18" x2="12" y2="18" strokeLinecap="round" />
+                              </svg>
+                            </button>
                             <a href={pageUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />

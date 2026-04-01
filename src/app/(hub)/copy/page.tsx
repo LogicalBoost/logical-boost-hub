@@ -659,6 +659,7 @@ export default function FunnelPage() {
     loading,
     canEdit,
     isClientRole,
+    publishedPages,
   } = useAppStore()
 
   // Client role users should not access this page
@@ -1159,6 +1160,60 @@ export default function FunnelPage() {
           )}
         </div>
       )}
+
+      {/* Landing pages for selected avatar */}
+      {avatarId && (() => {
+        const avatarPages = publishedPages.filter(p => p.avatar_id === avatarId)
+        if (avatarPages.length === 0) return null
+        const HUB_URL = 'https://hub.logicalboost.com'
+        return (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+            padding: '8px 16px',
+            background: 'var(--bg-card)',
+            borderRadius: 8,
+            border: '1px solid var(--border)',
+            marginBottom: 12,
+            fontSize: 12,
+          }}>
+            <span style={{ color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 11 }}>
+              Landing Pages
+            </span>
+            {avatarPages.map(page => {
+              const pageUrl = `${HUB_URL}/p/${page.client_slug}/${page.slug}`
+              const offerMatch = offers.find(o => o.id === page.offer_id)
+              return (
+                <span key={page.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <a
+                    href={pageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: 'var(--accent)', textDecoration: 'none' }}
+                  >
+                    /{page.slug}
+                  </a>
+                  {offerMatch && (
+                    <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>({offerMatch.name})</span>
+                  )}
+                  <button
+                    onClick={() => window.open(pageUrl, '_blank', 'width=390,height=844,scrollbars=yes')}
+                    title="Mobile preview"
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                      color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center',
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                      <line x1="12" y1="18" x2="12" y2="18" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                </span>
+              )
+            })}
+          </div>
+        )
+      })()}
 
       {currentInstance ? (
         <>

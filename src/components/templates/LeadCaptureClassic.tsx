@@ -4,45 +4,83 @@ import { useState, useEffect, useRef } from 'react'
 import type { Section, SectionItem, MediaAssets, TrustpilotWidget, FormConfig } from './types'
 import LeadFormDynamic from './LeadFormDynamic'
 import AnimatedBackground from '../shared/AnimatedBackground'
+import { CaretDown as ChevronDown } from '@phosphor-icons/react'
 import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  Shield,
-  Star,
-  DollarSign,
-  Award,
-  Phone,
-  CheckCircle,
-  Zap,
-  Target,
-  Users,
-  Eye,
-  FileText,
-  Calendar,
-  ThumbsUp,
-  Heart,
-  CreditCard,
-  MapPin,
-  TrendingUp,
-  Briefcase,
-  Home,
-} from 'lucide-react'
+  Clock as PhClock,
+  Shield as PhShield,
+  Star as PhStar,
+  CurrencyDollar as PhDollar,
+  Trophy as PhAward,
+  Phone as PhPhone,
+  CheckCircle as PhCheckCircle,
+  Lightning as PhZap,
+  Target as PhTarget,
+  Users as PhUsers,
+  Eye as PhEye,
+  FileText as PhFileText,
+  Calendar as PhCalendar,
+  ThumbsUp as PhThumbsUp,
+  Heart as PhHeart,
+  CreditCard as PhCreditCard,
+  MapPin as PhMapPin,
+  TrendUp as PhTrendingUp,
+  Briefcase as PhBriefcase,
+  House as PhHome,
+  Handshake as PhHandshake,
+  ChartBar as PhChartBar,
+  Percent as PhPercent,
+  Rocket as PhRocket,
+  Clipboard as PhClipboard,
+  Gear as PhGear,
+  Lock as PhLock,
+  Headset as PhHeadset,
+  Lifebuoy as PhLifebuoy,
+  Wrench as PhWrench,
+  Truck as PhTruck,
+  Leaf as PhLeaf,
+  Stethoscope as PhStethoscope,
+  GraduationCap as PhGraduationCap,
+  Scales as PhScales,
+  PaintBrush as PhPaintBrush,
+  Buildings as PhBuildings,
+  Storefront as PhStorefront,
+  Bank as PhBank,
+  Sparkle as PhSparkle,
+  Medal as PhMedal,
+  ArrowsClockwise as PhArrowsClockwise,
+} from '@phosphor-icons/react'
 
-/* ─── Icon map ─── */
-const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  clock: Clock, shield: Shield, star: Star, dollar: DollarSign,
-  award: Award, phone: Phone, check: CheckCircle, zap: Zap,
-  target: Target, users: Users, eye: Eye, file: FileText,
-  calendar: Calendar, thumbs_up: ThumbsUp, heart: Heart,
-  credit_card: CreditCard, map_pin: MapPin, trending_up: TrendingUp,
-  briefcase: Briefcase, home: Home,
+/* ─── Phosphor Duotone Icon Map ───
+   Maps icon name strings (from AI copy generation) to Phosphor components.
+   All rendered in duotone style for consistent two-tone illustrated look.
+   7,000+ icons available — add more mappings as needed.
+─── */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const PHOSPHOR_ICONS: Record<string, React.ComponentType<any>> = {
+  clock: PhClock, shield: PhShield, star: PhStar, dollar: PhDollar,
+  award: PhAward, phone: PhPhone, check: PhCheckCircle, zap: PhZap,
+  target: PhTarget, users: PhUsers, eye: PhEye, file: PhFileText,
+  calendar: PhCalendar, thumbs_up: PhThumbsUp, heart: PhHeart,
+  credit_card: PhCreditCard, map_pin: PhMapPin, trending_up: PhTrendingUp,
+  briefcase: PhBriefcase, home: PhHome, handshake: PhHandshake,
+  chart: PhChartBar, percent: PhPercent, rocket: PhRocket,
+  clipboard: PhClipboard, gear: PhGear, lock: PhLock,
+  headset: PhHeadset, lifebuoy: PhLifebuoy, wrench: PhWrench,
+  truck: PhTruck, leaf: PhLeaf, stethoscope: PhStethoscope,
+  graduation: PhGraduationCap, scales: PhScales, paint: PhPaintBrush,
+  buildings: PhBuildings, storefront: PhStorefront, bank: PhBank,
+  sparkle: PhSparkle, medal: PhMedal, refresh: PhArrowsClockwise,
+  trophy: PhAward,
 }
-function Icon({ name, className }: { name?: string; className?: string }) {
-  const C = name ? ICONS[name] : null
-  return C ? <C className={className} /> : <CheckCircle className={className} />
+
+/* Render a Phosphor duotone icon by name string */
+function DuotoneIcon({ name, size = 28, color }: { name?: string; size?: number; color?: string }) {
+  const C = name ? PHOSPHOR_ICONS[name] : null
+  const IconComponent = C || PhCheckCircle
+  return <IconComponent size={size} weight="duotone" color={color} />
 }
+
+/* DetailedIcon removed — replaced by Phosphor duotone icons (DuotoneIcon) */
 
 /* ─── Accent word highlight ─── */
 function AH({ text, word, className }: { text: string; word?: string; className?: string }) {
@@ -74,6 +112,21 @@ const SOCIALS: Record<string, React.ComponentType<{ className?: string }>> = {
   facebook: FacebookIcon, linkedin: LinkedinIcon, instagram: InstagramIcon, twitter: XIcon, x: XIcon,
 }
 
+/* ─── Section background lines (reusable — random directions, more visible) ─── */
+function SectionLines({ color, opacity = 0.07 }: { color: string; opacity?: number }) {
+  return (
+    <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
+      <line x1="0%" y1="25%" x2="45%" y2="0%" stroke={color} strokeWidth="1" opacity={opacity} />
+      <line x1="65%" y1="100%" x2="100%" y2="45%" stroke={color} strokeWidth="1" opacity={opacity} />
+      <line x1="15%" y1="100%" x2="55%" y2="60%" stroke={color} strokeWidth="0.75" opacity={opacity * 0.8} />
+      <line x1="80%" y1="0%" x2="40%" y2="100%" stroke={color} strokeWidth="0.75" opacity={opacity * 0.6} />
+      <line x1="0%" y1="70%" x2="30%" y2="100%" stroke={color} strokeWidth="0.75" opacity={opacity * 0.7} />
+      <line x1="90%" y1="0%" x2="100%" y2="35%" stroke={color} strokeWidth="0.75" opacity={opacity * 0.5} />
+      <line x1="50%" y1="0%" x2="20%" y2="50%" stroke={color} strokeWidth="0.5" opacity={opacity * 0.5} />
+    </svg>
+  )
+}
+
 /* ═══════════════════════════════════════════════════════
    COLOR USAGE GUIDE:
    - --color-primary: Icons, icon backgrounds, borders, decorative elements, blobs, section backgrounds
@@ -82,6 +135,30 @@ const SOCIALS: Record<string, React.ComponentType<{ className?: string }>> = {
    - --color-text: Headings and body text
    - --color-bg: Page background
    ═══════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════
+   UTILITY: compute contrasting text color for CTA buttons
+   ═══════════════════════════════════════════════════════ */
+function getContrastTextColor(bgColor: string): string {
+  const hex = bgColor.replace('#', '')
+  if (hex.length < 6) return '#ffffff'
+  const r = parseInt(hex.substring(0, 2), 16)
+  const g = parseInt(hex.substring(2, 4), 16)
+  const b = parseInt(hex.substring(4, 6), 16)
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance > 0.5 ? '#1a1a2e' : '#ffffff'
+}
+
+/* Check if accent color is too light to stand out on white backgrounds */
+function isLightColor(color: string): boolean {
+  const hex = color.replace('#', '')
+  if (hex.length < 6) return false
+  const r = parseInt(hex.substring(0, 2), 16)
+  const g = parseInt(hex.substring(2, 4), 16)
+  const b = parseInt(hex.substring(4, 6), 16)
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance > 0.6
+}
 
 /* ═══════════════════════════════════════════════════════
    MAIN TEMPLATE
@@ -128,8 +205,40 @@ export default function LeadCaptureClassic({ sections, media, formConfig, pageSl
   const faq = s.get('faq')
   const footer = s.get('footer')
 
+  // Read brand colors from CSS variables for contrast calculations
+  const [accentColor, setAccentColor] = useState('#e67e22')
+  const [primaryColor, setPrimaryColor] = useState('#2d6a4f')
+  useEffect(() => {
+    const root = document.documentElement
+    const styles = getComputedStyle(root)
+    const acc = styles.getPropertyValue('--color-accent').trim()
+    const pri = styles.getPropertyValue('--color-primary').trim()
+    if (acc) setAccentColor(acc)
+    if (pri) setPrimaryColor(pri)
+  }, [])
+
+  const accentIsLight = isLightColor(accentColor)
+  // If accent is too light for white bg, use secondary (dark) for buttons on light sections
+  const ctaBgColor = accentIsLight ? 'var(--color-secondary)' : 'var(--color-accent)'
+  const ctaTextColor = accentIsLight ? '#ffffff' : getContrastTextColor(accentColor)
+
   return (
     <div className="min-h-screen bg-white" style={{ fontFamily: 'var(--font-body)' }}>
+      {/* Inject CTA button styles — ensures extreme contrast */}
+      <style>{`
+        :root { --cta-text-color: ${ctaTextColor}; --cta-bg: ${ctaBgColor}; }
+        .cta-button {
+          background-color: ${ctaBgColor} !important;
+          color: ${ctaTextColor} !important;
+          text-shadow: ${ctaTextColor === '#ffffff' ? '0 1px 2px rgba(0,0,0,0.3)' : 'none'};
+        }
+        /* Keep accent for buttons on dark sections where it provides contrast */
+        .cta-button-on-dark {
+          background-color: var(--color-accent) !important;
+          color: ${getContrastTextColor(accentColor)} !important;
+        }
+      `}</style>
+
       {/* ─── HEADER ─── */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-3 md:px-10 lg:px-12 xl:px-24 flex items-center justify-between py-2 md:py-3">
@@ -140,7 +249,7 @@ export default function LeadCaptureClassic({ sections, media, formConfig, pageSl
           )}
           <a
             href="#lead-form"
-            className="btn-textured py-2 px-4 md:py-2.5 md:px-6 rounded-[var(--button-radius)] bg-[var(--color-accent)] text-white font-semibold text-xs md:text-sm transition-all whitespace-nowrap"
+            className="btn-textured cta-button py-2 px-4 md:py-2.5 md:px-6 rounded-[var(--button-radius)] bg-[var(--color-accent)] font-semibold text-xs md:text-sm transition-all whitespace-nowrap"
           >
             {hero?.cta || 'Get Started'}
           </a>
@@ -148,22 +257,22 @@ export default function LeadCaptureClassic({ sections, media, formConfig, pageSl
       </header>
 
       {/* ─── HERO ─── */}
-      {hero && <HeroBlock section={hero} media={media} />}
+      {hero && <HeroBlock section={hero} media={media} primaryColor={primaryColor} accentColor={accentColor} />}
 
       {/* ─── FEATURE CARDS BAR ─── */}
-      {features && <FeatureCardsBar section={features} />}
+      {features && <FeatureCardsBar section={features} primaryColor={primaryColor} accentColor={accentColor} />}
 
       {/* ─── TWO COLUMN INFO ─── */}
       {info && <TwoColumnInfo section={info} />}
 
       {/* ─── STEPS ─── */}
-      {steps && <StepsBlock section={steps} media={media} />}
+      {steps && <StepsBlock section={steps} media={media} primaryColor={primaryColor} accentColor={accentColor} />}
 
       {/* ─── TRUST BAR ─── */}
       {trust && <TrustBar section={trust} media={media} />}
 
       {/* ─── BENEFITS GRID ─── */}
-      {benefits && <BenefitsGrid section={benefits} media={media} />}
+      {benefits && <BenefitsGrid section={benefits} media={media} primaryColor={primaryColor} accentColor={accentColor} />}
 
       {/* ─── TESTIMONIALS ─── */}
       {testimonials && <TestimonialsBlock section={testimonials} media={media} />}
@@ -195,28 +304,36 @@ export default function LeadCaptureClassic({ sections, media, formConfig, pageSl
 /* Helper: fix garbled UTF-8 sequences (mojibake — UTF-8 bytes read as Latin-1) */
 function sanitizeText(text: string): string {
   return text
-    // 3-byte UTF-8 mojibake patterns (most common)
-    .replace(/\u00e2\u0080\u00a2/g, '•')    // • bullet
-    .replace(/\u00e2\u0080\u0099/g, '\u2019') // ' right single quote
-    .replace(/\u00e2\u0080\u009c/g, '\u201c') // " left double quote
-    .replace(/\u00e2\u0080\u009d/g, '\u201d') // " right double quote
-    .replace(/\u00e2\u0080\u0093/g, '\u2013') // – en dash
-    .replace(/\u00e2\u0080\u0094/g, '\u2014') // — em dash
-    .replace(/\u00e2\u009c\u0093/g, '✓')      // ✓ check mark
-    .replace(/\u00e2\u009c\u0085/g, '✅')     // ✅ white check mark
-    .replace(/\u00c2\u00a0/g, ' ')            // non-breaking space
-    // Catch any remaining 3-byte \u00e2 sequences as bullet fallback
+    .replace(/\u00e2\u0080\u00a2/g, '•')
+    .replace(/\u00e2\u0080\u0099/g, '\u2019')
+    .replace(/\u00e2\u0080\u009c/g, '\u201c')
+    .replace(/\u00e2\u0080\u009d/g, '\u201d')
+    .replace(/\u00e2\u0080\u0093/g, '\u2013')
+    .replace(/\u00e2\u0080\u0094/g, '\u2014')
+    .replace(/\u00e2\u009c\u0093/g, '✓')
+    .replace(/\u00e2\u009c\u0085/g, '✅')
+    .replace(/\u00c2\u00a0/g, ' ')
     .replace(/\u00e2[\u0080-\u009f][\u0080-\u00bf]/g, '•')
 }
 
 /* ═══════════════════════════════════════════════════════
-   HERO — White bg, text left, person image right with blob
+   HERO — Gradient bg, text left, person image right with
+   frosted glass callout bubble on bottom-right of image
    ═══════════════════════════════════════════════════════ */
-function HeroBlock({ section, media }: { section: Section; media: MediaAssets }) {
+function HeroBlock({ section, media, primaryColor, accentColor }: { section: Section; media: MediaAssets; primaryColor: string; accentColor: string }) {
   const img = media.hero_image
   return (
-    <section className="relative overflow-hidden bg-white">
+    <section className="relative overflow-hidden bg-[#fafbfa]">
       <AnimatedBackground />
+
+      {/* Very subtle single-color wash — stationary, not distracting */}
+      <div
+        className="absolute top-0 right-0 w-[50%] h-full pointer-events-none"
+        style={{
+          background: `linear-gradient(160deg, transparent 0%, ${primaryColor}06 50%, ${primaryColor}0a 100%)`,
+        }}
+      />
+
       <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24 py-16 md:py-20">
         <div className="flex flex-col md:flex-row items-center gap-10 md:gap-6">
           {/* Left: text */}
@@ -234,38 +351,40 @@ function HeroBlock({ section, media }: { section: Section; media: MediaAssets })
             )}
             <a
               href={section.cta_url || '#lead-form'}
-              className="btn-textured inline-block py-3.5 px-8 rounded-full bg-[var(--color-accent)] text-white font-bold text-base transition-all"
+              className="btn-textured cta-button inline-block py-4 px-10 rounded-full bg-[var(--color-accent)] font-bold text-base md:text-lg transition-all shadow-xl"
             >
               {section.cta}
             </a>
             {section.sub_cta && (
               <div className="mt-4 flex items-center justify-center md:justify-start gap-2">
-                <span className="inline-flex items-center gap-2 bg-gray-100 rounded-full px-3 py-1.5 text-gray-500 text-xs md:text-sm border border-gray-200">
-                  <Clock className="w-3 h-3 md:w-3.5 md:h-3.5 text-[var(--color-primary)]" />
+                <span className="inline-flex items-center gap-2 bg-gray-100/80 backdrop-blur-sm rounded-full px-4 py-2 text-gray-500 text-xs md:text-sm border border-gray-200/60">
+                  <PhClock size={14} weight="duotone" color="var(--color-primary)" />
                   {section.sub_cta}
                 </span>
               </div>
             )}
           </div>
 
-          {/* Right: hero image with decorative shapes */}
+          {/* Right: hero image with decorative shapes + frosted glass callout */}
           <div className="flex-shrink-0 md:max-w-[45%] flex justify-center">
             {img ? (
               <div className="relative w-[300px] md:w-[380px] lg:w-[420px]">
                 {/* Decorative shapes behind the image */}
                 <div
-                  className="absolute -top-4 -right-4 w-[85%] h-[85%] rounded-3xl bg-[var(--color-primary)]/10"
-                  style={{ transform: 'rotate(6deg)' }}
+                  className="absolute -top-4 -right-4 w-[85%] h-[85%] rounded-3xl"
+                  style={{ transform: 'rotate(6deg)', background: `${primaryColor}18` }}
                 />
                 <div
-                  className="absolute -bottom-3 -left-3 w-20 h-20 rounded-2xl bg-[var(--color-primary)]/15"
-                  style={{ transform: 'rotate(-12deg)' }}
+                  className="absolute -bottom-3 -left-3 w-20 h-20 rounded-2xl"
+                  style={{ transform: 'rotate(-12deg)', background: `${primaryColor}22` }}
                 />
                 <div
-                  className="absolute top-[20%] -right-6 w-12 h-12 rounded-full bg-[var(--color-accent)]/20"
+                  className="absolute top-[20%] -right-6 w-12 h-12 rounded-full"
+                  style={{ background: `${primaryColor}20` }}
                 />
                 <div
-                  className="absolute -bottom-2 right-[15%] w-8 h-8 rounded-full bg-[var(--color-primary)]/20"
+                  className="absolute -bottom-2 right-[15%] w-8 h-8 rounded-full"
+                  style={{ background: `${primaryColor}20` }}
                 />
                 {/* The actual image */}
                 <img
@@ -274,12 +393,35 @@ function HeroBlock({ section, media }: { section: Section; media: MediaAssets })
                   className="relative z-10 w-full rounded-2xl shadow-2xl object-cover"
                   style={{ aspectRatio: '4/5' }}
                 />
+                {/* Frosted glass callout — bottom right on top of image */}
+                {section.sub_cta && (
+                  <div
+                    className="absolute bottom-4 right-4 z-20 max-w-[200px] md:max-w-[220px] rounded-xl px-4 py-3"
+                    style={{
+                      background: 'rgba(255,255,255,0.18)',
+                      backdropFilter: 'blur(24px)',
+                      WebkitBackdropFilter: 'blur(24px)',
+                      border: '1px solid rgba(255,255,255,0.25)',
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.06)',
+                    }}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: `${accentColor}30` }}>
+                        <PhCheckCircle size={12} weight="duotone" color={accentColor} />
+                      </div>
+                      <span className="text-[10px] uppercase tracking-wider font-semibold text-white/80">Quick Fact</span>
+                    </div>
+                    <p className="text-xs font-semibold text-white leading-snug" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
+                      {section.sub_cta}
+                    </p>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="relative w-[300px] md:w-[380px]">
                 <div
-                  className="absolute -top-4 -right-4 w-[85%] h-[85%] rounded-3xl bg-[var(--color-primary)]/10"
-                  style={{ transform: 'rotate(6deg)' }}
+                  className="absolute -top-4 -right-4 w-[85%] h-[85%] rounded-3xl"
+                  style={{ transform: 'rotate(6deg)', background: `${primaryColor}15` }}
                 />
                 <div
                   className="w-full rounded-2xl bg-gray-100 border border-gray-200"
@@ -295,25 +437,48 @@ function HeroBlock({ section, media }: { section: Section; media: MediaAssets })
 }
 
 /* ═══════════════════════════════════════════════════════
-   FEATURE CARDS — Primary color bar with 3 white cards
+   FEATURE CARDS — Rich gradient bg, frosted glass cards,
+   detailed multi-color illustrated icons
    ═══════════════════════════════════════════════════════ */
-function FeatureCardsBar({ section }: { section: Section }) {
+function FeatureCardsBar({ section, primaryColor, accentColor }: { section: Section; primaryColor: string; accentColor: string }) {
   const items = section.items || []
   return (
-    <section className="bg-[var(--color-primary)] py-5 md:py-6">
-      <div className="max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
+    <section
+      className="relative py-6 md:py-8 overflow-hidden"
+      style={{
+        background: `linear-gradient(135deg, ${primaryColor} 0%, ${primaryColor}dd 50%, ${primaryColor}bb 100%)`,
+      }}
+    >
+      {/* Diagonal line decorations — more visible on dark bg */}
+      <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
+        <line x1="0%" y1="0%" x2="30%" y2="100%" stroke="white" strokeWidth="1" opacity="0.10" />
+        <line x1="50%" y1="0%" x2="80%" y2="100%" stroke="white" strokeWidth="1" opacity="0.08" />
+        <line x1="75%" y1="0%" x2="100%" y2="60%" stroke="white" strokeWidth="0.75" opacity="0.07" />
+        <line x1="15%" y1="100%" x2="45%" y2="0%" stroke="white" strokeWidth="0.75" opacity="0.06" />
+        <line x1="90%" y1="100%" x2="60%" y2="0%" stroke="white" strokeWidth="0.5" opacity="0.05" />
+      </svg>
+
+      <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24">
+        <div className={`grid grid-cols-2 ${items.length >= 4 ? 'lg:grid-cols-4' : items.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3 md:gap-4`}>
           {items.map((item, i) => (
-            <div key={i} className="bg-white rounded-2xl shadow-sm p-4 md:p-5 flex items-center gap-4">
-              <div className="relative flex-shrink-0">
-                <div className="w-12 h-12 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center">
-                  <Icon name={item.icon} className="w-5 h-5 text-[var(--color-primary)]" />
-                </div>
-                <div className="absolute -top-1 -right-1 w-12 h-12 rounded-full bg-[var(--color-primary)]/5 -z-10" />
+            <div
+              key={i}
+              className="rounded-2xl p-4 md:p-5 flex items-center gap-3 md:gap-4"
+              style={{
+                background: 'rgba(255,255,255,0.10)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                border: '1px solid rgba(255,255,255,0.18)',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+              }}
+            >
+              {/* Phosphor duotone icon */}
+              <div className="flex-shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-full bg-white/10 flex items-center justify-center">
+                <DuotoneIcon name={item.icon} size={28} color="#ffffff" />
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">{item.label}</p>
-                <p className="text-base font-bold text-[var(--color-text)]">{item.value}</p>
+                <p className="text-[10px] md:text-xs text-white/70 uppercase tracking-wide font-medium">{item.label}</p>
+                <p className="text-sm md:text-base font-bold text-white">{item.value}</p>
               </div>
             </div>
           ))}
@@ -324,7 +489,7 @@ function FeatureCardsBar({ section }: { section: Section }) {
 }
 
 /* ═══════════════════════════════════════════════════════
-   TWO COLUMN INFO — Headline, two bordered boxes, CTA
+   TWO COLUMN INFO — Gradient bg, frosted glass boxes
    ═══════════════════════════════════════════════════════ */
 function TwoColumnInfo({ section }: { section: Section }) {
   const items = section.items || []
@@ -333,8 +498,23 @@ function TwoColumnInfo({ section }: { section: Section }) {
   const right = items.slice(half)
 
   return (
-    <section className="py-16 md:py-20 bg-white">
-      <div className="max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24">
+    <section className="relative py-16 md:py-20 overflow-hidden"
+      style={{
+        background: `linear-gradient(160deg, #f8faf9 0%, #eef4f1 30%, #f0f7f4 60%, #f5f9f7 100%)`,
+      }}
+    >
+      {/* Decorative gradient blobs */}
+      <div className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full blur-[120px] pointer-events-none"
+        style={{ background: 'var(--color-primary)', opacity: 0.06 }}
+      />
+      <div className="absolute bottom-0 left-0 w-[350px] h-[350px] rounded-full blur-[100px] pointer-events-none"
+        style={{ background: 'var(--color-primary)', opacity: 0.04 }}
+      />
+
+      {/* Diagonal lines */}
+      <SectionLines color="var(--color-primary)" opacity={0.05} />
+
+      <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24">
         <div className="text-center max-w-3xl mx-auto mb-10">
           <h2
             className="text-3xl md:text-4xl font-bold text-[var(--color-text)] mb-4"
@@ -348,15 +528,15 @@ function TwoColumnInfo({ section }: { section: Section }) {
         </div>
 
         <div className="grid md:grid-cols-2 gap-5 md:gap-6 mb-10">
-          <InfoBox items={left} title={left[0]?.title} />
-          <InfoBox items={right} title={right[0]?.title} />
+          <FrostedInfoBox items={left} title={left[0]?.title} />
+          <FrostedInfoBox items={right} title={right[0]?.title} />
         </div>
 
         {section.cta && (
           <div className="text-center">
             <a
               href={section.cta_url || '#lead-form'}
-              className="btn-textured inline-block py-3.5 px-8 rounded-full bg-[var(--color-accent)] text-white font-bold text-base transition-all"
+              className="btn-textured cta-button inline-block py-4 px-10 rounded-full bg-[var(--color-accent)] font-bold text-base transition-all shadow-xl"
             >
               {section.cta}
             </a>
@@ -367,18 +547,32 @@ function TwoColumnInfo({ section }: { section: Section }) {
   )
 }
 
-function InfoBox({ items, title }: { items: SectionItem[]; title?: string }) {
+function FrostedInfoBox({ items, title }: { items: SectionItem[]; title?: string }) {
   return (
-    <div className="rounded-xl border border-[var(--color-primary)]/25 p-6 md:p-7">
+    <div
+      className="rounded-2xl p-6 md:p-7"
+      style={{
+        background: 'rgba(255,255,255,0.45)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        border: '1px solid rgba(255,255,255,0.4)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.02)',
+      }}
+    >
       {title && (
-        <h3 className="font-bold text-lg text-[var(--color-text)] mb-4">{title}</h3>
+        <h3 className="font-bold text-lg text-[var(--color-text)] mb-4 flex items-center gap-2">
+          <div className="w-1 h-5 rounded-full bg-[var(--color-primary)]" />
+          {title}
+        </h3>
       )}
       <ul className="space-y-3">
         {items.map((item, i) => {
           if (i === 0 && item.title) return null
           return (
             <li key={i} className="flex items-start gap-2.5">
-              <CheckCircle className="w-4.5 h-4.5 mt-0.5 text-[var(--color-primary)] flex-shrink-0" />
+              <div className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center">
+                <PhCheckCircle size={12} weight="duotone" color="var(--color-primary)" />
+              </div>
               <span className="text-sm text-gray-600 leading-relaxed">{item.text}</span>
             </li>
           )
@@ -389,15 +583,22 @@ function InfoBox({ items, title }: { items: SectionItem[]; title?: string }) {
 }
 
 /* ═══════════════════════════════════════════════════════
-   STEPS — Image left, numbered step cards right
+   STEPS — Image left, numbered step cards right,
+   subtle gradient bg with decorative elements
    ═══════════════════════════════════════════════════════ */
-function StepsBlock({ section, media }: { section: Section; media: MediaAssets }) {
+function StepsBlock({ section, media, primaryColor, accentColor }: { section: Section; media: MediaAssets; primaryColor: string; accentColor: string }) {
   const items = section.items || []
   const img = media.steps_image
 
   return (
-    <section className="py-16 md:py-20 bg-gray-50/50">
-      <div className="max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24">
+    <section className="relative py-16 md:py-20 overflow-hidden bg-white">
+      {/* Subtle accent gradient on left side */}
+      <div className="absolute top-0 left-0 w-[40%] h-full pointer-events-none"
+        style={{ background: `linear-gradient(180deg, ${primaryColor}06 0%, ${primaryColor}03 100%)` }}
+      />
+      <SectionLines color="var(--color-primary)" opacity={0.03} />
+
+      <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24">
         <div className="text-center max-w-3xl mx-auto mb-12">
           <h2
             className="text-3xl md:text-4xl font-bold text-[var(--color-text)] mb-3"
@@ -411,29 +612,45 @@ function StepsBlock({ section, media }: { section: Section; media: MediaAssets }
         </div>
 
         <div className={`flex flex-col lg:flex-row items-center gap-10 lg:gap-14${!img ? ' lg:justify-center' : ''}`}>
-          {/* Left: image with blob (hidden if no image) */}
+          {/* Left: image with blob */}
           {img && (
             <div className="lg:w-4/12 flex justify-center">
               <div className="relative w-[280px]">
                 <div
-                  className="absolute inset-[-8%] bg-[var(--color-primary)]/8"
-                  style={{ borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%' }}
+                  className="absolute inset-[-8%]"
+                  style={{ borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%', background: `${primaryColor}12` }}
                 />
                 <img src={img} alt="" className="relative z-10 rounded-3xl shadow-xl w-full" />
               </div>
             </div>
           )}
 
-          {/* Step cards — full width if no image */}
+          {/* Step cards with numbered badges */}
           <div className={img ? 'lg:w-8/12 space-y-4' : 'lg:w-10/12 space-y-4'}>
             {items.map((item, i) => (
               <div
                 key={i}
-                className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 md:p-6 flex items-start gap-4"
+                className="rounded-xl p-5 md:p-6 flex items-start gap-4 transition-all hover:shadow-lg"
+                style={{
+                  background: 'rgba(255,255,255,0.5)',
+                  backdropFilter: 'blur(16px)',
+                  border: '1px solid rgba(0,0,0,0.06)',
+                  boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+                }}
               >
                 <div className="relative flex-shrink-0">
-                  <div className="w-14 h-14 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center">
-                    <Icon name={item.icon} className="w-6 h-6 text-[var(--color-primary)]" />
+                  {/* Numbered circle with icon */}
+                  <div className="w-14 h-14 rounded-full flex items-center justify-center"
+                    style={{ background: `${primaryColor}12` }}
+                  >
+                    <DuotoneIcon name={item.icon} size={28} color={primaryColor} />
+                  </div>
+                  {/* Step number badge */}
+                  <div
+                    className="absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                    style={{ background: accentColor, color: getContrastTextColor(accentColor) }}
+                  >
+                    {i + 1}
                   </div>
                 </div>
                 <div className="flex-1">
@@ -442,7 +659,7 @@ function StepsBlock({ section, media }: { section: Section; media: MediaAssets }
                   {i === items.length - 1 && section.cta && (
                     <a
                       href={section.cta_url || '#lead-form'}
-                      className="btn-textured inline-block mt-3 py-2.5 px-6 rounded-full bg-[var(--color-accent)] text-white font-semibold text-sm transition-all"
+                      className="btn-textured cta-button inline-block mt-3 py-2.5 px-6 rounded-full bg-[var(--color-accent)] font-semibold text-sm transition-all"
                     >
                       {section.cta}
                     </a>
@@ -458,7 +675,7 @@ function StepsBlock({ section, media }: { section: Section; media: MediaAssets }
 }
 
 /* ═══════════════════════════════════════════════════════
-   TRUST BAR — Dark bg, 3 stat/trust cards
+   TRUST BAR — Dark bg, frosted stat cards
    ═══════════════════════════════════════════════════════ */
 function TrustBar({ section, media }: { section: Section; media: MediaAssets }) {
   const items = section.items || []
@@ -473,8 +690,15 @@ function TrustBar({ section, media }: { section: Section; media: MediaAssets }) 
         backgroundSize: 'cover',
       } : undefined}
     >
-      {/* Branded overlay — gradient from secondary to primary for rich branded feel */}
+      {/* Branded overlay */}
       <div className={`absolute inset-0 ${parallax ? 'bg-gradient-to-br from-[var(--color-secondary)]/90 to-[var(--color-primary)]/80' : 'bg-gradient-to-br from-[var(--color-secondary)] to-[var(--color-primary)]/90'}`} />
+
+      {/* Diagonal lines on dark bg */}
+      <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
+        <line x1="0%" y1="20%" x2="25%" y2="0%" stroke="white" strokeWidth="0.5" opacity="0.06" />
+        <line x1="60%" y1="100%" x2="100%" y2="30%" stroke="white" strokeWidth="0.5" opacity="0.04" />
+        <line x1="30%" y1="100%" x2="70%" y2="0%" stroke="white" strokeWidth="0.5" opacity="0.03" />
+      </svg>
 
       {parallax && (
         <style>{`
@@ -497,15 +721,22 @@ function TrustBar({ section, media }: { section: Section; media: MediaAssets }) 
           {items.map((item, i) => (
             <div
               key={i}
-              className="rounded-xl border border-white/15 p-6 md:p-7 text-center"
+              className="rounded-xl p-6 md:p-7 text-center"
+              style={{
+                background: 'rgba(255,255,255,0.08)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+              }}
             >
               {item.image ? (
                 <img src={item.image} alt="" className="h-12 mx-auto mb-3 object-contain" />
               ) : item.stat ? (
-                <p className="text-3xl md:text-4xl font-bold text-[var(--color-accent)] mb-2">{item.stat}</p>
+                <p className="text-2xl md:text-3xl font-bold text-[var(--color-accent)] mb-2 whitespace-nowrap">{item.stat}</p>
               ) : null}
               <div className="w-12 h-px bg-white/20 mx-auto mb-3" />
-              <p className="text-sm text-white/70">{item.label}</p>
+              <p className="text-xs md:text-sm text-white/70">{item.label}</p>
             </div>
           ))}
         </div>
@@ -515,15 +746,26 @@ function TrustBar({ section, media }: { section: Section; media: MediaAssets }) 
 }
 
 /* ═══════════════════════════════════════════════════════
-   BENEFITS GRID — Content left (2x2 cards), image right
+   BENEFITS GRID — Gradient bg, frosted glass cards with
+   left border accent, icon circles
    ═══════════════════════════════════════════════════════ */
-function BenefitsGrid({ section, media }: { section: Section; media: MediaAssets }) {
+function BenefitsGrid({ section, media, primaryColor, accentColor }: { section: Section; media: MediaAssets; primaryColor: string; accentColor: string }) {
   const items = section.items || []
   const img = media.benefits_image
 
   return (
-    <section className="py-16 md:py-20 bg-white">
-      <div className="max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24">
+    <section className="relative py-16 md:py-20 overflow-hidden"
+      style={{
+        background: `linear-gradient(160deg, #f6f9f8 0%, #edf3f0 40%, #f2f7f5 70%, #f8faf9 100%)`,
+      }}
+    >
+      {/* Decorative blobs */}
+      <div className="absolute bottom-0 right-0 w-[350px] h-[350px] rounded-full blur-[100px] pointer-events-none"
+        style={{ background: 'var(--color-primary)', opacity: 0.05 }}
+      />
+      <SectionLines color="var(--color-primary)" opacity={0.04} />
+
+      <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24">
         <div className="text-center max-w-3xl mx-auto mb-10">
           <h2
             className="text-3xl md:text-4xl font-bold text-[var(--color-text)] mb-3"
@@ -537,14 +779,27 @@ function BenefitsGrid({ section, media }: { section: Section; media: MediaAssets
         </div>
 
         <div className="flex flex-col lg:flex-row gap-10 lg:gap-12 items-center">
-          {/* Left: 2x2 card grid */}
+          {/* Left: 2x2 frosted card grid */}
           <div className={img ? 'lg:w-8/12' : 'w-full'}>
             <div className="grid sm:grid-cols-2 gap-4">
               {items.map((item, i) => (
                 <div
                   key={i}
-                  className="rounded-xl border border-[var(--color-primary)]/20 p-5 text-center hover:border-[var(--color-primary)]/40 hover:shadow-md transition-all"
+                  className="rounded-xl p-5 text-left hover:shadow-lg transition-all group"
+                  style={{
+                    background: 'rgba(255,255,255,0.40)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(255,255,255,0.35)',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+                    borderLeft: '3px solid var(--color-primary)',
+                  }}
                 >
+                  <div className="w-10 h-10 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <div className="w-7 h-7">
+                      <DuotoneIcon name={item.icon} size={28} color={primaryColor} />
+                    </div>
+                  </div>
                   <h3 className="font-bold text-[var(--color-text)] mb-2">{item.title}</h3>
                   <p className="text-sm text-gray-500 leading-relaxed">{item.text}</p>
                 </div>
@@ -555,7 +810,7 @@ function BenefitsGrid({ section, media }: { section: Section; media: MediaAssets
               <div className="text-center mt-8">
                 <a
                   href={section.cta_url || '#lead-form'}
-                  className="btn-textured inline-block py-3.5 px-8 rounded-full bg-[var(--color-accent)] text-white font-bold text-base transition-all"
+                  className="btn-textured cta-button inline-block py-4 px-10 rounded-full bg-[var(--color-accent)] font-bold text-base transition-all shadow-xl"
                 >
                   {section.cta}
                 </a>
@@ -563,20 +818,20 @@ function BenefitsGrid({ section, media }: { section: Section; media: MediaAssets
             )}
           </div>
 
-          {/* Right: image + CTA (only if image exists) */}
+          {/* Right: image + CTA */}
           {img && (
             <div className="lg:w-4/12 flex flex-col items-center gap-6">
               <div className="relative w-full max-w-[280px]">
                 <div
-                  className="absolute inset-[-6%] bg-[var(--color-primary)]/8"
-                  style={{ borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%' }}
+                  className="absolute inset-[-6%]"
+                  style={{ borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%', background: 'var(--color-primary)', opacity: 0.08 }}
                 />
                 <img src={img} alt="" className="relative z-10 rounded-2xl shadow-lg w-full" />
               </div>
               {section.cta && (
                 <a
                   href={section.cta_url || '#lead-form'}
-                  className="btn-textured inline-block py-3.5 px-8 rounded-full bg-[var(--color-accent)] text-white font-bold text-base transition-all"
+                  className="btn-textured cta-button inline-block py-4 px-10 rounded-full bg-[var(--color-accent)] font-bold text-base transition-all shadow-xl"
                 >
                   {section.cta}
                 </a>
@@ -590,7 +845,8 @@ function BenefitsGrid({ section, media }: { section: Section; media: MediaAssets
 }
 
 /* ═══════════════════════════════════════════════════════
-   TESTIMONIALS — Cards with stars, quotes, avatars
+   TESTIMONIALS — Cards with stars, quotes, avatars,
+   subtle gradient bg with decorative elements
    ═══════════════════════════════════════════════════════ */
 function TestimonialsBlock({ section, media }: { section: Section; media: MediaAssets }) {
   const items = section.items || []
@@ -598,8 +854,14 @@ function TestimonialsBlock({ section, media }: { section: Section; media: MediaA
   const perPage = 3
 
   return (
-    <section className="py-16 md:py-20 bg-gray-50/50">
-      <div className="max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24">
+    <section className="relative py-16 md:py-20 bg-white overflow-hidden">
+      {/* Subtle top-left gradient */}
+      <div className="absolute top-0 left-0 w-[300px] h-[300px] rounded-full blur-[100px] pointer-events-none"
+        style={{ background: 'var(--color-primary)', opacity: 0.04 }}
+      />
+      <SectionLines color="var(--color-primary)" opacity={0.06} />
+
+      <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24">
         <h2
           className="text-3xl md:text-4xl font-bold text-[var(--color-text)] text-center mb-10"
           style={{ fontFamily: 'var(--font-heading)' }}
@@ -611,18 +873,21 @@ function TestimonialsBlock({ section, media }: { section: Section; media: MediaA
           {items.map((item, i) => (
             <div
               key={i}
-              className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 flex flex-col"
+              className="rounded-xl p-6 flex flex-col hover:shadow-lg transition-all"
+              style={{
+                background: 'rgba(255,255,255,0.9)',
+                border: '1px solid rgba(0,0,0,0.06)',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
+              }}
             >
               {/* Stars */}
               <div className="flex gap-0.5 mb-3">
                 {[...Array(5)].map((_, si) => (
-                  <Star
+                  <PhStar
                     key={si}
-                    className={`w-4.5 h-4.5 ${
-                      si < (item.rating || 5)
-                        ? 'text-yellow-400 fill-yellow-400'
-                        : 'text-gray-200'
-                    }`}
+                    size={18}
+                    weight={si < (item.rating || 5) ? 'fill' : 'regular'}
+                    color={si < (item.rating || 5) ? '#facc15' : '#e5e7eb'}
                   />
                 ))}
               </div>
@@ -636,7 +901,7 @@ function TestimonialsBlock({ section, media }: { section: Section; media: MediaA
                   <img
                     src={item.photo || media.testimonial_photos?.[i]}
                     alt={item.name || ''}
-                    className="w-10 h-10 rounded-full object-cover"
+                    className="w-10 h-10 rounded-full object-cover ring-2 ring-[var(--color-primary)]/20"
                   />
                 )}
                 <div>
@@ -674,20 +939,17 @@ function TrustpilotBlock({ widget }: { widget: TrustpilotWidget }) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // Load the Trustpilot widget bootstrap script if not already loaded
     if (!document.querySelector('script[src*="widget.trustpilot.com"]')) {
       const script = document.createElement('script')
       script.src = '//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js'
       script.async = true
       document.head.appendChild(script)
       script.onload = () => {
-        // Initialize Trustpilot widgets after script loads
         if ((window as unknown as Record<string, unknown>).Trustpilot && containerRef.current) {
           (window as unknown as Record<string, { loadFromElement: (el: HTMLElement, flag: boolean) => void }>).Trustpilot.loadFromElement(containerRef.current, true)
         }
       }
     } else {
-      // Script already loaded — re-initialize
       setTimeout(() => {
         if ((window as unknown as Record<string, unknown>).Trustpilot && containerRef.current) {
           (window as unknown as Record<string, { loadFromElement: (el: HTMLElement, flag: boolean) => void }>).Trustpilot.loadFromElement(containerRef.current, true)
@@ -699,8 +961,11 @@ function TrustpilotBlock({ widget }: { widget: TrustpilotWidget }) {
   if (!widget.businessUnitId) return null
 
   return (
-    <section className="py-12 md:py-16 bg-gray-50">
-      <div className="max-w-5xl mx-auto px-4 md:px-10" ref={containerRef}>
+    <section className="relative py-12 md:py-16 overflow-hidden"
+      style={{ background: 'linear-gradient(180deg, #f8faf9 0%, #f0f5f2 100%)' }}
+    >
+      <SectionLines color="var(--color-primary)" opacity={0.03} />
+      <div className="relative z-10 max-w-5xl mx-auto px-4 md:px-10" ref={containerRef}>
         <div className="text-center mb-8">
           <p className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-2">Verified Reviews</p>
           {widget.reviewUrl && (
@@ -714,7 +979,6 @@ function TrustpilotBlock({ widget }: { widget: TrustpilotWidget }) {
             </a>
           )}
         </div>
-        {/* Carousel widget — shows scrolling review cards */}
         <div
           className="trustpilot-widget"
           data-locale="en-US"
@@ -735,15 +999,23 @@ function TrustpilotBlock({ widget }: { widget: TrustpilotWidget }) {
 }
 
 /* ═══════════════════════════════════════════════════════
-   FAQ — Accordion
+   FAQ — Accordion with frosted glass cards,
+   gradient bg
    ═══════════════════════════════════════════════════════ */
 function FaqBlock({ section }: { section: Section }) {
   const [open, setOpen] = useState<number | null>(null)
   const items = section.items || []
 
   return (
-    <section className="py-16 md:py-20 bg-white">
-      <div className="max-w-3xl mx-auto px-4 md:px-10">
+    <section className="relative py-16 md:py-20 overflow-hidden bg-white">
+      <SectionLines color="var(--color-primary)" opacity={0.03} />
+
+      {/* Subtle bottom-right blob */}
+      <div className="absolute bottom-0 right-0 w-[250px] h-[250px] rounded-full blur-[80px] pointer-events-none"
+        style={{ background: 'var(--color-primary)', opacity: 0.04 }}
+      />
+
+      <div className="relative z-10 max-w-3xl mx-auto px-4 md:px-10">
         <h2
           className="text-3xl md:text-4xl font-bold text-[var(--color-text)] text-center mb-10"
           style={{ fontFamily: 'var(--font-heading)' }}
@@ -751,19 +1023,27 @@ function FaqBlock({ section }: { section: Section }) {
           <AH text={section.headline || ''} word={section.accent_word} />
         </h2>
 
-        <div className="space-y-0 divide-y divide-gray-200">
+        <div className="space-y-3">
           {items.map((item, i) => (
-            <div key={i}>
+            <div
+              key={i}
+              className="rounded-xl overflow-hidden transition-all"
+              style={{
+                background: open === i ? 'rgba(255,255,255,0.9)' : 'rgba(248,250,249,0.8)',
+                border: `1px solid ${open === i ? 'var(--color-primary)' : 'rgba(0,0,0,0.06)'}`,
+                boxShadow: open === i ? '0 4px 16px rgba(0,0,0,0.06)' : '0 1px 4px rgba(0,0,0,0.02)',
+              }}
+            >
               <button
                 onClick={() => setOpen(open === i ? null : i)}
-                className="w-full flex items-center justify-between py-5 text-left group"
+                className="w-full flex items-center justify-between px-5 py-4 text-left group"
               >
                 <span className="font-medium text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors pr-4">
                   {item.question}
                 </span>
                 <ChevronDown
                   className={`w-5 h-5 text-gray-400 transition-transform duration-200 flex-shrink-0 ${
-                    open === i ? 'rotate-180' : ''
+                    open === i ? 'rotate-180 text-[var(--color-primary)]' : ''
                   }`}
                 />
               </button>
@@ -771,7 +1051,7 @@ function FaqBlock({ section }: { section: Section }) {
                 className="overflow-hidden transition-all duration-300"
                 style={{ maxHeight: open === i ? '300px' : '0px' }}
               >
-                <p className="pb-5 text-sm text-gray-500 leading-relaxed">
+                <p className="px-5 pb-5 text-sm text-gray-500 leading-relaxed">
                   {item.answer}
                 </p>
               </div>
@@ -784,12 +1064,23 @@ function FaqBlock({ section }: { section: Section }) {
 }
 
 /* ═══════════════════════════════════════════════════════
-   FOOTER — Dark bg, logo, links, phone, social
+   FOOTER — Dark gradient bg, logo, links, phone, social
    ═══════════════════════════════════════════════════════ */
 function FooterBlock({ section, media }: { section?: Section; media: MediaAssets }) {
   return (
-    <footer className="bg-[var(--color-secondary)] py-8 md:py-10">
-      <div className="max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24">
+    <footer
+      className="relative py-8 md:py-10 overflow-hidden"
+      style={{
+        background: `linear-gradient(135deg, var(--color-secondary) 0%, var(--color-secondary) 60%, var(--color-primary) 100%)`,
+      }}
+    >
+      {/* Subtle decorative lines */}
+      <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
+        <line x1="0%" y1="50%" x2="30%" y2="0%" stroke="white" strokeWidth="0.5" opacity="0.04" />
+        <line x1="70%" y1="100%" x2="100%" y2="30%" stroke="white" strokeWidth="0.5" opacity="0.03" />
+      </svg>
+
+      <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Logo */}
           <div>
@@ -809,7 +1100,7 @@ function FooterBlock({ section, media }: { section?: Section; media: MediaAssets
             ))}
             {section?.phone && (
               <a href={`tel:${section.phone}`} className="text-white/50 hover:text-white/80 transition-colors flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5" />
+                <PhPhone size={14} weight="duotone" />
                 {section.phone}
               </a>
             )}

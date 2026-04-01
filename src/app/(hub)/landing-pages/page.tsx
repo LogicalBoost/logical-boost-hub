@@ -856,10 +856,21 @@ export default function LandingPagesPage() {
                                 <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
                               </svg>
                             </button>
+                            <button
+                              onClick={() => window.open(pageUrl, '_blank', 'width=390,height=844,scrollbars=yes')}
+                              title="Mobile preview"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center' }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                                <line x1="12" y1="18" x2="12" y2="18" strokeLinecap="round" />
+                              </svg>
+                            </button>
                             <a
                               href={pageUrl}
                               target="_blank"
                               rel="noopener noreferrer"
+                              title="Open in new tab"
                               style={{ color: 'var(--text-muted)', padding: 4, display: 'flex', alignItems: 'center' }}
                             >
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
