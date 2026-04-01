@@ -216,13 +216,11 @@ export default function LandingPagesPage() {
   // Tab state: builder vs published pages list — clients default to pages view
   const [activeView, setActiveView] = useState<'builder' | 'pages'>(isClientRole ? 'pages' : 'builder')
 
-  // Delete a published page with confirmation
-  async function handleDeletePublishedPage(pageId: string, slug: string) {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "/${slug}"?\n\nThis will permanently remove the published page. This cannot be undone.`
-    )
-    if (!confirmed) return
+  // Delete confirmation state (inline, not browser confirm)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
+  // Delete a published page (called after inline confirmation)
+  async function handleDeletePublishedPage(pageId: string, slug: string) {
     const { error } = await supabase
       .from('published_pages')
       .delete()
@@ -234,6 +232,7 @@ export default function LandingPagesPage() {
       showToast(`Page /${slug} deleted`)
       refreshPublishedPages(client!.id)
     }
+    setDeleteConfirmId(null)
   }
 
   async function handleSaveAsTemplate(page: PublishedPage) {
@@ -272,10 +271,10 @@ export default function LandingPagesPage() {
     }
   }
 
-  async function handleDeleteMediaAsset(assetId: string, storagePath: string | null) {
-    const confirmed = window.confirm('Delete this image? This cannot be undone.')
-    if (!confirmed) return
+  // Media asset delete confirmation
+  const [deleteMediaConfirmId, setDeleteMediaConfirmId] = useState<string | null>(null)
 
+  async function handleDeleteMediaAsset(assetId: string, storagePath: string | null) {
     // Delete from storage if we have the path
     if (storagePath) {
       await supabase.storage.from('client-assets').remove([storagePath])
@@ -879,9 +878,41 @@ export default function LandingPagesPage() {
                                 <line x1="10" y1="14" x2="21" y2="3" />
                               </svg>
                             </a>
-                            {canEdit && (
+                            {canEdit && deleteConfirmId === page.id ? (
+                              <div style={{
+                                display: 'flex', alignItems: 'center', gap: 6,
+                                padding: '4px 8px', borderRadius: 6,
+                                background: 'rgba(239, 68, 68, 0.1)',
+                                border: '1px solid rgba(239, 68, 68, 0.3)',
+                              }}>
+                                <span style={{ fontSize: 11, color: '#ef4444', whiteSpace: 'nowrap' }}>
+                                  Delete /{page.slug}?
+                                </span>
+                                <button
+                                  onClick={() => handleDeletePublishedPage(page.id, page.slug)}
+                                  style={{
+                                    background: '#ef4444', color: '#fff', border: 'none',
+                                    borderRadius: 4, padding: '3px 8px', fontSize: 11,
+                                    fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  Yes, Delete
+                                </button>
+                                <button
+                                  onClick={() => setDeleteConfirmId(null)}
+                                  style={{
+                                    background: 'var(--bg-secondary)', color: 'var(--text-secondary)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 4, padding: '3px 8px', fontSize: 11,
+                                    cursor: 'pointer', whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : canEdit && (
                               <button
-                                onClick={() => handleDeletePublishedPage(page.id, page.slug)}
+                                onClick={() => setDeleteConfirmId(page.id)}
                                 title="Delete page"
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}
                                 onMouseEnter={e => (e.currentTarget.style.color = '#ef4444')}
@@ -1596,23 +1627,42 @@ export default function LandingPagesPage() {
                             pointerEvents: 'none',
                           }}>&#10003;</div>
                         )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDeleteMediaAsset(asset.id, asset.storage_path)
-                          }}
-                          style={{
-                            position: 'absolute', top: 2, right: 2,
-                            width: 18, height: 18, borderRadius: '50%',
-                            background: 'rgba(0,0,0,0.6)', border: 'none',
-                            color: '#fff', fontSize: 11, cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            opacity: 0.6, transition: 'opacity 0.2s',
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = '#ef4444' }}
-                          onMouseLeave={e => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.background = 'rgba(0,0,0,0.6)' }}
-                          title="Delete image"
-                        >&#10005;</button>
+                        {deleteMediaConfirmId === asset.id ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteMediaAsset(asset.id, asset.storage_path)
+                              setDeleteMediaConfirmId(null)
+                            }}
+                            onMouseLeave={() => setDeleteMediaConfirmId(null)}
+                            style={{
+                              position: 'absolute', top: 2, right: 2,
+                              width: 18, height: 18, borderRadius: '50%',
+                              background: '#ef4444', border: 'none',
+                              color: '#fff', fontSize: 9, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}
+                            title="Confirm delete"
+                          >&#10003;</button>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDeleteMediaConfirmId(asset.id)
+                            }}
+                            style={{
+                              position: 'absolute', top: 2, right: 2,
+                              width: 18, height: 18, borderRadius: '50%',
+                              background: 'rgba(0,0,0,0.6)', border: 'none',
+                              color: '#fff', fontSize: 11, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              opacity: 0.6, transition: 'opacity 0.2s',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = '#ef4444' }}
+                            onMouseLeave={e => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.background = 'rgba(0,0,0,0.6)' }}
+                            title="Delete image"
+                          >&#10005;</button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1912,23 +1962,42 @@ export default function LandingPagesPage() {
                             pointerEvents: 'none',
                           }}>&#10003;</div>
                         )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDeleteMediaAsset(asset.id, asset.storage_path)
-                          }}
-                          style={{
-                            position: 'absolute', top: 2, right: 2,
-                            width: 18, height: 18, borderRadius: '50%',
-                            background: 'rgba(0,0,0,0.6)', border: 'none',
-                            color: '#fff', fontSize: 11, cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            opacity: 0.6, transition: 'opacity 0.2s',
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = '#ef4444' }}
-                          onMouseLeave={e => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.background = 'rgba(0,0,0,0.6)' }}
-                          title="Delete image"
-                        >&#10005;</button>
+                        {deleteMediaConfirmId === asset.id ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteMediaAsset(asset.id, asset.storage_path)
+                              setDeleteMediaConfirmId(null)
+                            }}
+                            onMouseLeave={() => setDeleteMediaConfirmId(null)}
+                            style={{
+                              position: 'absolute', top: 2, right: 2,
+                              width: 18, height: 18, borderRadius: '50%',
+                              background: '#ef4444', border: 'none',
+                              color: '#fff', fontSize: 9, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}
+                            title="Confirm delete"
+                          >&#10003;</button>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDeleteMediaConfirmId(asset.id)
+                            }}
+                            style={{
+                              position: 'absolute', top: 2, right: 2,
+                              width: 18, height: 18, borderRadius: '50%',
+                              background: 'rgba(0,0,0,0.6)', border: 'none',
+                              color: '#fff', fontSize: 11, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              opacity: 0.6, transition: 'opacity 0.2s',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = '#ef4444' }}
+                            onMouseLeave={e => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.background = 'rgba(0,0,0,0.6)' }}
+                            title="Delete image"
+                          >&#10005;</button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -2149,13 +2218,22 @@ export default function LandingPagesPage() {
                             {stepsImageUrl === asset.file_url && (
                               <div style={{ position: 'absolute', inset: 0, background: 'rgba(16,185,129,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 700, pointerEvents: 'none' }}>&#10003;</div>
                             )}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleDeleteMediaAsset(asset.id, asset.storage_path) }}
-                              style={{ position: 'absolute', top: 1, right: 1, width: 14, height: 14, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', fontSize: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}
-                              onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = '#ef4444' }}
-                              onMouseLeave={e => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.background = 'rgba(0,0,0,0.6)' }}
-                              title="Delete"
-                            >&#10005;</button>
+                            {deleteMediaConfirmId === asset.id ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteMediaAsset(asset.id, asset.storage_path); setDeleteMediaConfirmId(null) }}
+                                onMouseLeave={() => setDeleteMediaConfirmId(null)}
+                                style={{ position: 'absolute', top: 1, right: 1, width: 14, height: 14, borderRadius: '50%', background: '#ef4444', border: 'none', color: '#fff', fontSize: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                title="Confirm delete"
+                              >&#10003;</button>
+                            ) : (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setDeleteMediaConfirmId(asset.id) }}
+                                style={{ position: 'absolute', top: 1, right: 1, width: 14, height: 14, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', fontSize: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}
+                                onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = '#ef4444' }}
+                                onMouseLeave={e => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.background = 'rgba(0,0,0,0.6)' }}
+                                title="Delete"
+                              >&#10005;</button>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -2265,13 +2343,22 @@ export default function LandingPagesPage() {
                             {benefitsImageUrl === asset.file_url && (
                               <div style={{ position: 'absolute', inset: 0, background: 'rgba(16,185,129,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 700, pointerEvents: 'none' }}>&#10003;</div>
                             )}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleDeleteMediaAsset(asset.id, asset.storage_path) }}
-                              style={{ position: 'absolute', top: 1, right: 1, width: 14, height: 14, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', fontSize: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}
-                              onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = '#ef4444' }}
-                              onMouseLeave={e => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.background = 'rgba(0,0,0,0.6)' }}
-                              title="Delete"
-                            >&#10005;</button>
+                            {deleteMediaConfirmId === asset.id ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteMediaAsset(asset.id, asset.storage_path); setDeleteMediaConfirmId(null) }}
+                                onMouseLeave={() => setDeleteMediaConfirmId(null)}
+                                style={{ position: 'absolute', top: 1, right: 1, width: 14, height: 14, borderRadius: '50%', background: '#ef4444', border: 'none', color: '#fff', fontSize: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                title="Confirm delete"
+                              >&#10003;</button>
+                            ) : (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setDeleteMediaConfirmId(asset.id) }}
+                                style={{ position: 'absolute', top: 1, right: 1, width: 14, height: 14, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', fontSize: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}
+                                onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = '#ef4444' }}
+                                onMouseLeave={e => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.background = 'rgba(0,0,0,0.6)' }}
+                                title="Delete"
+                              >&#10005;</button>
+                            )}
                           </div>
                         ))}
                       </div>
