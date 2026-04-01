@@ -1161,56 +1161,80 @@ export default function FunnelPage() {
         </div>
       )}
 
-      {/* Landing pages for selected avatar */}
+      {/* Landing page thumbnails for selected avatar */}
       {avatarId && (() => {
         const avatarPages = publishedPages.filter(p => p.avatar_id === avatarId)
         if (avatarPages.length === 0) return null
         const HUB_URL = 'https://hub.logicalboost.com'
         return (
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-            padding: '8px 16px',
+            padding: '10px 16px',
             background: 'var(--bg-card)',
             borderRadius: 8,
             border: '1px solid var(--border)',
             marginBottom: 12,
-            fontSize: 12,
           }}>
-            <span style={{ color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 11 }}>
+            <div style={{ color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 11, marginBottom: 8 }}>
               Landing Pages
-            </span>
-            {avatarPages.map(page => {
-              const pageUrl = `${HUB_URL}/p/${page.client_slug}/${page.slug}`
-              const offerMatch = offers.find(o => o.id === page.offer_id)
-              return (
-                <span key={page.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {avatarPages.map(page => {
+                const pageUrl = `${HUB_URL}/p/${page.client_slug}/${page.slug}`
+                const offerMatch = offers.find(o => o.id === page.offer_id)
+                const heroImg = page.media_assets?.hero_image
+                const brandColors = page.brand_kit_snapshot as Record<string, string> | null
+                const primaryColor = brandColors?.primary_color || '#1a365d'
+                return (
                   <a
+                    key={page.id}
                     href={pageUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ color: 'var(--accent)', textDecoration: 'none' }}
-                  >
-                    /{page.slug}
-                  </a>
-                  {offerMatch && (
-                    <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>({offerMatch.name})</span>
-                  )}
-                  <button
-                    onClick={() => window.open(pageUrl, '_blank', 'width=390,height=844,scrollbars=yes')}
-                    title="Mobile preview"
+                    title={`/${page.slug}${offerMatch ? ` — ${offerMatch.name}` : ''}`}
                     style={{
-                      background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-                      color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center',
+                      display: 'block', width: 110, textDecoration: 'none',
+                      borderRadius: 6, overflow: 'hidden',
+                      border: '1px solid var(--border)',
+                      transition: 'border-color 0.15s, transform 0.15s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--accent)'
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--border)'
+                      e.currentTarget.style.transform = 'translateY(0)'
                     }}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-                      <line x1="12" y1="18" x2="12" y2="18" strokeLinecap="round" />
-                    </svg>
-                  </button>
-                </span>
-              )
-            })}
+                    <div style={{
+                      width: '100%', height: 68, position: 'relative',
+                      background: heroImg ? `url(${heroImg}) center/cover` : `linear-gradient(135deg, ${primaryColor}, ${primaryColor}cc)`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {!heroImg && (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5">
+                          <rect x="3" y="3" width="18" height="18" rx="2" />
+                          <circle cx="8.5" cy="8.5" r="1.5" />
+                          <polyline points="21 15 16 10 5 21" />
+                        </svg>
+                      )}
+                    </div>
+                    <div style={{
+                      padding: '4px 6px', background: 'var(--bg-secondary)',
+                    }}>
+                      <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--accent)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        /{page.slug}
+                      </div>
+                      {offerMatch && (
+                        <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {offerMatch.name}
+                        </div>
+                      )}
+                    </div>
+                  </a>
+                )
+              })}
+            </div>
           </div>
         )
       })()}

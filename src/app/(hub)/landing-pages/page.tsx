@@ -492,7 +492,7 @@ export default function LandingPagesPage() {
     const setter = setterMap[type]
     const loadingSetterMap = { hero: setGeneratingImage, parallax: setUploadingParallax, steps: (v: boolean) => setUploadingSectionImage(v ? 'steps' : null), benefits: (v: boolean) => setUploadingSectionImage(v ? 'benefits' : null) }
     const loadingSetter = loadingSetterMap[type]
-    const roleMap = { hero: 'hero_image', parallax: 'parallax', steps: 'photo', benefits: 'photo' } as const
+    const roleMap = { hero: 'hero_image', parallax: 'parallax', steps: 'process_step', benefits: 'gallery' } as const
     const slotMap = { hero: 'hero_image', parallax: 'parallax_image', steps: 'steps_image', benefits: 'benefits_image' }
     const labelMap = { hero: 'Hero', parallax: 'Parallax', steps: 'Steps', benefits: 'Benefits' }
 
@@ -2125,6 +2125,42 @@ export default function LandingPagesPage() {
                   <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
                     Steps Section Image
                   </label>
+                  {/* Saved Steps Images Gallery */}
+                  {mediaAssets.filter(a => a.role === 'process_step').length > 0 && (
+                    <div style={{
+                      marginBottom: 8, padding: 8, borderRadius: 'var(--radius-sm)',
+                      border: '1px solid rgba(16, 185, 129, 0.15)', background: 'rgba(16, 185, 129, 0.04)',
+                    }}>
+                      <label style={{ fontSize: 10, fontWeight: 600, color: '#10b981', display: 'block', marginBottom: 6 }}>
+                        Saved — click to use
+                      </label>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {mediaAssets.filter(a => a.role === 'process_step').map(asset => (
+                          <div key={asset.id} style={{
+                            width: 64, height: 48, borderRadius: 6, overflow: 'hidden',
+                            border: stepsImageUrl === asset.file_url ? '2px solid #10b981' : '1px solid var(--border)',
+                            cursor: 'pointer', position: 'relative', flexShrink: 0,
+                            boxShadow: stepsImageUrl === asset.file_url ? '0 0 8px rgba(16,185,129,0.3)' : 'none',
+                          }}>
+                            <img
+                              src={asset.file_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                              onClick={() => { setStepsImageUrl(asset.file_url); setCopySlots(prev => ({ ...prev, steps_image: asset.file_url })); showToast('Steps image selected') }}
+                            />
+                            {stepsImageUrl === asset.file_url && (
+                              <div style={{ position: 'absolute', inset: 0, background: 'rgba(16,185,129,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 700, pointerEvents: 'none' }}>&#10003;</div>
+                            )}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteMediaAsset(asset.id, asset.storage_path) }}
+                              style={{ position: 'absolute', top: 1, right: 1, width: 14, height: 14, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', fontSize: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}
+                              onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = '#ef4444' }}
+                              onMouseLeave={e => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.background = 'rgba(0,0,0,0.6)' }}
+                              title="Delete"
+                            >&#10005;</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {stepsImageUrl ? (
                     <div style={{ position: 'relative', borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--border)', marginBottom: 8 }}>
                       <img
@@ -2205,6 +2241,42 @@ export default function LandingPagesPage() {
                   <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
                     Benefits Section Image
                   </label>
+                  {/* Saved Benefits Images Gallery */}
+                  {mediaAssets.filter(a => a.role === 'gallery').length > 0 && (
+                    <div style={{
+                      marginBottom: 8, padding: 8, borderRadius: 'var(--radius-sm)',
+                      border: '1px solid rgba(16, 185, 129, 0.15)', background: 'rgba(16, 185, 129, 0.04)',
+                    }}>
+                      <label style={{ fontSize: 10, fontWeight: 600, color: '#10b981', display: 'block', marginBottom: 6 }}>
+                        Saved — click to use
+                      </label>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {mediaAssets.filter(a => a.role === 'gallery').map(asset => (
+                          <div key={asset.id} style={{
+                            width: 64, height: 48, borderRadius: 6, overflow: 'hidden',
+                            border: benefitsImageUrl === asset.file_url ? '2px solid #10b981' : '1px solid var(--border)',
+                            cursor: 'pointer', position: 'relative', flexShrink: 0,
+                            boxShadow: benefitsImageUrl === asset.file_url ? '0 0 8px rgba(16,185,129,0.3)' : 'none',
+                          }}>
+                            <img
+                              src={asset.file_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                              onClick={() => { setBenefitsImageUrl(asset.file_url); setCopySlots(prev => ({ ...prev, benefits_image: asset.file_url })); showToast('Benefits image selected') }}
+                            />
+                            {benefitsImageUrl === asset.file_url && (
+                              <div style={{ position: 'absolute', inset: 0, background: 'rgba(16,185,129,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 700, pointerEvents: 'none' }}>&#10003;</div>
+                            )}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteMediaAsset(asset.id, asset.storage_path) }}
+                              style={{ position: 'absolute', top: 1, right: 1, width: 14, height: 14, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', fontSize: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}
+                              onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = '#ef4444' }}
+                              onMouseLeave={e => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.background = 'rgba(0,0,0,0.6)' }}
+                              title="Delete"
+                            >&#10005;</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {benefitsImageUrl ? (
                     <div style={{ position: 'relative', borderRadius: 'var(--radius)', overflow: 'hidden', border: '1px solid var(--border)', marginBottom: 8 }}>
                       <img

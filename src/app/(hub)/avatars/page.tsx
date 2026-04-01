@@ -286,56 +286,65 @@ export default function AvatarsPage() {
                   })}
                 </div>
               )}
-              {/* Landing pages for this avatar */}
+              {/* Landing page thumbnails for this avatar */}
               {getAvatarPages(avatar.id).length > 0 && (
                 <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Landing Pages
                   </div>
-                  {getAvatarPages(avatar.id).map(page => {
-                    const pageUrl = `${HUB_URL}/p/${page.client_slug}/${page.slug}`
-                    return (
-                      <div
-                        key={page.id}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 6,
-                          fontSize: 12, padding: '3px 0',
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
+                    {getAvatarPages(avatar.id).map(page => {
+                      const pageUrl = `${HUB_URL}/p/${page.client_slug}/${page.slug}`
+                      const heroImg = page.media_assets?.hero_image
+                      const brandColors = page.brand_kit_snapshot as Record<string, string> | null
+                      const primaryColor = brandColors?.primary_color || '#1a365d'
+                      return (
                         <a
+                          key={page.id}
                           href={pageUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--accent)', textDecoration: 'none' }}
-                        >
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-                            <polyline points="15 3 21 3 21 9" />
-                            <line x1="10" y1="14" x2="21" y2="3" />
-                          </svg>
-                          /{page.slug}
-                        </a>
-                        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-                          &middot; {getOfferName(page.offer_id)}
-                        </span>
-                        <button
-                          onClick={() => window.open(pageUrl, '_blank', 'width=390,height=844,scrollbars=yes')}
-                          title="Mobile preview"
+                          title={`/${page.slug} — ${getOfferName(page.offer_id)}`}
                           style={{
-                            background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-                            color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center',
-                            marginLeft: 2,
+                            display: 'block', width: 80, textDecoration: 'none',
+                            borderRadius: 6, overflow: 'hidden',
+                            border: '1px solid var(--border)',
+                            transition: 'border-color 0.15s, transform 0.15s',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = 'var(--accent)'
+                            e.currentTarget.style.transform = 'translateY(-2px)'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = 'var(--border)'
+                            e.currentTarget.style.transform = 'translateY(0)'
                           }}
                         >
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-                            <line x1="12" y1="18" x2="12" y2="18" strokeLinecap="round" />
-                          </svg>
-                        </button>
-                      </div>
-                    )
-                  })}
+                          <div style={{
+                            width: '100%', height: 56, position: 'relative',
+                            background: heroImg ? `url(${heroImg}) center/cover` : `linear-gradient(135deg, ${primaryColor}, ${primaryColor}cc)`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            {!heroImg && (
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5">
+                                <rect x="3" y="3" width="18" height="18" rx="2" />
+                                <circle cx="8.5" cy="8.5" r="1.5" />
+                                <polyline points="21 15 16 10 5 21" />
+                              </svg>
+                            )}
+                          </div>
+                          <div style={{
+                            padding: '4px 6px', background: 'var(--bg-secondary)',
+                            fontSize: 10, color: 'var(--text-secondary)',
+                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            textAlign: 'center',
+                          }}>
+                            /{page.slug}
+                          </div>
+                        </a>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
             </div>
@@ -470,49 +479,84 @@ export default function AvatarsPage() {
                   <div className="detail-item">
                     <div className="detail-label">Landing Pages</div>
                     <div className="detail-value">
-                      {getAvatarPages(selectedAvatar.id).map(page => {
-                        const pageUrl = `${HUB_URL}/p/${page.client_slug}/${page.slug}`
-                        return (
-                          <div key={page.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 12px', borderRadius: 8, background: 'var(--bg-secondary)' }}>
-                            {/* Preview thumbnail from hero image */}
-                            {page.media_assets?.hero_image && (
-                              <img
-                                src={page.media_assets.hero_image}
-                                alt={page.slug}
-                                style={{ width: 48, height: 36, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }}
-                              />
-                            )}
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <a href={pageUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
-                                /{page.slug}
+                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        {getAvatarPages(selectedAvatar.id).map(page => {
+                          const pageUrl = `${HUB_URL}/p/${page.client_slug}/${page.slug}`
+                          const heroImg = page.media_assets?.hero_image
+                          const brandColors = page.brand_kit_snapshot as Record<string, string> | null
+                          const primaryColor = brandColors?.primary_color || '#1a365d'
+                          return (
+                            <div key={page.id} style={{ width: 140 }}>
+                              <a
+                                href={pageUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  display: 'block', borderRadius: 8, overflow: 'hidden',
+                                  border: '1px solid var(--border)', textDecoration: 'none',
+                                  transition: 'border-color 0.15s, transform 0.15s, box-shadow 0.15s',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.borderColor = 'var(--accent)'
+                                  e.currentTarget.style.transform = 'translateY(-2px)'
+                                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.borderColor = 'var(--border)'
+                                  e.currentTarget.style.transform = 'translateY(0)'
+                                  e.currentTarget.style.boxShadow = 'none'
+                                }}
+                              >
+                                <div style={{
+                                  width: '100%', height: 90, position: 'relative',
+                                  background: heroImg ? `url(${heroImg}) center/cover` : `linear-gradient(135deg, ${primaryColor}, ${primaryColor}cc)`,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                }}>
+                                  {!heroImg && (
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5">
+                                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                                      <circle cx="8.5" cy="8.5" r="1.5" />
+                                      <polyline points="21 15 16 10 5 21" />
+                                    </svg>
+                                  )}
+                                </div>
+                                <div style={{
+                                  padding: '6px 8px', background: 'var(--bg-secondary)',
+                                }}>
+                                  <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--accent)' }}>
+                                    /{page.slug}
+                                  </div>
+                                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                                    {getOfferName(page.offer_id)}
+                                  </div>
+                                </div>
                               </a>
-                              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                                {getOfferName(page.offer_id)} &middot; {page.template_slug || 'Template'}
+                              <div style={{ display: 'flex', gap: 4, marginTop: 4, justifyContent: 'center' }}>
+                                <button
+                                  onClick={() => window.open(pageUrl, '_blank', 'width=390,height=844,scrollbars=yes')}
+                                  title="Mobile preview"
+                                  style={{
+                                    background: 'none', border: 'none', cursor: 'pointer', padding: 3,
+                                    color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center',
+                                  }}
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                                    <line x1="12" y1="18" x2="12" y2="18" strokeLinecap="round" />
+                                  </svg>
+                                </button>
+                                <a href={pageUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)', padding: 3, display: 'inline-flex', alignItems: 'center' }}>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                                    <polyline points="15 3 21 3 21 9" />
+                                    <line x1="10" y1="14" x2="21" y2="3" />
+                                  </svg>
+                                </a>
                               </div>
                             </div>
-                            <button
-                              onClick={() => window.open(pageUrl, '_blank', 'width=390,height=844,scrollbars=yes')}
-                              title="Mobile preview"
-                              style={{
-                                background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-                                color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', flexShrink: 0,
-                              }}
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-                                <line x1="12" y1="18" x2="12" y2="18" strokeLinecap="round" />
-                              </svg>
-                            </button>
-                            <a href={pageUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-                                <polyline points="15 3 21 3 21 9" />
-                                <line x1="10" y1="14" x2="21" y2="3" />
-                              </svg>
-                            </a>
-                          </div>
-                        )
-                      })}
+                          )
+                        })}
+                      </div>
                     </div>
                   </div>
                 )}
