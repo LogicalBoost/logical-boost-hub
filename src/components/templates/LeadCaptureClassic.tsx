@@ -479,12 +479,6 @@ function HeroBlock({ section, media, primaryColor, accentColor, formConfig, page
                         boxShadow: '0 8px 32px rgba(0,0,0,0.06)',
                       }}
                     >
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: `${accentColor}30` }}>
-                          <PhCheckCircle size={12} weight="duotone" color={accentColor} />
-                        </div>
-                        <span className="text-[10px] uppercase tracking-wider font-semibold text-white/80">Quick Fact</span>
-                      </div>
                       <p className="text-xs font-semibold text-white leading-snug" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
                         {section.sub_cta}
                       </p>
