@@ -136,7 +136,7 @@ export default function OffersPage() {
           <p className="page-subtitle">Conversion propositions for campaigns</p>
         </div>
         {canEdit && (
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="btn-group-responsive" style={{ display: 'flex', gap: 8 }}>
             <button
               className="btn btn-secondary"
               onClick={() => setShowAddForm(true)}
@@ -161,7 +161,7 @@ export default function OffersPage() {
             <div className="card-title">Add New Offer</div>
             <button className="btn btn-secondary btn-sm" onClick={resetAddForm}>Cancel</button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-group">
               <label className="form-label">Offer Name *</label>
               <input className="form-input" value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Free Roof Inspection" />

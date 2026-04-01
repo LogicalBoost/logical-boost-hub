@@ -672,7 +672,7 @@ export default function LandingPagesPage() {
   const livePageCount = publishedPages.filter(p => p.status === 'published').length
 
   return (
-    <div style={{ padding: '24px 32px', maxWidth: 1200, margin: '0 auto' }}>
+    <div className="page-container-responsive" style={{ padding: '24px 32px', maxWidth: 1200, margin: '0 auto' }}>
       {/* Page header */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 26, marginBottom: 4 }}>Landing Pages</h1>
@@ -776,7 +776,7 @@ export default function LandingPagesPage() {
                       const pageUrl = `${HUB_URL}/p/${page.client_slug}/${page.slug}`
                       const heroImg = page.media_assets?.hero_image
                       return (
-                        <div key={page.id} style={{
+                        <div key={page.id} className="published-page-row-responsive" style={{
                           display: 'flex', alignItems: 'center', gap: 12,
                           padding: '10px 14px', borderRadius: 'var(--radius-sm)',
                           background: 'var(--bg-card)', border: '1px solid var(--border)',
@@ -830,7 +830,7 @@ export default function LandingPagesPage() {
                           )}
 
                           {/* Actions */}
-                          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          <div className="published-page-actions" style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                             {canEdit && (
                               <button
                                 onClick={() => handleSaveAsTemplate(page)}
@@ -950,7 +950,7 @@ export default function LandingPagesPage() {
       {activeView === 'builder' && !isClientRole && <>
 
       {/* Step indicator */}
-      <div style={{
+      <div className="step-indicator-responsive" style={{
         display: 'flex',
         gap: 4,
         marginBottom: 28,
@@ -1010,7 +1010,7 @@ export default function LandingPagesPage() {
       {step === 1 && (
         <div style={card({ maxWidth: 640 })}>
           <h3 style={{ fontSize: 18, marginBottom: 16 }}>Select Avatar + Offer</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+          <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
             <div>
               <label style={labelStyle}>Avatar</label>
               <select
@@ -1696,7 +1696,7 @@ export default function LandingPagesPage() {
               )}
 
               {/* Two columns: Upload | Generate */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 {/* Upload / Drop zone */}
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
@@ -1991,7 +1991,7 @@ export default function LandingPagesPage() {
               )}
 
               {/* Two columns: Upload | AI Generate */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 {/* Upload / Drop zone */}
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
@@ -2119,7 +2119,7 @@ export default function LandingPagesPage() {
                 Add images for the Steps and Benefits sections. If left empty, sections will use a clean full-width layout.
               </p>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 {/* Steps Image */}
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
@@ -2514,7 +2514,7 @@ function BuildStep({
         <div style={{ ...card({ padding: 24 }) }}>
           <h3 style={{ fontSize: 18, marginBottom: 16 }}>Build & Deploy</h3>
 
-          <div style={{
+          <div className="grid-2col-responsive" style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
             gap: 12,

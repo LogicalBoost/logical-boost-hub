@@ -291,7 +291,7 @@ export default function BusinessOverviewPage() {
           <h1 className="page-title">Business Overview</h1>
           <p className="page-subtitle">Foundation data that powers all AI generation</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="btn-group-responsive" style={{ display: 'flex', gap: 8 }}>
           {canEdit && (
             <button className="btn btn-secondary" onClick={() => setShowNewForm(true)}>
               + Add New Client
@@ -319,7 +319,7 @@ export default function BusinessOverviewPage() {
         <div className="card">
           <div className="card-title">Company Info</div>
           <div className="detail-grid" style={{ marginTop: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div className="detail-item">
                 <span className="detail-label">Business Name</span>
                 {editing ? (

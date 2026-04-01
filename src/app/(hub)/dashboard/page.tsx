@@ -282,7 +282,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div className="dashboard-bottom-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         {/* Activity Feed */}
         <div className="funnel-section-card" style={{ gridColumn: activityFeed.length > 0 ? '1' : '1 / -1' }}>
           <div className="funnel-section-header">

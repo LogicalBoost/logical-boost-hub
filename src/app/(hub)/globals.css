@@ -1376,6 +1376,62 @@ select.form-input {
   .platform-rules-grid {
     grid-template-columns: 1fr;
   }
+
+  /* ── Responsive utility classes ── */
+  /* Two-column grids become single column on mobile */
+  .grid-2col-responsive {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Responsive page container — reduce padding */
+  .page-container-responsive {
+    padding: 16px !important;
+  }
+
+  /* Step indicator: hide scrollbar */
+  .step-indicator-responsive {
+    scrollbar-width: none;
+  }
+  .step-indicator-responsive::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Dashboard bottom grid: single column */
+  .dashboard-bottom-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Button groups: wrap on mobile */
+  .btn-group-responsive {
+    flex-wrap: wrap !important;
+  }
+  .btn-group-responsive > button,
+  .btn-group-responsive > a {
+    flex: 1 1 auto !important;
+    min-width: 120px !important;
+    justify-content: center !important;
+  }
+
+  /* Published page row: stack on mobile */
+  .published-page-row-responsive {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+  .published-page-row-responsive .published-page-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  /* Settings team member action row: stack */
+  .team-actions-responsive {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+  }
+  .team-actions-responsive select {
+    width: 100% !important;
+  }
 }
 
 /* ============================================================================

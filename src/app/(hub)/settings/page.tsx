@@ -880,7 +880,7 @@ export default function SettingsPage() {
           <div className="card">
             <div className="card-title">Company Info</div>
             <div className="detail-grid" style={{ marginTop: 16 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div className="detail-item">
                   <span className="detail-label">Business Name</span>
                   {editing ? (
@@ -1330,7 +1330,7 @@ export default function SettingsPage() {
                         </div>
                       ))}
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div className="form-group">
                         <label className="form-label" style={{ fontSize: 11 }}>Heading Font</label>
                         <input className="form-input" value={bkHeadingFont} onChange={e => setBkHeadingFont(e.target.value)} placeholder="e.g. Inter, sans-serif" />
@@ -1966,7 +1966,7 @@ export default function SettingsPage() {
             <h3>My Profile</h3>
           </div>
           <div style={{ padding: 24 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, maxWidth: 600 }}>
+            <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, maxWidth: 600 }}>
               <div className="form-group">
                 <label className="form-label">Name</label>
                 <input
@@ -2010,7 +2010,7 @@ export default function SettingsPage() {
             <h3>Change Password</h3>
           </div>
           <div style={{ padding: 24 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, maxWidth: 600 }}>
+            <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, maxWidth: 600 }}>
               <div className="form-group">
                 <label className="form-label">New Password</label>
                 <input
@@ -2093,7 +2093,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 {member.id !== user?.id && (
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div className="team-actions-responsive" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                     <select
                       value={member.role}
                       onChange={e => handleChangeRole(member.id, e.target.value as UserRole)}
