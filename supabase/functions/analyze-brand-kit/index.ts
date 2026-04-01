@@ -18,9 +18,15 @@ Given a website URL and any available business context, analyze the brand and pr
    - additional_colors: Array of any other notable colors used (hex codes)
 
 2. TYPOGRAPHY:
-   - heading_font: Font family used for headings (or best guess)
-   - body_font: Font family used for body text
+   - heading_font: Font family used for headings. USE the actual font names from Google Fonts links or font-family CSS declarations provided. NEVER guess if actual font data is provided.
+   - body_font: Font family used for body text. USE the actual font names extracted from the site. If multiple fonts are found, the one on body/p elements is the body font, the one on h1-h6 is the heading font.
    - font_style_notes: Any notable typography patterns (sizes, weights, spacing)
+
+   CRITICAL FONT RULES:
+   - You will be given ACTUAL font names extracted from Google Fonts links and CSS font-family declarations. USE THESE EXACT NAMES.
+   - Google Fonts link families are the most reliable source. If the site loads "Muli" and "Comfortaa" from Google Fonts, those ARE the fonts.
+   - NEVER say "System default" if actual font names were detected.
+   - If only one font is found, use it for both heading and body.
 
 3. BUTTON_STYLE:
    - shape: "rounded", "pill", "square", "soft-rounded"
@@ -175,6 +181,82 @@ Deno.serve(async (req: Request) => {
         const styleMatches = html.match(/<style[\s\S]*?<\/style>/gi) || []
         const styles = styleMatches.join('\n').substring(0, 2000)
 
+        // 12. Extract FONT information
+        // Google Fonts links (most reliable source)
+        const googleFontLinks = html.match(/<link[^>]*fonts\.googleapis\.com[^>]*>/gi) || []
+        const googleFontFamilies: string[] = []
+        for (const link of googleFontLinks) {
+          const hrefMatch = link.match(/href=["']([^"']+)["']/)
+          if (hrefMatch) {
+            const url = hrefMatch[1]
+            // Extract family names from Google Fonts URL
+            const familyMatches = url.match(/family=([^&"']+)/gi) || []
+            for (const fm of familyMatches) {
+              const name = decodeURIComponent(fm.replace('family=', '').split(':')[0].replace(/\+/g, ' '))
+              if (name) googleFontFamilies.push(name)
+            }
+          }
+        }
+
+        // font-family declarations from CSS (inline styles + style blocks + external CSS)
+        const allCssText = styles + '\n' + inlineStyles
+        const fontFamilyMatches = allCssText.match(/font-family\s*:\s*([^;}"']+)/gi) || []
+        const fontFamilies = new Set<string>()
+        for (const fm of fontFamilyMatches) {
+          const value = fm.replace(/font-family\s*:\s*/i, '').trim()
+          // Extract the first font name (primary font)
+          const firstName = value.split(',')[0].trim().replace(/["']/g, '')
+          if (firstName && !['inherit', 'initial', 'unset', 'sans-serif', 'serif', 'monospace', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI'].includes(firstName)) {
+            fontFamilies.add(firstName)
+          }
+        }
+
+        // Also check external CSS for font-family declarations
+        for (const linkTag of cssLinkMatches.slice(0, 3)) {
+          const hrefMatch = linkTag.match(/href=["']([^"']+)["']/)
+          if (hrefMatch) {
+            try {
+              let cssUrl = hrefMatch[1]
+              if (cssUrl.startsWith('/')) cssUrl = new URL(cssUrl, websiteUrl).href
+              else if (!cssUrl.startsWith('http')) cssUrl = new URL(cssUrl, websiteUrl).href
+              if (cssUrl.includes('fonts.googleapis.com')) continue // already handled
+              const cssRes = await fetch(cssUrl, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+                signal: AbortSignal.timeout(5000),
+              })
+              if (cssRes.ok) {
+                const cssText = await cssRes.text()
+                const cssFontMatches = cssText.match(/font-family\s*:\s*([^;}"']+)/gi) || []
+                for (const fm of cssFontMatches) {
+                  const value = fm.replace(/font-family\s*:\s*/i, '').trim()
+                  const firstName = value.split(',')[0].trim().replace(/["']/g, '')
+                  if (firstName && !['inherit', 'initial', 'unset', 'sans-serif', 'serif', 'monospace', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI'].includes(firstName)) {
+                    fontFamilies.add(firstName)
+                  }
+                }
+                // Extract @font-face declarations
+                const fontFaceMatches = cssText.match(/@font-face\s*\{[^}]*font-family\s*:\s*["']?([^"';}\n]+)/gi) || []
+                for (const ff of fontFaceMatches) {
+                  const nameMatch = ff.match(/font-family\s*:\s*["']?([^"';}\n]+)/i)
+                  if (nameMatch) {
+                    const name = nameMatch[1].trim().replace(/["']/g, '')
+                    if (name) fontFamilies.add(name)
+                  }
+                }
+              }
+            } catch { /* skip */ }
+          }
+        }
+
+        // Check for CSS custom properties with font info
+        const fontVarMatches = allCssText.match(/--[a-zA-Z-]*font[a-zA-Z-]*\s*:\s*[^;}\n]+/gi) || []
+
+        const fontInfo = `
+GOOGLE FONTS LOADED: ${googleFontFamilies.length > 0 ? googleFontFamilies.join(', ') : 'none detected'}
+FONT-FAMILY DECLARATIONS FOUND: ${[...fontFamilies].join(', ') || 'none detected'}
+CSS FONT VARIABLES: ${fontVarMatches.slice(0, 10).join('\n') || 'none'}
+`
+
         // Sort hex colors by frequency (most used first)
         const colorFrequency: Record<string, number> = {}
         for (const h of hexMatches) {
@@ -204,6 +286,9 @@ ${cssVarMatches.slice(0, 20).join('\n')}
 
 THEME COLOR META: ${themeColor || 'not set'}
 TILE COLOR META: ${tileColor || 'not set'}
+
+TYPOGRAPHY/FONTS DETECTED:
+${fontInfo}
 
 INLINE STYLES WITH COLOR (sample):
 ${inlineStyles.substring(0, 1000)}
