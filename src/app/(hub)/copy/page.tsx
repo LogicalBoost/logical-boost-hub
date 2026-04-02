@@ -1076,92 +1076,120 @@ export default function FunnelPage() {
   // ── Render: Main page ────────────────────────────────────────────────
   return (
     <div className="funnel-page">
-      {/* ── Client-friendly header ── */}
-      {isClientRole && (
-        <div style={{ marginBottom: 20 }}>
-          <h1 className="page-title" style={{ marginBottom: 4 }}>Campaign Copy</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: 0 }}>
-            Review the ad copy and scripts created for your campaigns. Use the dropdowns below to switch between different audiences and offers.
-          </p>
-        </div>
-      )}
-
-      {/* ── Selector bar ── */}
-      <div className="funnel-selector-bar">
-        <div className="funnel-selector-col">
-          <label className="funnel-selector-label">
-            {isClientRole ? 'Select an Audience' : 'Avatar (by priority)'}
-          </label>
-          <select
-            className="form-input funnel-avatar-select"
-            value={avatarId}
-            onChange={(e) => setAvatarId(e.target.value)}
-          >
-            {approvedAvatars.map((a, idx) => {
-              const info = avatarCampaignInfo(a.id)
-              const tag = a.priority === 1 ? '★' : a.priority === 2 ? '▲' : ''
-              return (
-                <option key={a.id} value={a.id}>
-                  {idx + 1}. {tag}{tag ? ' ' : ''}{a.name} — {a.avatar_type}{info.totalComponents > 0 ? ` (${info.totalComponents} components)` : ''}
-                </option>
-              )
-            })}
-          </select>
-        </div>
-        <div className="funnel-selector-col">
-          <label className="funnel-selector-label">
-            {isClientRole ? 'Select an Offer' : 'Offer'}
-          </label>
-          <select
-            className="form-input"
-            value={offerId}
-            onChange={(e) => setOfferId(e.target.value)}
-          >
-            {approvedOffers.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}{o.offer_type ? ` (${o.offer_type})` : ''}
-              </option>
-            ))}
-          </select>
-        </div>
-        {!currentInstance && canEdit && !generating ? (
-          <button
-            className="btn btn-primary funnel-selector-btn"
-            onClick={handleGenerate}
-            disabled={loading || !avatarId || !offerId}
-          >
-            &#9889; Generate Campaign
-          </button>
-        ) : currentInstance ? (
-          <div className="funnel-selector-status">
-            <span className="funnel-selector-check">&#10003;</span>
-            <span>{instanceComponents.length} components</span>
+      {isClientRole ? (
+        <>
+          {/* ── Client: Page title is the current audience + offer ── */}
+          <div style={{ marginBottom: 8 }}>
+            <h1 className="page-title" style={{ marginBottom: 4 }}>
+              {selectedAvatar?.name || 'Campaign Copy'}
+            </h1>
+            {selectedOffer && (
+              <p style={{ color: 'var(--accent)', fontSize: 15, margin: 0, fontWeight: 500 }}>
+                {selectedOffer.name}
+              </p>
+            )}
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '6px 0 0' }}>
+              {instanceComponents.length} copy components &bull; Click any item to copy it to your clipboard
+            </p>
           </div>
-        ) : null}
-      </div>
 
-      {/* Client guidance — show when there are multiple avatars to browse */}
-      {isClientRole && approvedAvatars.length > 1 && (
-        <div style={{
-          padding: '10px 16px',
-          background: 'rgba(16, 185, 129, 0.06)',
-          border: '1px solid rgba(16, 185, 129, 0.15)',
-          borderRadius: 8,
-          marginBottom: 12,
-          fontSize: 13,
-          color: 'var(--text-secondary)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-        }}>
-          <span style={{ fontSize: 16 }}>&#128161;</span>
-          You have <strong style={{ color: 'var(--text-primary)' }}>{approvedAvatars.length} audience segments</strong> with campaign copy.
-          Switch the audience dropdown above to review copy for each one. Click any item to copy it to your clipboard.
+          {/* ── Client: Green switch-audience box ── */}
+          {approvedAvatars.length > 1 && (
+            <div style={{
+              padding: '16px 20px',
+              background: 'rgba(16, 185, 129, 0.08)',
+              border: '2px solid rgba(16, 185, 129, 0.3)',
+              borderRadius: 10,
+              marginBottom: 20,
+            }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)', marginBottom: 10 }}>
+                Switch Audience ({approvedAvatars.length} available)
+              </div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                <select
+                  className="form-input"
+                  value={avatarId}
+                  onChange={(e) => setAvatarId(e.target.value)}
+                  style={{ flex: 1, minWidth: 220, maxWidth: 400 }}
+                >
+                  {approvedAvatars.map((a, idx) => (
+                    <option key={a.id} value={a.id}>
+                      {idx + 1}. {a.name}
+                    </option>
+                  ))}
+                </select>
+                {approvedOffers.length > 1 && (
+                  <select
+                    className="form-input"
+                    value={offerId}
+                    onChange={(e) => setOfferId(e.target.value)}
+                    style={{ flex: 1, minWidth: 180, maxWidth: 300 }}
+                  >
+                    {approvedOffers.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        /* ── Agency: Standard selector bar ── */
+        <div className="funnel-selector-bar">
+          <div className="funnel-selector-col">
+            <label className="funnel-selector-label">Avatar (by priority)</label>
+            <select
+              className="form-input funnel-avatar-select"
+              value={avatarId}
+              onChange={(e) => setAvatarId(e.target.value)}
+            >
+              {approvedAvatars.map((a, idx) => {
+                const info = avatarCampaignInfo(a.id)
+                const tag = a.priority === 1 ? '★' : a.priority === 2 ? '▲' : ''
+                return (
+                  <option key={a.id} value={a.id}>
+                    {idx + 1}. {tag}{tag ? ' ' : ''}{a.name} — {a.avatar_type}{info.totalComponents > 0 ? ` (${info.totalComponents} components)` : ''}
+                  </option>
+                )
+              })}
+            </select>
+          </div>
+          <div className="funnel-selector-col">
+            <label className="funnel-selector-label">Offer</label>
+            <select
+              className="form-input"
+              value={offerId}
+              onChange={(e) => setOfferId(e.target.value)}
+            >
+              {approvedOffers.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}{o.offer_type ? ` (${o.offer_type})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          {!currentInstance && canEdit && !generating ? (
+            <button
+              className="btn btn-primary funnel-selector-btn"
+              onClick={handleGenerate}
+              disabled={loading || !avatarId || !offerId}
+            >
+              &#9889; Generate Campaign
+            </button>
+          ) : currentInstance ? (
+            <div className="funnel-selector-status">
+              <span className="funnel-selector-check">&#10003;</span>
+              <span>{instanceComponents.length} components</span>
+            </div>
+          ) : null}
         </div>
       )}
 
-      {/* Avatar context strip — shows key info about the selected avatar */}
-      {selectedAvatar && (
+      {/* Avatar context strip — shows key info about the selected avatar (agency only) */}
+      {selectedAvatar && !isClientRole && (
         <div className="funnel-avatar-context">
           <span className="funnel-avatar-context-name">{selectedAvatar.name}</span>
           <span className="funnel-avatar-context-sep">·</span>
