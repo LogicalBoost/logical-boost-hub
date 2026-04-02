@@ -8,7 +8,10 @@ import { useAuth } from './AuthProvider'
 
 const clientNavItems = [
   { href: '/client/dashboard/', label: 'Dashboard', icon: '◫' },
+  { href: '/client/copy/', label: 'Copy', icon: '◬' },
   { href: '/client/landing-pages/', label: 'Landing Pages', icon: '◰' },
+  { href: '/client/avatars/', label: 'Avatars', icon: '◪' },
+  { href: '/client/offers/', label: 'Offers', icon: '◭' },
   { href: '/client/settings/', label: 'Settings', icon: '◷' },
 ]
 

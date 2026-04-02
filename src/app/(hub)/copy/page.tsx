@@ -662,16 +662,6 @@ export default function FunnelPage() {
     publishedPages,
   } = useAppStore()
 
-  // Client role users should not access this page
-  if (isClientRole) {
-    return (
-      <div style={{ padding: '60px 32px', textAlign: 'center', color: 'var(--text-muted)' }}>
-        <h2 style={{ fontSize: 20, color: 'var(--text-primary)', marginBottom: 8 }}>Access Restricted</h2>
-        <p>This section is managed by the agency team.</p>
-      </div>
-    )
-  }
-
   const [avatarId, setAvatarId] = useState('')
   const [offerId, setOfferId] = useState('')
   const [activeTab, setActiveTab] = useState('google_headlines')

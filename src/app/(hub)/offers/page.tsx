@@ -250,7 +250,9 @@ export default function OffersPage() {
             <div className="card-actions">
               <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); setSelectedOffer(offer) }}>View Details</button>
               <button className="btn btn-danger btn-sm" onClick={(e) => { e.stopPropagation(); handleDeny(offer.id) }}>Deny</button>
-              <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); handleApprove(offer.id) }}>Approve</button>
+              {canEdit && (
+                <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); handleApprove(offer.id) }}>Approve</button>
+              )}
             </div>
           </div>
         ))}
