@@ -66,7 +66,35 @@ export default function LoginPage() {
           password,
         })
         if (authError) {
-          setError(authError.message)
+          // If email not confirmed, auto-confirm via edge function and retry
+          if (authError.message.toLowerCase().includes('email not confirmed')) {
+            try {
+              const res = await fetch(
+                `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/confirm-user`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email, password }),
+                }
+              )
+              const result = await res.json()
+              if (result.session) {
+                // Set the session from the edge function response
+                await supabase.auth.setSession({
+                  access_token: result.session.access_token,
+                  refresh_token: result.session.refresh_token,
+                })
+                // AuthProvider will handle redirect
+                return
+              } else {
+                setError(result.error || 'Login failed')
+              }
+            } catch {
+              setError('Login failed. Please try again.')
+            }
+          } else {
+            setError(authError.message)
+          }
         }
         // AuthProvider will handle the redirect on success
       } else {

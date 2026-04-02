@@ -33,7 +33,7 @@ export function useAuth() {
 }
 
 // Pages that don't require authentication
-const PUBLIC_PATHS = ['/login/']
+const PUBLIC_PATHS = ['/login']
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SupabaseUser | null>(null)
