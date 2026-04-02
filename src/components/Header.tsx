@@ -24,24 +24,43 @@ export default function Header() {
   clientRef.current = client
 
   useEffect(() => {
+    if (!profile) return // Wait for profile to load
     loadAllClients().then((clients) => {
-      // Auto-restore last selected client from localStorage
-      // Skip if a client is already set (e.g., just created via createClient)
-      if (!restoredRef.current && clients.length > 0) {
+      if (!restoredRef.current) {
         restoredRef.current = true
         if (clientRef.current) return // A client was already set (e.g., just created)
-        try {
-          const savedId = localStorage.getItem('lbh_selected_client_id')
-          if (savedId && clients.some(c => c.id === savedId)) {
-            switchClient(savedId)
-          } else if (clients.length === 1) {
-            switchClient(clients[0].id)
+
+        // Client-role users: auto-select their assigned client
+        if (profile.role === 'client') {
+          if (profile.client_id) {
+            const assigned = clients.find(c => c.id === profile.client_id)
+            if (assigned) {
+              switchClient(assigned.id)
+              return
+            }
           }
-        } catch { /* storage unavailable */ }
+          // Fallback: if only one client visible, select it
+          if (clients.length === 1) {
+            switchClient(clients[0].id)
+            return
+          }
+        }
+
+        // Agency roles: restore from localStorage or auto-select
+        if (clients.length > 0) {
+          try {
+            const savedId = localStorage.getItem('lbh_selected_client_id')
+            if (savedId && clients.some(c => c.id === savedId)) {
+              switchClient(savedId)
+            } else if (clients.length === 1) {
+              switchClient(clients[0].id)
+            }
+          } catch { /* storage unavailable */ }
+        }
       }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadAllClients, switchClient])
+  }, [loadAllClients, switchClient, profile])
 
   async function handleClientChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const value = e.target.value
