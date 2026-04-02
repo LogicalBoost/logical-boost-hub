@@ -2599,6 +2599,46 @@ export default function SettingsPage() {
   }
 
   // ═══════════════════════════════════════
+  // Phone Numbers tab — read-only for clients
+  // ═══════════════════════════════════════
+
+  function renderPhoneNumbersReadOnly() {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <div className="funnel-section-card">
+          <div className="funnel-section-header">
+            <h3>Phone Numbers</h3>
+          </div>
+          <div style={{ padding: 24 }}>
+            {clientPhoneNumbers.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-secondary)', fontSize: 14 }}>
+                No phone numbers have been set up yet.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {clientPhoneNumbers.map(phone => (
+                  <div key={phone.id} style={{ padding: 16, background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-primary)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 15, fontWeight: 600 }}>{phone.phone_number}</span>
+                      <span className="tag" style={{ fontSize: 11 }}>{phone.label}</span>
+                      {phone.is_default && (
+                        <span className="tag" style={{ fontSize: 11, background: 'var(--success-muted)', color: 'var(--success)' }}>Default</span>
+                      )}
+                    </div>
+                    {phone.notes && (
+                      <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6 }}>{phone.notes}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ═══════════════════════════════════════
   // Prompts tab render
   // ═══════════════════════════════════════
 
@@ -2863,14 +2903,12 @@ export default function SettingsPage() {
             </button>
           </>
         )}
-        {!isClientRole && (
-          <button
-            className={`funnel-tab ${activeTab === 'phones' ? 'funnel-tab-active' : ''}`}
-            onClick={() => setActiveTab('phones')}
-          >
-            Phone Numbers
-          </button>
-        )}
+        <button
+          className={`funnel-tab ${activeTab === 'phones' ? 'funnel-tab-active' : ''}`}
+          onClick={() => setActiveTab('phones')}
+        >
+          Phone Numbers
+        </button>
       </div>
 
       {/* Tab content */}
@@ -2880,7 +2918,7 @@ export default function SettingsPage() {
       {activeTab === 'team' && isAdmin && renderTeamTab()}
       {activeTab === 'clients' && isAdmin && renderClientAccessTab()}
       {activeTab === 'prompts' && isAdmin && renderPromptsTab()}
-      {activeTab === 'phones' && !isClientRole && renderPhoneNumbersTab()}
+      {activeTab === 'phones' && (isClientRole ? renderPhoneNumbersReadOnly() : renderPhoneNumbersTab())}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/components/AuthProvider'
 import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
@@ -8,7 +8,14 @@ import { showToast } from '@/lib/demo-toast'
 
 export default function ClientSettingsPage() {
   const { profile, signOut } = useAuth()
-  const { client } = useAppStore()
+  const { client, clientPhoneNumbers, refreshClientPhoneNumbers } = useAppStore()
+
+  // Load phone numbers
+  useEffect(() => {
+    if (client?.id) {
+      refreshClientPhoneNumbers(client.id)
+    }
+  }, [client?.id, refreshClientPhoneNumbers])
   const [changingPassword, setChangingPassword] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [saving, setSaving] = useState(false)
@@ -110,6 +117,33 @@ export default function ClientSettingsPage() {
           )}
         </div>
       </div>
+
+      {/* Phone numbers */}
+      {clientPhoneNumbers.length > 0 && (
+        <div className="funnel-section-card" style={{ marginBottom: 24 }}>
+          <div className="funnel-section-header">
+            <h3>Phone Numbers</h3>
+          </div>
+          <div style={{ padding: '16px 20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {clientPhoneNumbers.map(phone => (
+                <div key={phone.id} style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 15, fontWeight: 600 }}>{phone.phone_number}</span>
+                    <span className="tag" style={{ fontSize: 11 }}>{phone.label}</span>
+                    {phone.is_default && (
+                      <span className="tag" style={{ fontSize: 11, background: 'var(--success-muted)', color: 'var(--success)' }}>Default</span>
+                    )}
+                  </div>
+                  {phone.notes && (
+                    <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6 }}>{phone.notes}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sign out */}
       <div className="funnel-section-card">

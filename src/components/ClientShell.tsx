@@ -12,6 +12,8 @@ const clientNavItems = [
   { href: '/client/landing-pages/', label: 'Landing Pages', icon: '◰' },
   { href: '/client/avatars/', label: 'Avatars', icon: '◪' },
   { href: '/client/offers/', label: 'Offers', icon: '◭' },
+  { href: '/client/intake/', label: 'Intake', icon: '◨' },
+  { href: '/client/competitive-intel/', label: 'Competitor Intel', icon: '◮' },
   { href: '/client/settings/', label: 'Settings', icon: '◷' },
 ]
 

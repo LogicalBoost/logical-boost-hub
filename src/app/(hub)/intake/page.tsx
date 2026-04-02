@@ -7,7 +7,7 @@ import { showToast } from '@/lib/demo-toast'
 import { supabase } from '@/lib/supabase'
 
 export default function IntakePage() {
-  const { client, intakeQuestions, refreshIntake, loadClientData, setLoading, loading, canEdit } = useAppStore()
+  const { client, intakeQuestions, refreshIntake, loadClientData, setLoading, loading, canEdit, isClientRole } = useAppStore()
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [loadingMessage, setLoadingMessage] = useState('')
 
@@ -123,7 +123,9 @@ export default function IntakePage() {
           <div className="empty-state-icon">&#128221;</div>
           <div className="empty-state-text">No intake questions yet</div>
           <div className="empty-state-sub">
-            Generate targeted questions based on your client profile.
+            {isClientRole
+              ? 'Your agency team will set up intake questions for your account.'
+              : 'Generate targeted questions based on your client profile.'}
           </div>
           {canEdit && (
             <button
@@ -154,13 +156,15 @@ export default function IntakePage() {
           <span className={`badge ${answeredCount === totalCount ? 'badge-approved' : 'badge-pending'}`}>
             {answeredCount === totalCount ? 'Completed' : 'Pending'}
           </span>
-          <button
-            className="btn btn-primary"
-            onClick={handleSaveAnswers}
-            disabled={loading}
-          >
-            Save Answers
-          </button>
+          {canEdit && (
+            <button
+              className="btn btn-primary"
+              onClick={handleSaveAnswers}
+              disabled={loading}
+            >
+              Save Answers
+            </button>
+          )}
         </div>
       </div>
 
@@ -200,12 +204,27 @@ export default function IntakePage() {
             .map((q) => (
               <div key={q.id} className="form-group">
                 <label className="form-label">{q.question}</label>
-                <textarea
-                  className="form-input form-textarea"
-                  value={answers[q.id] ?? ''}
-                  onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
-                  placeholder="Type your answer here..."
-                />
+                {isClientRole ? (
+                  <div style={{
+                    padding: '10px 14px',
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: 14,
+                    color: (answers[q.id] ?? '').trim() ? 'var(--text-primary)' : 'var(--text-muted)',
+                    minHeight: 40,
+                    whiteSpace: 'pre-wrap',
+                  }}>
+                    {(answers[q.id] ?? '').trim() || 'Not answered yet'}
+                  </div>
+                ) : (
+                  <textarea
+                    className="form-input form-textarea"
+                    value={answers[q.id] ?? ''}
+                    onChange={(e) => setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                    placeholder="Type your answer here..."
+                  />
+                )}
               </div>
             ))}
         </div>
