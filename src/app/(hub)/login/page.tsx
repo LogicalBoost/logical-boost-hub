@@ -133,7 +133,11 @@ export default function LoginPage() {
       if (updateError) {
         setError(updateError.message)
       } else {
-        setResetSuccess(true)
+        // Password updated — user already has a session from recovery flow.
+        // Clean URL params and redirect to dashboard.
+        window.history.replaceState({}, '', '/login/')
+        window.location.href = '/dashboard/'
+        return
       }
     } catch {
       setError('An unexpected error occurred')

@@ -119,16 +119,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const normalizedPath = pathname || '/'
     const isPublicPage = PUBLIC_PATHS.some(p => normalizedPath.startsWith(p))
 
-    // Check if this is a password recovery flow — don't redirect away from login
+    // Check if this is an active password recovery flow — don't redirect away from login
+    // Only block redirect if recovery token is still being processed (hash contains type=recovery)
     const hash = typeof window !== 'undefined' ? window.location.hash : ''
-    const isRecoveryFlow = hash.includes('type=recovery') ||
-      (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('reset') === 'true')
+    const isActiveRecovery = hash.includes('type=recovery')
 
     if (!user && !isPublicPage) {
       // Not logged in and trying to access protected page
       router.push('/login/')
-    } else if (user && isPublicPage && !isRecoveryFlow) {
-      // Logged in but on login page (and NOT doing password recovery), redirect to dashboard
+    } else if (user && isPublicPage && !isActiveRecovery) {
+      // Logged in but on login page, redirect to dashboard
+      // Note: ?reset=true alone does NOT block redirect — only an active recovery token does
       router.push('/dashboard/')
     }
   }, [user, loading, pathname, router])
