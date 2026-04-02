@@ -84,11 +84,10 @@ function DuotoneIcon({ name, size = 28, color }: { name?: string; size?: number;
 
 /* ─── Accent word highlight ─── */
 function AH({ text, word, className }: { text: string; word?: string; className?: string }) {
-  const balanceStyle: React.CSSProperties = { textWrap: 'balance' }
-  if (!word || !text.includes(word)) return <span className={className} style={balanceStyle}>{text}</span>
+  if (!word || !text.includes(word)) return <span className={className}>{text}</span>
   const i = text.indexOf(word)
   return (
-    <span className={className} style={balanceStyle}>
+    <span className={className}>
       {text.slice(0, i)}
       <span className="text-[var(--color-accent)]">{word}</span>
       {text.slice(i + word.length)}
