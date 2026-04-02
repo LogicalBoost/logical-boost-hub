@@ -34,6 +34,8 @@ export function useAuth() {
 
 // Pages that don't require authentication
 const PUBLIC_PATHS = ['/login']
+// Paths exclusively for client-role users
+const CLIENT_PATHS = ['/client']
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SupabaseUser | null>(null)
@@ -117,17 +119,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const normalizedPath = pathname || '/'
     const isPublicPage = PUBLIC_PATHS.some(p => normalizedPath.startsWith(p))
+    const isClientPage = CLIENT_PATHS.some(p => normalizedPath.startsWith(p))
+    const isLandingPage = normalizedPath.startsWith('/p/')
 
     // Only block redirect for active recovery token in hash
     const hash = typeof window !== 'undefined' ? window.location.hash : ''
     const isActiveRecovery = hash.includes('type=recovery')
 
-    if (!user && !isPublicPage) {
+    if (!user && !isPublicPage && !isLandingPage) {
       router.push('/login/')
-    } else if (user && isPublicPage && !isActiveRecovery) {
-      router.push('/dashboard/')
+    } else if (user && profile && isPublicPage && !isActiveRecovery) {
+      // After login, route to the correct app based on role
+      if (profile.role === 'client') {
+        router.push('/client/dashboard/')
+      } else {
+        router.push('/dashboard/')
+      }
+    } else if (user && profile) {
+      // Client-role user trying to access agency (hub) routes → redirect to client app
+      if (profile.role === 'client' && !isClientPage && !isPublicPage && !isLandingPage) {
+        router.push('/client/dashboard/')
+      }
+      // Agency user trying to access client routes → redirect to agency dashboard
+      if (profile.role !== 'client' && isClientPage) {
+        router.push('/dashboard/')
+      }
     }
-  }, [user, loading, pathname, router])
+  }, [user, profile, loading, pathname, router])
 
   // Show loading spinner while checking auth + loading profile
   if (loading) {

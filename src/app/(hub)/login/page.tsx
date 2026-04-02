@@ -162,9 +162,24 @@ export default function LoginPage() {
         setError(updateError.message)
       } else {
         // Password updated — user already has a session from recovery flow.
-        // Clean URL params and redirect to dashboard.
+        // Clean URL params and redirect based on role.
+        // Fetch the user's profile to determine correct destination.
         window.history.replaceState({}, '', '/login/')
-        window.location.href = '/dashboard/'
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        if (authUser) {
+          const { data: userProfile } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', authUser.id)
+            .single()
+          if (userProfile?.role === 'client') {
+            window.location.href = '/client/dashboard/'
+          } else {
+            window.location.href = '/dashboard/'
+          }
+        } else {
+          window.location.href = '/dashboard/'
+        }
         return
       }
     } catch {

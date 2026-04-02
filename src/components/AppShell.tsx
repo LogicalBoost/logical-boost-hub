@@ -10,11 +10,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isLoginPage = pathname?.startsWith('/login')
   const isLandingPage = pathname?.startsWith('/p/')
+  const isClientRoute = pathname?.startsWith('/client')
   const { profile } = useAuth()
   const { client } = useAppStore()
 
-  // Login and landing pages render full-screen without shell
-  if (isLoginPage || isLandingPage) {
+  // Login, landing pages, and client routes render without agency shell
+  if (isLoginPage || isLandingPage || isClientRoute) {
     return <>{children}</>
   }
 
