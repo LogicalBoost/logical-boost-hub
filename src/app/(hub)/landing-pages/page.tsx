@@ -321,6 +321,19 @@ export default function LandingPagesPage() {
   // All existing pages for this client
   const allExistingPages = useMemo(() => landingPages, [landingPages])
 
+  // Check if approved copy components exist for current avatar+offer combo
+  const approvedCopyForCombo = useMemo(() => {
+    if (!selectedAvatarId || !selectedOfferId) return []
+    return copyComponents.filter(
+      c =>
+        c.status === 'approved' &&
+        (c.avatar_ids?.includes(selectedAvatarId) || (c.avatar_ids || []).length === 0) &&
+        (c.offer_ids?.includes(selectedOfferId) || (c.offer_ids || []).length === 0)
+    )
+  }, [copyComponents, selectedAvatarId, selectedOfferId])
+
+  const hasCopyForCombo = approvedCopyForCombo.length > 0
+
   // Template slots for selected template
   const templateSlots: CopySlotDef[] = useMemo(() => {
     if (!selectedTemplate) return []
@@ -333,13 +346,27 @@ export default function LandingPagesPage() {
 
   const handleAvatarOfferSelect = useCallback(() => {
     if (!selectedAvatarId || !selectedOfferId) return
+
+    // Check if copy components exist for this combo
+    const approvedCopy = copyComponents.filter(
+      c =>
+        c.status === 'approved' &&
+        (c.avatar_ids?.includes(selectedAvatarId) || (c.avatar_ids || []).length === 0) &&
+        (c.offer_ids?.includes(selectedOfferId) || (c.offer_ids || []).length === 0)
+    )
+
+    if (approvedCopy.length === 0) {
+      showToast('No copy components found for this Avatar + Offer. Go to the Copy page and generate copy components first.')
+      return
+    }
+
     // Reset downstream state
     setSelectedTemplate(null)
     setCopySlots({})
     setMissingSlotIds([])
     setActivePage(null)
     setStep(2)
-  }, [selectedAvatarId, selectedOfferId])
+  }, [selectedAvatarId, selectedOfferId, copyComponents])
 
   const handleTemplateSelect = useCallback((tid: TemplateId) => {
     setSelectedTemplate(tid)
@@ -1126,9 +1153,34 @@ export default function LandingPagesPage() {
               </select>
             </div>
           </div>
+
+          {/* Warning: no copy components for this avatar+offer */}
+          {selectedAvatarId && selectedOfferId && !hasCopyForCombo && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 10,
+              padding: '12px 16px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'rgba(245, 158, 11, 0.1)',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              marginBottom: 8,
+            }}>
+              <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>⚠️</span>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#f59e0b', margin: 0 }}>
+                  No copy components for this Avatar + Offer
+                </p>
+                <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+                  Go to the <strong>Copy</strong> page and generate copy components for this combination first. Landing page AI copy generation uses your approved copy components as source material.
+                </p>
+              </div>
+            </div>
+          )}
+
           <button
-            style={btn('primary', !selectedAvatarId || !selectedOfferId)}
-            disabled={!selectedAvatarId || !selectedOfferId}
+            style={btn('primary', !selectedAvatarId || !selectedOfferId || !hasCopyForCombo)}
+            disabled={!selectedAvatarId || !selectedOfferId || !hasCopyForCombo}
             onClick={handleAvatarOfferSelect}
           >
             Continue
