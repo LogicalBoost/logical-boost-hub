@@ -317,7 +317,7 @@ export default function LeadCaptureClassic({ sections, media, brandKit, formConf
       {hero && <HeroBlock section={hero} media={media} primaryColor={resolvedPrimary} accentColor={resolvedAccent} formConfig={formConfig || undefined} pageSlug={pageSlug} clientSlug={clientSlug} publishedPageId={publishedPageId} />}
 
       {/* ─── FEATURE CARDS BAR ─── */}
-      {features && <FeatureCardsBar section={features} primaryColor={resolvedPrimary} accentColor={resolvedAccent} />}
+      {features && <FeatureCardsBar section={features} primaryColor={resolvedPrimary} accentColor={resolvedAccent} trustpilotWidget={media.trustpilot_widget} />}
 
       {/* ─── TWO COLUMN INFO ─── */}
       {info && <TwoColumnInfo section={info} />}
@@ -333,11 +333,6 @@ export default function LeadCaptureClassic({ sections, media, brandKit, formConf
 
       {/* ─── TESTIMONIALS ─── */}
       {testimonials && <TestimonialsBlock section={testimonials} media={media} />}
-
-      {/* ─── TRUSTPILOT WIDGET ─── */}
-      {media.trustpilot_widget?.businessUnitId && (
-        <TrustpilotBlock widget={media.trustpilot_widget} />
-      )}
 
       {/* ─── FAQ ─── */}
       {faq && <FaqBlock section={faq} />}
@@ -508,8 +503,32 @@ function HeroBlock({ section, media, primaryColor, accentColor, formConfig, page
    FEATURE CARDS — Rich gradient bg, frosted glass cards,
    detailed multi-color illustrated icons
    ═══════════════════════════════════════════════════════ */
-function FeatureCardsBar({ section, primaryColor, accentColor }: { section: Section; primaryColor: string; accentColor: string }) {
+function FeatureCardsBar({ section, primaryColor, accentColor, trustpilotWidget }: { section: Section; primaryColor: string; accentColor: string; trustpilotWidget?: TrustpilotWidget }) {
   const items = section.items || []
+  const tpRef = useRef<HTMLDivElement>(null)
+  const hasTrustpilot = !!(trustpilotWidget?.businessUnitId)
+
+  useEffect(() => {
+    if (!hasTrustpilot) return
+    if (!document.querySelector('script[src*="widget.trustpilot.com"]')) {
+      const script = document.createElement('script')
+      script.src = '//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js'
+      script.async = true
+      document.head.appendChild(script)
+      script.onload = () => {
+        if ((window as unknown as Record<string, unknown>).Trustpilot && tpRef.current) {
+          (window as unknown as Record<string, { loadFromElement: (el: HTMLElement, flag: boolean) => void }>).Trustpilot.loadFromElement(tpRef.current, true)
+        }
+      }
+    } else {
+      setTimeout(() => {
+        if ((window as unknown as Record<string, unknown>).Trustpilot && tpRef.current) {
+          (window as unknown as Record<string, { loadFromElement: (el: HTMLElement, flag: boolean) => void }>).Trustpilot.loadFromElement(tpRef.current, true)
+        }
+      }, 100)
+    }
+  }, [hasTrustpilot, trustpilotWidget])
+
   return (
     <section
       className="relative py-6 md:py-8 overflow-hidden"
@@ -551,6 +570,26 @@ function FeatureCardsBar({ section, primaryColor, accentColor }: { section: Sect
             </div>
           ))}
         </div>
+
+        {/* Trustpilot widget — inline below feature cards */}
+        {hasTrustpilot && (
+          <div className="mt-5 md:mt-6 flex flex-col items-center" ref={tpRef}>
+            <div
+              className="trustpilot-widget"
+              data-locale="en-US"
+              data-template-id="5419b6ffb0d04a076446a9af"
+              data-businessunit-id={trustpilotWidget!.businessUnitId}
+              data-style-height="20px"
+              data-style-width="100%"
+              data-theme="dark"
+              data-stars="4,5"
+            >
+              <a href={trustpilotWidget!.reviewUrl || '#'} target="_blank" rel="noopener noreferrer" className="text-white/60 text-xs">
+                Trustpilot
+              </a>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   )
