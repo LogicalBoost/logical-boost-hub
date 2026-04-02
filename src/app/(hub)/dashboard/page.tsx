@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useMemo } from 'react'
 import { useAppStore } from '@/lib/store'
+import { useAuth } from '@/components/AuthProvider'
 
 interface SetupStep {
   label: string
@@ -14,7 +15,8 @@ interface SetupStep {
 }
 
 export default function DashboardPage() {
-  const { client, avatars, offers, funnelInstances, copyComponents, intakeQuestions, competitors } = useAppStore()
+  const { client, avatars, offers, funnelInstances, copyComponents, intakeQuestions, competitors, isClientRole } = useAppStore()
+  const { profile } = useAuth()
 
   const activeFunnels = funnelInstances.filter((fi) => fi.status === 'active').length
   const approvedAvatars = avatars.filter(a => a.status === 'approved').length
@@ -134,6 +136,16 @@ export default function DashboardPage() {
   }
 
   if (!client) {
+    // Client-role users: show loading while their client auto-selects
+    if (isClientRole || profile?.role === 'client') {
+      return (
+        <div className="empty-state">
+          <div style={{ fontSize: 32, marginBottom: 16 }}>&#9881;&#65039;</div>
+          <div className="empty-state-text">Loading your account...</div>
+        </div>
+      )
+    }
+    // Agency users: show add client prompt
     return (
       <div className="empty-state">
         <div className="empty-state-icon">&#128640;</div>
@@ -151,6 +163,53 @@ export default function DashboardPage() {
     )
   }
 
+  // Client-role dashboard — simplified view
+  if (isClientRole) {
+    return (
+      <div>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Welcome, {profile?.name || client.name}</h1>
+            <p className="page-subtitle">{client.name} dashboard</p>
+          </div>
+        </div>
+
+        {/* Client stat cards */}
+        <div className="funnel-stats-bar" style={{ marginBottom: 24 }}>
+          <div className="funnel-stat">
+            <div className="funnel-stat-value">{approvedAvatars}</div>
+            <div className="funnel-stat-label">Audiences</div>
+          </div>
+          <div className="funnel-stat">
+            <div className="funnel-stat-value">{approvedOffers}</div>
+            <div className="funnel-stat-label">Offers</div>
+          </div>
+          <div className="funnel-stat">
+            <div className="funnel-stat-value">{copyComponents.length}</div>
+            <div className="funnel-stat-label">Copy Components</div>
+          </div>
+        </div>
+
+        {/* Quick links for clients */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <Link href="/landing-pages/" className="funnel-section-card" style={{ textDecoration: 'none', color: 'inherit', padding: '24px', display: 'block' }}>
+            <h3 style={{ fontSize: 15, marginBottom: 6, color: 'var(--accent)' }}>&#128196; Landing Pages</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+              View and manage your landing pages
+            </p>
+          </Link>
+          <Link href="/settings/" className="funnel-section-card" style={{ textDecoration: 'none', color: 'inherit', padding: '24px', display: 'block' }}>
+            <h3 style={{ fontSize: 15, marginBottom: 6, color: 'var(--accent)' }}>&#9881;&#65039; Settings</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
+              Manage your account and preferences
+            </p>
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  // Agency dashboard
   return (
     <div>
       <div className="page-header">
