@@ -1093,8 +1093,8 @@ export default function FunnelPage() {
             </p>
           </div>
 
-          {/* ── Client: Green switch-audience box ── */}
-          {approvedAvatars.length > 1 && (
+          {/* ── Client: Green selector box — shows when multiple audiences OR offers ── */}
+          {(approvedAvatars.length > 1 || approvedOffers.length > 1) && (
             <div style={{
               padding: '16px 20px',
               background: 'rgba(16, 185, 129, 0.08)',
@@ -1102,35 +1102,44 @@ export default function FunnelPage() {
               borderRadius: 10,
               marginBottom: 20,
             }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)', marginBottom: 10 }}>
-                Switch Audience ({approvedAvatars.length} available)
-              </div>
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                <select
-                  className="form-input"
-                  value={avatarId}
-                  onChange={(e) => setAvatarId(e.target.value)}
-                  style={{ flex: 1, minWidth: 220, maxWidth: 400 }}
-                >
-                  {approvedAvatars.map((a, idx) => (
-                    <option key={a.id} value={a.id}>
-                      {idx + 1}. {a.name}
-                    </option>
-                  ))}
-                </select>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {approvedAvatars.length > 1 && (
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', marginBottom: 6 }}>
+                      Audience ({approvedAvatars.length} available)
+                    </div>
+                    <select
+                      className="form-input"
+                      value={avatarId}
+                      onChange={(e) => setAvatarId(e.target.value)}
+                      style={{ width: '100%', maxWidth: 500 }}
+                    >
+                      {approvedAvatars.map((a, idx) => (
+                        <option key={a.id} value={a.id}>
+                          {idx + 1}. {a.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 {approvedOffers.length > 1 && (
-                  <select
-                    className="form-input"
-                    value={offerId}
-                    onChange={(e) => setOfferId(e.target.value)}
-                    style={{ flex: 1, minWidth: 180, maxWidth: 300 }}
-                  >
-                    {approvedOffers.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', marginBottom: 6 }}>
+                      Offer ({approvedOffers.length} available)
+                    </div>
+                    <select
+                      className="form-input"
+                      value={offerId}
+                      onChange={(e) => setOfferId(e.target.value)}
+                      style={{ width: '100%', maxWidth: 500 }}
+                    >
+                      {approvedOffers.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 )}
               </div>
             </div>
