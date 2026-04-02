@@ -1076,10 +1076,22 @@ export default function FunnelPage() {
   // ── Render: Main page ────────────────────────────────────────────────
   return (
     <div className="funnel-page">
-      {/* ── Compact selector bar ── */}
+      {/* ── Client-friendly header ── */}
+      {isClientRole && (
+        <div style={{ marginBottom: 20 }}>
+          <h1 className="page-title" style={{ marginBottom: 4 }}>Campaign Copy</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: 0 }}>
+            Review the ad copy and scripts created for your campaigns. Use the dropdowns below to switch between different audiences and offers.
+          </p>
+        </div>
+      )}
+
+      {/* ── Selector bar ── */}
       <div className="funnel-selector-bar">
         <div className="funnel-selector-col">
-          <label className="funnel-selector-label">Avatar (by priority)</label>
+          <label className="funnel-selector-label">
+            {isClientRole ? 'Select an Audience' : 'Avatar (by priority)'}
+          </label>
           <select
             className="form-input funnel-avatar-select"
             value={avatarId}
@@ -1097,7 +1109,9 @@ export default function FunnelPage() {
           </select>
         </div>
         <div className="funnel-selector-col">
-          <label className="funnel-selector-label">Offer</label>
+          <label className="funnel-selector-label">
+            {isClientRole ? 'Select an Offer' : 'Offer'}
+          </label>
           <select
             className="form-input"
             value={offerId}
@@ -1125,6 +1139,26 @@ export default function FunnelPage() {
           </div>
         ) : null}
       </div>
+
+      {/* Client guidance — show when there are multiple avatars to browse */}
+      {isClientRole && approvedAvatars.length > 1 && (
+        <div style={{
+          padding: '10px 16px',
+          background: 'rgba(16, 185, 129, 0.06)',
+          border: '1px solid rgba(16, 185, 129, 0.15)',
+          borderRadius: 8,
+          marginBottom: 12,
+          fontSize: 13,
+          color: 'var(--text-secondary)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+        }}>
+          <span style={{ fontSize: 16 }}>&#128161;</span>
+          You have <strong style={{ color: 'var(--text-primary)' }}>{approvedAvatars.length} audience segments</strong> with campaign copy.
+          Switch the audience dropdown above to review copy for each one. Click any item to copy it to your clipboard.
+        </div>
+      )}
 
       {/* Avatar context strip — shows key info about the selected avatar */}
       {selectedAvatar && (
