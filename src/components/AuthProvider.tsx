@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
 
-  const loadProfile = useCallback(async (userId: string) => {
+  const loadProfile = useCallback(async (userId: string): Promise<AuthUser | null> => {
     const { data } = await supabase
       .from('users')
       .select('id, email, name, role, client_id')
@@ -51,15 +51,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (data) {
       setProfile(data as AuthUser)
+      return data as AuthUser
     } else {
       // User exists in auth but not in users table yet.
       // This happens on first signup. We'll auto-create a profile.
-      // Default to admin for the first user, team_editor for subsequent.
-      // Use RPC function to bypass RLS and get accurate total user count.
       const { data: userCount } = await supabase.rpc('get_user_count')
-
       const role: UserRole = (userCount === 0) ? 'admin' : 'team_editor'
-
       const authUser = (await supabase.auth.getUser()).data.user
       const { data: newProfile } = await supabase
         .from('users')
@@ -75,8 +72,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (newProfile) {
         setProfile(newProfile as AuthUser)
+        return newProfile as AuthUser
       }
     }
+    return null
   }, [])
 
   const handleSignOut = useCallback(async () => {
@@ -88,16 +87,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router])
 
   useEffect(() => {
-    // Check existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Check existing session — don't stop loading until profile is fully resolved
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user)
-        loadProfile(session.user.id)
+        await loadProfile(session.user.id)
       }
+      // Only now is it safe to render the app
       setLoading(false)
     })
 
-    // Listen for auth state changes
+    // Listen for auth state changes (login/logout after initial load)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setUser(session.user)
@@ -115,26 +115,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (loading) return
 
-    // Normalize pathname for basePath comparison
     const normalizedPath = pathname || '/'
     const isPublicPage = PUBLIC_PATHS.some(p => normalizedPath.startsWith(p))
 
-    // Check if this is an active password recovery flow — don't redirect away from login
-    // Only block redirect if recovery token is still being processed (hash contains type=recovery)
+    // Only block redirect for active recovery token in hash
     const hash = typeof window !== 'undefined' ? window.location.hash : ''
     const isActiveRecovery = hash.includes('type=recovery')
 
     if (!user && !isPublicPage) {
-      // Not logged in and trying to access protected page
       router.push('/login/')
     } else if (user && isPublicPage && !isActiveRecovery) {
-      // Logged in but on login page, redirect to dashboard
-      // Note: ?reset=true alone does NOT block redirect — only an active recovery token does
       router.push('/dashboard/')
     }
   }, [user, loading, pathname, router])
 
-  // Show loading spinner while checking auth
+  // Show loading spinner while checking auth + loading profile
   if (loading) {
     return (
       <div style={{
