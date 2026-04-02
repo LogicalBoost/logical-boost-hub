@@ -224,3 +224,18 @@ export async function discoverCompetitors(
     user_prompt: options?.userPrompt,
   })
 }
+
+// Invite user — creates account via service role (auto-confirmed) + sends password setup email
+export async function inviteUser(
+  email: string,
+  name: string,
+  role: string,
+  clientId?: string
+) {
+  return callEdgeFunction('invite-user', {
+    email,
+    name,
+    role,
+    client_id: clientId,
+  })
+}

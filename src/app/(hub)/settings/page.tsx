@@ -5,7 +5,7 @@ import { useAuth } from '@/components/AuthProvider'
 import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import { showToast } from '@/lib/demo-toast'
-import { analyzeBusiness, analyzeBrandKit, generateIntake, refineSystem } from '@/lib/api'
+import { analyzeBusiness, analyzeBrandKit, generateIntake, refineSystem, inviteUser } from '@/lib/api'
 import type { UserRole, Competitor, PromptTemplate, ClientPhoneNumber } from '@/types/database'
 import TagInput from '@/components/TagInput'
 import LogoUpload from '@/components/LogoUpload'
@@ -299,48 +299,24 @@ export default function SettingsPage() {
     if (!inviteEmail.trim()) return
     setInviting(true)
 
-    const { data: existing } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', inviteEmail.trim())
-      .single()
+    try {
+      const result = await inviteUser(
+        inviteEmail.trim(),
+        inviteName.trim() || inviteEmail.split('@')[0],
+        inviteRole,
+        inviteRole === 'client' ? client?.id : undefined
+      )
 
-    if (existing) {
-      showToast('User with this email already exists')
+      showToast(result.message || 'Invite sent! They will receive a password setup email.')
+      setInviteEmail('')
+      setInviteName('')
+      setShowInviteForm(false)
+      loadTeam()
+    } catch (err) {
+      showToast('Failed to invite: ' + (err as Error).message)
+    } finally {
       setInviting(false)
-      return
     }
-
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: inviteEmail.trim(),
-      password: crypto.randomUUID().slice(0, 12),
-      options: {
-        data: { name: inviteName.trim() || inviteEmail.split('@')[0] },
-      },
-    })
-
-    if (authError) {
-      showToast('Failed to invite: ' + authError.message)
-      setInviting(false)
-      return
-    }
-
-    if (authData.user) {
-      await supabase.from('users').insert({
-        id: authData.user.id,
-        email: inviteEmail.trim(),
-        name: inviteName.trim() || inviteEmail.split('@')[0],
-        role: inviteRole,
-        status: 'active',
-      })
-    }
-
-    showToast('Team member invited! They will receive a confirmation email.')
-    setInviteEmail('')
-    setInviteName('')
-    setShowInviteForm(false)
-    setInviting(false)
-    loadTeam()
   }
 
   async function handleChangeRole(memberId: string, newRole: UserRole) {
