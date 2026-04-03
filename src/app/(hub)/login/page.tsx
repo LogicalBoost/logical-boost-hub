@@ -15,37 +15,65 @@ export default function LoginPage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [resetSuccess, setResetSuccess] = useState(false)
+  const [sessionReady, setSessionReady] = useState(false)
 
   // Check for password reset flow on mount
   // Supabase sends recovery links with hash fragments: #access_token=...&type=recovery
   // OR with ?reset=true query param (our custom redirect)
   useEffect(() => {
+    let isRecoveryFlow = false
+
     // Method 1: Check hash fragment for recovery token (Supabase default flow)
     const hash = window.location.hash
     if (hash) {
       const hashParams = new URLSearchParams(hash.substring(1))
       const type = hashParams.get('type')
       if (type === 'recovery') {
-        // Supabase auth client will automatically pick up the token from the hash
-        // and establish a session. We just need to wait for it.
+        isRecoveryFlow = true
         setMode('reset')
-        return
       }
     }
 
     // Method 2: Check query param (our custom redirect from resetPasswordForEmail)
-    // Always show reset form if ?reset=true — session may still be loading
     const params = new URLSearchParams(window.location.search)
     if (params.get('reset') === 'true') {
+      isRecoveryFlow = true
       setMode('reset')
     }
 
     // Listen for auth state changes (catches recovery token being processed)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         setMode('reset')
+        if (session) {
+          setSessionReady(true)
+        }
+      }
+      // Also catch SIGNED_IN which happens when recovery token is exchanged
+      if (event === 'SIGNED_IN' && session && isRecoveryFlow) {
+        setSessionReady(true)
       }
     })
+
+    // If this is a recovery flow, also poll for session (backup in case event was missed)
+    if (isRecoveryFlow) {
+      const checkSession = async () => {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          setSessionReady(true)
+        } else {
+          // Retry after a short delay — token exchange can take a moment
+          setTimeout(async () => {
+            const { data: { session: retrySession } } = await supabase.auth.getSession()
+            if (retrySession) {
+              setSessionReady(true)
+            }
+          }, 2000)
+        }
+      }
+      // Small delay to let Supabase process the hash tokens
+      setTimeout(checkSession, 500)
+    }
 
     return () => subscription.unsubscribe()
   }, [])
@@ -152,6 +180,13 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
     try {
+      // Verify we have an active session before attempting password update
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setError('Your reset link has expired or is invalid. Please request a new password reset.')
+        setLoading(false)
+        return
+      }
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
       })
@@ -260,6 +295,15 @@ export default function LoginPage() {
             </div>
           ) : mode === 'reset' ? (
             /* Set new password form */
+            !sessionReady ? (
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <div style={{ fontSize: 28, marginBottom: 12 }}>&#9881;&#65039;</div>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>Verifying your reset link...</div>
+                <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  Please wait while we verify your identity.
+                </div>
+              </div>
+            ) : (
             <form onSubmit={handleSetNewPassword}>
               {error && (
                 <div style={{
@@ -310,6 +354,7 @@ export default function LoginPage() {
                 {loading ? 'Updating...' : 'Set New Password'}
               </button>
             </form>
+            )
           ) : mode === 'forgot' ? (
             /* Forgot password form */
             <form onSubmit={handleForgotPassword}>

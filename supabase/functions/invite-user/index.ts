@@ -131,14 +131,14 @@ Deno.serve(async (req: Request) => {
       type: 'recovery',
       email: email.trim(),
       options: {
-        redirectTo: `${siteUrl}/login`,
+        redirectTo: `${siteUrl}/login?reset=true`,
       },
     })
 
     // Send the actual email via the public client (generateLink doesn't send on service role)
     const publicClient = createClient(supabaseUrl, anonKey)
     const { error: emailError } = await publicClient.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${siteUrl}/login`,
+      redirectTo: `${siteUrl}/login?reset=true`,
     })
 
     return jsonResponse({
