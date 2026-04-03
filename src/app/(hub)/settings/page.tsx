@@ -55,6 +55,7 @@ export default function SettingsPage() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteName, setInviteName] = useState('')
   const [inviteRole, setInviteRole] = useState<UserRole>('team_editor')
+  const [inviteClientIds, setInviteClientIds] = useState<string[]>([])
   const [inviting, setInviting] = useState(false)
   const [managingMember, setManagingMember] = useState<TeamMember | null>(null)
 
@@ -297,6 +298,19 @@ export default function SettingsPage() {
   async function handleInviteMember(e: React.FormEvent) {
     e.preventDefault()
     if (!inviteEmail.trim()) return
+
+    // Validate: non-admin roles must have at least one client assigned
+    if (inviteRole !== 'admin' && inviteClientIds.length === 0) {
+      showToast('Please select at least one client to assign')
+      return
+    }
+
+    // Client role must have exactly one client
+    if (inviteRole === 'client' && inviteClientIds.length !== 1) {
+      showToast('Client role users must be assigned to exactly one client')
+      return
+    }
+
     setInviting(true)
 
     try {
@@ -304,12 +318,14 @@ export default function SettingsPage() {
         inviteEmail.trim(),
         inviteName.trim() || inviteEmail.split('@')[0],
         inviteRole,
-        inviteRole === 'client' ? client?.id : undefined
+        inviteRole === 'client' ? inviteClientIds[0] : undefined,
+        inviteRole !== 'client' && inviteRole !== 'admin' ? inviteClientIds : undefined
       )
 
       showToast(result.message || 'Invite sent! They will receive a password setup email.')
       setInviteEmail('')
       setInviteName('')
+      setInviteClientIds([])
       setShowInviteForm(false)
       loadTeam()
     } catch (err) {
@@ -2084,11 +2100,25 @@ export default function SettingsPage() {
                     )}
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{member.email}</div>
-                  <div style={{ marginTop: 4 }}>
+                  <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
                     <span className="tag" style={{ fontSize: 11 }}>{member.role}</span>
                     {member.status === 'disabled' && (
-                      <span className="tag" style={{ fontSize: 11, background: '#ef4444', marginLeft: 4 }}>disabled</span>
+                      <span className="tag" style={{ fontSize: 11, background: '#ef4444' }}>disabled</span>
                     )}
+                    {member.role !== 'admin' && (() => {
+                      const memberAssignments = assignments.filter(a => a.user_id === member.id)
+                      const assignedClients = memberAssignments
+                        .map(a => allClients.find(c => c.id === a.client_id))
+                        .filter(Boolean)
+                      if (assignedClients.length === 0) {
+                        return <span style={{ fontSize: 11, color: 'var(--warning)' }}>No clients assigned</span>
+                      }
+                      return assignedClients.map(c => (
+                        <span key={c!.id} className="tag" style={{ fontSize: 11, background: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent)' }}>
+                          {c!.name}
+                        </span>
+                      ))
+                    })()}
                   </div>
                 </div>
                 {member.id !== user?.id && (
@@ -2160,16 +2190,81 @@ export default function SettingsPage() {
                     <select
                       className="form-input"
                       value={inviteRole}
-                      onChange={e => setInviteRole(e.target.value as UserRole)}
+                      onChange={e => {
+                        setInviteRole(e.target.value as UserRole)
+                        setInviteClientIds([])
+                      }}
                     >
-                      <option value="admin">Admin (full access)</option>
+                      <option value="admin">Admin (full access to all clients)</option>
                       <option value="team_editor">Team Editor (edit assigned clients)</option>
                       <option value="team_viewer">Team Viewer (read-only)</option>
-                      <option value="client">Client (own data only)</option>
+                      <option value="client">Client (access to their own account)</option>
                     </select>
                   </div>
+
+                  {/* Client assignment — required for non-admin roles */}
+                  {inviteRole !== 'admin' && (
+                    <div className="form-group">
+                      <label className="form-label">
+                        {inviteRole === 'client' ? 'Assign to Client *' : 'Assign to Clients *'}
+                      </label>
+                      <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 8px' }}>
+                        {inviteRole === 'client'
+                          ? 'Select which client account this person belongs to'
+                          : 'Select which client accounts this person can access'}
+                      </p>
+                      {allClients.length === 0 ? (
+                        <div style={{ padding: 12, fontSize: 13, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)' }}>
+                          No clients created yet. Create a client first in Business Overview.
+                        </div>
+                      ) : (
+                        <div style={{
+                          maxHeight: 200, overflowY: 'auto',
+                          border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+                        }}>
+                          {allClients.map(c => {
+                            const isSelected = inviteClientIds.includes(c.id)
+                            return (
+                              <label
+                                key={c.id}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 10,
+                                  padding: '10px 12px', cursor: 'pointer',
+                                  borderBottom: '1px solid var(--border)',
+                                  background: isSelected ? 'rgba(16, 185, 129, 0.1)' : 'transparent',
+                                }}
+                              >
+                                <input
+                                  type={inviteRole === 'client' ? 'radio' : 'checkbox'}
+                                  name="invite-client"
+                                  checked={isSelected}
+                                  onChange={() => {
+                                    if (inviteRole === 'client') {
+                                      setInviteClientIds([c.id])
+                                    } else {
+                                      setInviteClientIds(prev =>
+                                        isSelected
+                                          ? prev.filter(id => id !== c.id)
+                                          : [...prev, c.id]
+                                      )
+                                    }
+                                  }}
+                                  style={{ accentColor: 'var(--accent)' }}
+                                />
+                                <div>
+                                  <div style={{ fontWeight: 500, fontSize: 14 }}>{c.name}</div>
+                                  {c.website && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{c.website}</div>}
+                                </div>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
-                    <button type="button" className="btn btn-secondary" onClick={() => setShowInviteForm(false)}>Cancel</button>
+                    <button type="button" className="btn btn-secondary" onClick={() => { setShowInviteForm(false); setInviteClientIds([]) }}>Cancel</button>
                     <button type="submit" className="btn btn-primary" disabled={inviting}>
                       {inviting ? 'Inviting...' : 'Send Invite'}
                     </button>

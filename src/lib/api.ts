@@ -230,12 +230,14 @@ export async function inviteUser(
   email: string,
   name: string,
   role: string,
-  clientId?: string
+  clientId?: string,
+  assignedClientIds?: string[]
 ) {
   return callEdgeFunction('invite-user', {
     email,
     name,
     role,
     client_id: clientId,
+    assigned_client_ids: assignedClientIds,
   })
 }

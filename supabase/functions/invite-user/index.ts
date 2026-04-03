@@ -10,7 +10,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { email, name, role, client_id } = await req.json()
+    const { email, name, role, client_id, assigned_client_ids } = await req.json()
 
     if (!email?.trim()) {
       return errorResponse('Email is required')
@@ -103,12 +103,20 @@ Deno.serve(async (req: Request) => {
       return errorResponse('Failed to save user record: ' + insertError.message)
     }
 
-    // If client role, also add client_assignments
+    // Add client_assignments
     if (role === 'client' && client_id) {
+      // Client role: single assignment
       await adminClient.from('client_assignments').insert({
         user_id: authData.user.id,
         client_id,
       })
+    } else if (assigned_client_ids?.length > 0) {
+      // Team editor/viewer: multiple assignments
+      const assignments = assigned_client_ids.map((cid: string) => ({
+        user_id: authData.user.id,
+        client_id: cid,
+      }))
+      await adminClient.from('client_assignments').insert(assignments)
     }
 
     // Generate a password reset link so user can set their own password
