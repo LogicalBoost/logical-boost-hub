@@ -34,13 +34,10 @@ export default function LoginPage() {
     }
 
     // Method 2: Check query param (our custom redirect from resetPasswordForEmail)
+    // Always show reset form if ?reset=true — session may still be loading
     const params = new URLSearchParams(window.location.search)
     if (params.get('reset') === 'true') {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-          setMode('reset')
-        }
-      })
+      setMode('reset')
     }
 
     // Listen for auth state changes (catches recovery token being processed)

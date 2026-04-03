@@ -122,9 +122,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isClientPage = CLIENT_PATHS.some(p => normalizedPath.startsWith(p))
     const isLandingPage = normalizedPath.startsWith('/p/')
 
-    // Only block redirect for active recovery token in hash
+    // Block redirect if this is a password recovery flow
+    // Supabase puts type=recovery in the hash AND/OR we have ?reset=true in query
     const hash = typeof window !== 'undefined' ? window.location.hash : ''
-    const isActiveRecovery = hash.includes('type=recovery')
+    const search = typeof window !== 'undefined' ? window.location.search : ''
+    const isActiveRecovery = hash.includes('type=recovery') || search.includes('reset=true')
 
     if (!user && !isPublicPage && !isLandingPage) {
       router.push('/login/')
