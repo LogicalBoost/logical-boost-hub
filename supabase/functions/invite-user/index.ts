@@ -1,5 +1,5 @@
-// Invite User — creates a user with service role (auto-confirmed) and sends password reset
-// Uses SUPABASE_SERVICE_ROLE_KEY to bypass email confirmation requirement
+// Invite User — creates user via admin API and sends a secure invite email
+// User must set their own password before accessing the platform
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, jsonResponse, errorResponse } from '../_shared/ai-client.ts'
@@ -28,6 +28,7 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+    const siteUrl = Deno.env.get('SITE_URL') || 'https://hub.logicalboost.com'
 
     // Create a client with the caller's JWT to check their role
     const callerClient = createClient(supabaseUrl, anonKey, {
@@ -53,7 +54,7 @@ Deno.serve(async (req: Request) => {
     // Use service role client for admin operations
     const adminClient = createClient(supabaseUrl, serviceRoleKey)
 
-    // Check if user already exists
+    // Check if user already exists in our users table
     const { data: existing } = await adminClient
       .from('users')
       .select('id')
@@ -64,11 +65,17 @@ Deno.serve(async (req: Request) => {
       return errorResponse('A user with this email already exists')
     }
 
-    // Create user with admin API — email auto-confirmed, temporary password
-    const tempPassword = crypto.randomUUID().slice(0, 16) + '!A1'
+    // Also check auth.users to prevent duplicate auth accounts
+    const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers()
+    const existingAuth = authUsers?.find(u => u.email === email.trim())
+    if (existingAuth) {
+      return errorResponse('A user with this email already exists in the auth system')
+    }
+
+    // Step 1: Create user with NO password — they cannot log in until they set one
+    // email_confirm: true so no confirmation email is sent
     const { data: authData, error: createError } = await adminClient.auth.admin.createUser({
       email: email.trim(),
-      password: tempPassword,
       email_confirm: true,
       user_metadata: { name: name?.trim() || email.split('@')[0] },
     })
@@ -81,7 +88,7 @@ Deno.serve(async (req: Request) => {
       return errorResponse('User creation returned no user')
     }
 
-    // Insert into our users table
+    // Step 2: Insert into our users table
     const userRecord: Record<string, unknown> = {
       id: authData.user.id,
       email: email.trim(),
@@ -103,15 +110,13 @@ Deno.serve(async (req: Request) => {
       return errorResponse('Failed to save user record: ' + insertError.message)
     }
 
-    // Add client_assignments
+    // Step 3: Add client_assignments
     if (role === 'client' && client_id) {
-      // Client role: single assignment
       await adminClient.from('client_assignments').insert({
         user_id: authData.user.id,
         client_id,
       })
     } else if (assigned_client_ids?.length > 0) {
-      // Team editor/viewer: multiple assignments
       const assignments = assigned_client_ids.map((cid: string) => ({
         user_id: authData.user.id,
         client_id: cid,
@@ -119,33 +124,28 @@ Deno.serve(async (req: Request) => {
       await adminClient.from('client_assignments').insert(assignments)
     }
 
-    // Generate a password reset link so user can set their own password
-    // Use the Supabase Auth API to send a recovery email
-    const siteUrl = Deno.env.get('SITE_URL') || 'https://hub.logicalboost.com'
+    // Step 4: Send password reset email — this is the ONLY email they receive
+    // The link has type=recovery which forces them to set a password on the login page
+    // Using admin generateLink to create the recovery link, then sending via resetPasswordForEmail
     const { error: resetError } = await adminClient.auth.admin.generateLink({
       type: 'recovery',
       email: email.trim(),
       options: {
-        redirectTo: `${siteUrl}/login?reset=true`,
+        redirectTo: `${siteUrl}/login`,
       },
     })
 
-    // Even if the link generation fails, the user is created.
-    // We can send reset manually from the frontend as fallback.
-
-    // Now send the actual password reset email via Supabase
-    // (generateLink just creates the link but doesn't send it on service role)
-    // Use the anon client to trigger the actual email
+    // Send the actual email via the public client (generateLink doesn't send on service role)
     const publicClient = createClient(supabaseUrl, anonKey)
-    await publicClient.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${siteUrl}/login?reset=true`,
+    const { error: emailError } = await publicClient.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${siteUrl}/login`,
     })
 
     return jsonResponse({
       success: true,
       user_id: authData.user.id,
-      message: `Invite sent to ${email.trim()}. They will receive a password setup email.`,
-      reset_error: resetError?.message || null,
+      message: `Invite sent to ${email.trim()}. They will receive an email to set their password.`,
+      email_error: emailError?.message || resetError?.message || null,
     })
 
   } catch (err) {
