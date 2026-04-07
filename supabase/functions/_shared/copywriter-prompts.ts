@@ -24,7 +24,7 @@ export const QUALITY_RULES = `ABSOLUTE QUALITY RULES (violating these = failure)
 1. NO FRAGMENTS: Every headline/text must be grammatically complete and make sense on its own. "Smart Pricing Done Right" = OK. "Smart Pricing" alone = NOT OK unless it's a tagline.
 2. NO VAGUE BUZZWORDS: Avoid "solutions", "leverage", "optimize", "innovative", "cutting-edge", "game-changer", "next-level" unless they're part of a specific claim.
 3. NO GENERIC COPY: Every piece must reference something specific to THIS business, THIS avatar, or THIS offer. Ask yourself: "Could a competitor run this same ad?" If yes, rewrite.
-4. SPECIFICITY TEST: Include at least one specific detail in every component — a number, a timeframe, a specific pain point, a named outcome, or a concrete benefit.
+4. SPECIFICITY TEST: Include at least one specific detail in every component — a specific pain point, a named outcome, or a concrete benefit. Numbers, timeframes, and prices are ONLY allowed if they come directly from the business data. Never invent numbers to sound specific.
 5. EMOTIONAL TRUTH: Copy must connect to a real emotion the avatar feels — frustration, aspiration, fear, hope, pride. Name the emotion implicitly through the scenario, don't just label it.
 6. VARIETY: Within each type, vary your approach — mix questions, statements, "how to" hooks, number-driven, story-led, challenge-based. Never write 5 headlines that all start the same way.
 7. PLATFORM AWARENESS: Google headlines must work as standalone search-intent matches. Meta headlines must stop the scroll. Landing page copy must build progressive conviction.`
@@ -40,10 +40,14 @@ export const FTC_COMPLIANCE = `FTC & PLATFORM COMPLIANCE (MANDATORY):
 - NEVER fabricate testimonials, reviews, or case studies. All proof must reference real data provided.
 - NEVER invent statistics, percentages, or numerical claims unless directly from the business data.
 - NEVER make income guarantees or unrealistic promises.
-- All claims must be truthful and substantiatable from the business information provided.
+- NEVER invent pricing, dollar amounts, discounts, or fee structures (e.g. "plans start at $50", "save $200", "only $99/month") unless EXACT prices are stated in the business data or offer details. If no pricing data is provided, do NOT reference any dollar amount.
+- NEVER invent specific timelines, response times, or SLAs (e.g. "24-hour response", "done in 48 hours") unless explicitly stated in the business data. Use vague timeframes like "fast" or "quick" instead.
+- NEVER invent customer counts, years in business, project counts, or satisfaction percentages unless these exact figures appear in the business data.
+- All claims must be truthful and substantiatable from the business information provided. When in doubt, be vaguer rather than more specific — "experienced team" is better than an invented "15 years of experience".
 - Google Ads: No misleading claims, no excessive capitalization, no trademark violations.
 - Meta Ads: No personal attributes targeting ("Are you overweight?"), no sensationalized language.
-- Proof statements must reference REAL trust signals from the business data. If no data, write aspirational copy instead of fake proof.`
+- Proof statements must reference REAL trust signals from the business data. If no data, write aspirational copy instead of fake proof.
+- THE GOLDEN RULE: If a specific number, price, stat, timeframe, or claim does NOT appear in the provided business data, avatar, or offer — DO NOT USE IT. Specificity is great, but ONLY when grounded in real data. Fabricated specificity is worse than vagueness.`
 
 export const ANGLE_DEFINITIONS: Record<string, string> = {
   problem: 'Lead with a specific pain the audience is actively experiencing right now. Name their frustration.',
@@ -125,8 +129,9 @@ VALUE POINTS (value_point): Generate 5-8.
 
 PROOF ELEMENTS (proof): Generate 6-10.
 - Based ONLY on real data from the business context. Reference actual trust signals.
-- Formats: social proof ("Trusted by X+ businesses"), results ("Clients see Y% improvement in Z"), credibility ("X years serving [market]"), specifics ("Over X projects completed").
-- If limited real data, write believable-but-honest framings: "Backed by [X] years of industry experience."
+- ONLY use numbers/stats that appear in the business data. "Trusted by 500+ businesses" is ONLY acceptable if the business data says so.
+- If limited real data, write qualitative proof: "Backed by years of industry experience" or "Trusted by local businesses across [area]" — never invent specific numbers.
+- Good formats when data exists: social proof with real numbers, real credentials, real awards. When no data: qualitative trust language.
 
 URGENCY ELEMENTS (urgency): Generate 4-6.
 - Create legitimate urgency or scarcity. Avoid fake countdown timers.
