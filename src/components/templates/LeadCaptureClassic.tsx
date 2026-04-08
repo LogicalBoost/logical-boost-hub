@@ -810,8 +810,8 @@ function TrustBar({ section, media }: { section: Section; media: MediaAssets }) 
         backgroundSize: 'cover',
       } : undefined}
     >
-      {/* Branded overlay */}
-      <div className={`absolute inset-0 ${parallax ? 'bg-gradient-to-br from-[var(--color-secondary)]/90 to-[var(--color-primary)]/80' : 'bg-gradient-to-br from-[var(--color-secondary)] to-[var(--color-primary)]/90'}`} />
+      {/* Branded overlay — lighter when parallax image is present so it shows through */}
+      <div className={`absolute inset-0 ${parallax ? 'bg-gradient-to-br from-[var(--color-secondary)]/70 to-[var(--color-primary)]/60' : 'bg-gradient-to-br from-[var(--color-secondary)] to-[var(--color-primary)]/90'}`} />
 
       {/* Diagonal lines on dark bg */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">

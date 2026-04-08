@@ -332,6 +332,7 @@ export default function LandingPage() {
     hero_image: page.media_assets?.hero_image || undefined,
     parallax_image: page.media_assets?.parallax_image || undefined,
     logo: page.media_assets?.logo || undefined,
+    two_column_image: page.media_assets?.two_column_image || undefined,
     steps_image: page.media_assets?.steps_image || undefined,
     benefits_image: page.media_assets?.benefits_image || undefined,
     process_image: page.media_assets?.process_image || undefined,
