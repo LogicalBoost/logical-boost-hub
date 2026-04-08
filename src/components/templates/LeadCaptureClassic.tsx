@@ -334,6 +334,11 @@ export default function LeadCaptureClassic({ sections, media, brandKit, formConf
       {/* ─── TESTIMONIALS ─── */}
       {testimonials && <TestimonialsBlock section={testimonials} media={media} />}
 
+      {/* ─── TRUSTPILOT REVIEWS ─── */}
+      {media.trustpilot_widget?.businessUnitId && (
+        <TrustpilotBlock widget={media.trustpilot_widget} />
+      )}
+
       {/* ─── FAQ ─── */}
       {faq && <FaqBlock section={faq} />}
 
