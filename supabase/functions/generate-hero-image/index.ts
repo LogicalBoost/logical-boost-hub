@@ -291,28 +291,29 @@ async function generateImage(prompt: string, referenceImage?: { base64: string; 
   // Note: "-preview" suffix models route to free tier quotas even on paid plans
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent'
 
-  // Build parts array — text prompt + optional reference image
-  const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = []
+  // Build request parts — text prompt + optional reference image
+  // deno-lint-ignore no-explicit-any
+  const requestParts: any[] = []
 
   if (referenceImage) {
     // Add reference image first so the model "sees" it before reading the prompt
-    parts.push({
+    requestParts.push({
       inlineData: {
         mimeType: referenceImage.mimeType,
         data: referenceImage.base64,
       },
     })
     // Prepend reference instruction to the prompt
-    parts.push({
+    requestParts.push({
       text: `Use the attached image as a visual reference for style, composition, setting, and mood. Generate a NEW image inspired by it that matches the following direction:\n\n${prompt}`,
     })
   } else {
-    parts.push({ text: prompt })
+    requestParts.push({ text: prompt })
   }
 
   const body = {
     contents: [{
-      parts,
+      parts: requestParts,
     }],
     generationConfig: {
       responseModalities: ['IMAGE'],
@@ -343,15 +344,18 @@ async function generateImage(prompt: string, referenceImage?: { base64: string; 
     throw new Error(`Gemini returned no candidates. Response: ${JSON.stringify(data).substring(0, 500)}`)
   }
 
-  const parts = candidates[0].content?.parts
-  if (!parts || parts.length === 0) {
+  // deno-lint-ignore no-explicit-any
+  const responseParts: any[] = candidates[0].content?.parts
+  if (!responseParts || responseParts.length === 0) {
     throw new Error('Gemini response has no content parts')
   }
 
   // Find the image part
-  const imagePart = parts.find((p: { inlineData?: { mimeType: string; data: string } }) => p.inlineData?.mimeType?.startsWith('image/'))
+  // deno-lint-ignore no-explicit-any
+  const imagePart = responseParts.find((p: any) => p.inlineData?.mimeType?.startsWith('image/'))
   if (!imagePart) {
-    throw new Error(`No image in response. Parts: ${parts.map((p: { text?: string; inlineData?: { mimeType: string } }) => p.text ? 'text' : p.inlineData?.mimeType || 'unknown').join(', ')}`)
+    // deno-lint-ignore no-explicit-any
+    throw new Error(`No image in response. Parts: ${responseParts.map((p: any) => p.text ? 'text' : p.inlineData?.mimeType || 'unknown').join(', ')}`)
   }
 
   const base64 = imagePart.inlineData.data
