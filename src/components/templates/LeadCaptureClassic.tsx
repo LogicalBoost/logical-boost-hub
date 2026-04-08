@@ -609,23 +609,43 @@ function TwoColumnInfo({ section, media }: { section: Section; media: MediaAsset
   const left = items.slice(0, half)
   const right = items.slice(half)
   const img = media.two_column_image
+  const parallax = media.parallax_image
 
   return (
     <section className="relative py-16 md:py-20 overflow-hidden"
-      style={{
+      style={parallax ? {
+        backgroundImage: `url(${parallax})`,
+        backgroundAttachment: 'fixed',
+        backgroundPosition: 'center',
+        backgroundSize: 'cover',
+      } : {
         background: `linear-gradient(160deg, #f8faf9 0%, #eef4f1 30%, #f0f7f4 60%, #f5f9f7 100%)`,
       }}
     >
-      {/* Decorative gradient blobs */}
-      <div className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full blur-[120px] pointer-events-none"
-        style={{ background: 'var(--color-primary)', opacity: 0.06 }}
-      />
-      <div className="absolute bottom-0 left-0 w-[350px] h-[350px] rounded-full blur-[100px] pointer-events-none"
-        style={{ background: 'var(--color-primary)', opacity: 0.04 }}
-      />
+      {/* Overlay — light frosted when parallax, decorative blobs when not */}
+      {parallax ? (
+        <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px]" />
+      ) : (
+        <>
+          <div className="absolute top-0 right-0 w-[400px] h-[400px] rounded-full blur-[120px] pointer-events-none"
+            style={{ background: 'var(--color-primary)', opacity: 0.06 }}
+          />
+          <div className="absolute bottom-0 left-0 w-[350px] h-[350px] rounded-full blur-[100px] pointer-events-none"
+            style={{ background: 'var(--color-primary)', opacity: 0.04 }}
+          />
+        </>
+      )}
+
+      {parallax && (
+        <style>{`
+          @supports (-webkit-touch-callout: none) {
+            [style*="background-attachment: fixed"] { background-attachment: scroll !important; }
+          }
+        `}</style>
+      )}
 
       {/* Diagonal lines */}
-      <SectionLines color="var(--color-primary)" opacity={0.05} />
+      <SectionLines color="var(--color-primary)" opacity={parallax ? 0.03 : 0.05} />
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24">
         <div className="text-center max-w-3xl mx-auto mb-10">
