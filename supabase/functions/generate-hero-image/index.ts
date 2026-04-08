@@ -274,7 +274,7 @@ The person is engaged in their work or daily activity — not just standing and 
  *
  * Imagen requires a paid plan, but Gemini Flash image generation is free.
  */
-async function generateImage(prompt: string): Promise<Uint8Array> {
+async function generateImage(prompt: string, referenceImage?: { base64: string; mimeType: string }): Promise<Uint8Array> {
   const apiKey = GOOGLE_AI_API_KEY
   if (!apiKey) {
     throw new Error(
@@ -288,9 +288,28 @@ async function generateImage(prompt: string): Promise<Uint8Array> {
   // Note: "-preview" suffix models route to free tier quotas even on paid plans
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent'
 
+  // Build parts array — text prompt + optional reference image
+  const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = []
+
+  if (referenceImage) {
+    // Add reference image first so the model "sees" it before reading the prompt
+    parts.push({
+      inlineData: {
+        mimeType: referenceImage.mimeType,
+        data: referenceImage.base64,
+      },
+    })
+    // Prepend reference instruction to the prompt
+    parts.push({
+      text: `Use the attached image as a visual reference for style, composition, setting, and mood. Generate a NEW image inspired by it that matches the following direction:\n\n${prompt}`,
+    })
+  } else {
+    parts.push({ text: prompt })
+  }
+
   const body = {
     contents: [{
-      parts: [{ text: prompt }],
+      parts,
     }],
     generationConfig: {
       responseModalities: ['IMAGE'],
@@ -360,6 +379,7 @@ Deno.serve(async (req: Request) => {
       image_style = 'hero',    // hero | family | trust | lifestyle
       custom_prompt,             // Optional override prompt
       role = 'hero_image',       // hero_image | parallax | process_step | photo | background_texture | gallery | other
+      reference_image,           // Optional — { base64: string, mimeType: string } for image-to-image
     } = await req.json()
 
     if (!client_id || !avatar_id) {
@@ -428,11 +448,11 @@ Deno.serve(async (req: Request) => {
       businessContext
     )
 
-    console.log(`Generating ${role} image for avatar "${avatar.name}" with style "${image_style}"`)
+    console.log(`Generating ${role} image for avatar "${avatar.name}" with style "${image_style}"${reference_image ? ' (with reference image)' : ''}`)
     console.log(`Prompt: ${imagePrompt.substring(0, 200)}...`)
 
-    // Generate image via Gemini Flash
-    const imageBytes = await generateImage(imagePrompt)
+    // Generate image via Gemini Flash (with optional reference image)
+    const imageBytes = await generateImage(imagePrompt, reference_image || undefined)
 
     // Upload to Supabase Storage
     const filename = `${role}-${avatar_id}-${image_style}-${Date.now()}.png`

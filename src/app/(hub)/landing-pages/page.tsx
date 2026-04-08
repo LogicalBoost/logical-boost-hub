@@ -189,6 +189,7 @@ export default function LandingPagesPage() {
   const [imageStyle, setImageStyle] = useState<'hero' | 'family' | 'trust' | 'lifestyle'>('hero')
   const [customImagePrompt, setCustomImagePrompt] = useState('')
   const [imageError, setImageError] = useState<string | null>(null)
+  const [referenceImage, setReferenceImage] = useState<{ base64: string; mimeType: string; preview: string } | null>(null)
 
   // AI-generated sections (complete PageData.sections array)
   const [generatedSections, setGeneratedSections] = useState<unknown[] | null>(null)
@@ -432,7 +433,9 @@ export default function LandingPagesPage() {
         selectedAvatarId,
         imageStyle,
         customImagePrompt.trim() || undefined,
-        selectedOfferId || undefined
+        selectedOfferId || undefined,
+        'hero_image',
+        referenceImage ? { base64: referenceImage.base64, mimeType: referenceImage.mimeType } : undefined
       )
       if (result.image_url) {
         setHeroImageUrl(result.image_url)
@@ -449,7 +452,7 @@ export default function LandingPagesPage() {
     } finally {
       setGeneratingImage(false)
     }
-  }, [client, selectedAvatarId, imageStyle, customImagePrompt])
+  }, [client, selectedAvatarId, imageStyle, customImagePrompt, referenceImage])
 
   const handleGenerateParallaxImage = useCallback(async () => {
     if (!client || !selectedAvatarId) return
@@ -1958,6 +1961,71 @@ export default function LandingPagesPage() {
                       marginBottom: 8,
                     }}
                   />
+
+                  {/* Reference image */}
+                  {referenceImage ? (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '6px 8px', marginBottom: 8,
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid rgba(139, 92, 246, 0.3)',
+                      background: 'rgba(139, 92, 246, 0.06)',
+                    }}>
+                      <img src={referenceImage.preview} alt="" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 4 }} />
+                      <span style={{ fontSize: 11, color: '#a78bfa', flex: 1 }}>Reference image attached</span>
+                      <button
+                        onClick={() => setReferenceImage(null)}
+                        style={{
+                          background: 'none', border: 'none', color: 'var(--text-muted)',
+                          cursor: 'pointer', fontSize: 14, padding: '0 4px',
+                        }}
+                        title="Remove reference"
+                      >&#10005;</button>
+                    </div>
+                  ) : (
+                    <label
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '5px 10px', marginBottom: 8,
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px dashed var(--border)',
+                        background: 'transparent',
+                        color: 'var(--text-muted)',
+                        fontSize: 11,
+                        cursor: 'pointer',
+                        transition: 'border-color 0.15s',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#8b5cf6' }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+                    >
+                      <span style={{ fontSize: 14 }}>&#128206;</span>
+                      <span>Attach reference image (optional)</span>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        style={{ display: 'none' }}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          // Max 4MB for Gemini inline data
+                          if (file.size > 4 * 1024 * 1024) {
+                            showToast('Reference image must be under 4MB')
+                            return
+                          }
+                          const reader = new FileReader()
+                          reader.onload = () => {
+                            const dataUrl = reader.result as string
+                            // dataUrl = "data:image/png;base64,XXXXX..."
+                            const base64 = dataUrl.split(',')[1]
+                            const mimeType = file.type || 'image/png'
+                            setReferenceImage({ base64, mimeType, preview: dataUrl })
+                          }
+                          reader.readAsDataURL(file)
+                          e.target.value = '' // reset so same file can be re-selected
+                        }}
+                      />
+                    </label>
+                  )}
 
                   <button
                     style={{

@@ -127,7 +127,8 @@ export async function generateHeroImage(
   imageStyle: 'hero' | 'family' | 'trust' | 'lifestyle' = 'hero',
   customPrompt?: string,
   offerId?: string,
-  role: string = 'hero_image'
+  role: string = 'hero_image',
+  referenceImage?: { base64: string; mimeType: string }
 ) {
   return callEdgeFunction('generate-hero-image', {
     client_id: clientId,
@@ -136,6 +137,7 @@ export async function generateHeroImage(
     image_style: imageStyle,
     custom_prompt: customPrompt,
     role,
+    reference_image: referenceImage || undefined,
   })
 }
 
