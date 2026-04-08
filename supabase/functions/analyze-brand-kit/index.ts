@@ -147,100 +147,114 @@ Deno.serve(async (req: Request) => {
         const metaMatches = html.match(/<meta[\s\S]*?>/gi) || []
         const metas = metaMatches.join('\n')
 
-        // 10. Get CSS from linked stylesheets (fetch first 2)
-        let externalCssColors = ''
-        const cssLinkMatches = html.match(/<link[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']+)["']/gi) || []
-        for (const linkTag of cssLinkMatches.slice(0, 2)) {
+        // 10. Fetch external CSS stylesheets — extract colors (fonts extracted later in step 12f)
+        const cssLinkMatches = html.match(/<link[^>]*rel=["']stylesheet["'][^>]*>/gi) || []
+        const fetchedCssTexts: Map<string, string> = new Map() // cache to avoid double-fetching
+        for (const linkTag of cssLinkMatches.slice(0, 5)) {
           const hrefMatch = linkTag.match(/href=["']([^"']+)["']/)
-          if (hrefMatch) {
-            try {
-              let cssUrl = hrefMatch[1]
-              if (cssUrl.startsWith('/')) cssUrl = new URL(cssUrl, websiteUrl).href
-              else if (!cssUrl.startsWith('http')) cssUrl = new URL(cssUrl, websiteUrl).href
-              const cssRes = await fetch(cssUrl, {
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-                signal: AbortSignal.timeout(5000),
-              })
-              if (cssRes.ok) {
-                const cssText = await cssRes.text()
-                // Extract colors from CSS
-                const cssHexes = cssText.match(/#[0-9a-fA-F]{3,8}\b/g) || []
-                for (const h of cssHexes) {
-                  const clean = h.toLowerCase()
-                  if (clean.length === 7) hexColors.add(clean)
-                }
-                // Extract CSS variables
-                const cssVars = cssText.match(/--[a-zA-Z-]*(?:color|brand|primary|secondary|accent|bg|background|text|cta|button)[a-zA-Z-]*\s*:\s*[^;}\n]+/gi) || []
-                cssVarMatches.push(...cssVars)
+          if (!hrefMatch) continue
+          try {
+            let cssUrl = hrefMatch[1]
+            if (cssUrl.includes('fonts.googleapis.com') || cssUrl.includes('use.typekit.net')) continue // handled in font step
+            if (cssUrl.startsWith('//')) cssUrl = 'https:' + cssUrl
+            else if (cssUrl.startsWith('/')) cssUrl = new URL(cssUrl, websiteUrl).href
+            else if (!cssUrl.startsWith('http')) cssUrl = new URL(cssUrl, websiteUrl).href
+            if (fetchedCssTexts.has(cssUrl)) continue
+            const cssRes = await fetch(cssUrl, {
+              headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+              signal: AbortSignal.timeout(5000),
+            })
+            if (cssRes.ok) {
+              const cssText = await cssRes.text()
+              fetchedCssTexts.set(cssUrl, cssText)
+              // Extract colors from CSS
+              const cssHexes = cssText.match(/#[0-9a-fA-F]{3,8}\b/g) || []
+              for (const h of cssHexes) {
+                const clean = h.toLowerCase()
+                if (clean.length === 7) hexColors.add(clean)
               }
-            } catch { /* skip failed CSS fetch */ }
-          }
+              // Extract CSS variables
+              const cssVars = cssText.match(/--[a-zA-Z-]*(?:color|brand|primary|secondary|accent|bg|background|text|cta|button)[a-zA-Z-]*\s*:\s*[^;}\n]+/gi) || []
+              cssVarMatches.push(...cssVars)
+            }
+          } catch { /* skip failed CSS fetch */ }
         }
 
         // 11. Get inline style blocks
         const styleMatches = html.match(/<style[\s\S]*?<\/style>/gi) || []
         const styles = styleMatches.join('\n').substring(0, 2000)
 
-        // 12. Extract FONT information
-        // Google Fonts links (most reliable source)
-        const googleFontLinks = html.match(/<link[^>]*fonts\.googleapis\.com[^>]*>/gi) || []
+        // 12. Extract FONT information — comprehensive multi-source approach
+        const GENERIC_FONTS = new Set(['inherit', 'initial', 'unset', 'revert', 'sans-serif', 'serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'ui-sans-serif', 'ui-serif', 'ui-monospace', 'ui-rounded', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Helvetica Neue', 'Arial', 'Noto Sans', 'Liberation Sans', 'Helvetica', 'Times New Roman', 'Georgia', 'Courier New', 'Lucida Console'])
+        const fontFamilies = new Set<string>()
+        const fontFaceFamilies = new Set<string>()
         const googleFontFamilies: string[] = []
+
+        // Helper: extract clean font name from a font-family value
+        const extractFontName = (value: string) => {
+          const firstName = value.split(',')[0].trim().replace(/["']/g, '').trim()
+          if (firstName && !GENERIC_FONTS.has(firstName)) return firstName
+          return null
+        }
+
+        // 12a. Google Fonts links — parse URL AND fetch the CSS for @font-face names
+        const googleFontLinks = html.match(/<link[^>]*fonts\.googleapis\.com[^>]*>/gi) || []
         for (const link of googleFontLinks) {
           const hrefMatch = link.match(/href=["']([^"']+)["']/)
           if (hrefMatch) {
-            const url = hrefMatch[1]
-            // Extract family names from Google Fonts URL
+            let url = hrefMatch[1]
+            if (url.startsWith('//')) url = 'https:' + url
+            // Parse family names from URL (works for both v1 and v2 API)
             const familyMatches = url.match(/family=([^&"']+)/gi) || []
             for (const fm of familyMatches) {
               const name = decodeURIComponent(fm.replace('family=', '').split(':')[0].replace(/\+/g, ' '))
               if (name) googleFontFamilies.push(name)
             }
-          }
-        }
-
-        // font-family declarations from CSS (inline styles + style blocks + external CSS)
-        const allCssText = styles + '\n' + inlineStyles
-        const fontFamilyMatches = allCssText.match(/font-family\s*:\s*([^;}"']+)/gi) || []
-        const fontFamilies = new Set<string>()
-        for (const fm of fontFamilyMatches) {
-          const value = fm.replace(/font-family\s*:\s*/i, '').trim()
-          // Extract the first font name (primary font)
-          const firstName = value.split(',')[0].trim().replace(/["']/g, '')
-          if (firstName && !['inherit', 'initial', 'unset', 'sans-serif', 'serif', 'monospace', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI'].includes(firstName)) {
-            fontFamilies.add(firstName)
-          }
-        }
-
-        // Also check external CSS for font-family declarations
-        for (const linkTag of cssLinkMatches.slice(0, 3)) {
-          const hrefMatch = linkTag.match(/href=["']([^"']+)["']/)
-          if (hrefMatch) {
+            // Also fetch the CSS file to get actual @font-face font-family names
             try {
-              let cssUrl = hrefMatch[1]
-              if (cssUrl.startsWith('/')) cssUrl = new URL(cssUrl, websiteUrl).href
-              else if (!cssUrl.startsWith('http')) cssUrl = new URL(cssUrl, websiteUrl).href
-              if (cssUrl.includes('fonts.googleapis.com')) continue // already handled
-              const cssRes = await fetch(cssUrl, {
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+              const gfRes = await fetch(url, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
                 signal: AbortSignal.timeout(5000),
               })
-              if (cssRes.ok) {
-                const cssText = await cssRes.text()
-                const cssFontMatches = cssText.match(/font-family\s*:\s*([^;}"']+)/gi) || []
-                for (const fm of cssFontMatches) {
-                  const value = fm.replace(/font-family\s*:\s*/i, '').trim()
-                  const firstName = value.split(',')[0].trim().replace(/["']/g, '')
-                  if (firstName && !['inherit', 'initial', 'unset', 'sans-serif', 'serif', 'monospace', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI'].includes(firstName)) {
-                    fontFamilies.add(firstName)
+              if (gfRes.ok) {
+                const gfCss = await gfRes.text()
+                const faceMatches = gfCss.match(/font-family\s*:\s*['"]?([^'";}\n]+)/gi) || []
+                for (const fm of faceMatches) {
+                  const name = fm.replace(/font-family\s*:\s*/i, '').trim().replace(/["']/g, '').trim()
+                  if (name && !GENERIC_FONTS.has(name)) {
+                    fontFaceFamilies.add(name)
+                    googleFontFamilies.push(name) // also add to google fonts list
                   }
                 }
-                // Extract @font-face declarations
-                const fontFaceMatches = cssText.match(/@font-face\s*\{[^}]*font-family\s*:\s*["']?([^"';}\n]+)/gi) || []
-                for (const ff of fontFaceMatches) {
-                  const nameMatch = ff.match(/font-family\s*:\s*["']?([^"';}\n]+)/i)
-                  if (nameMatch) {
-                    const name = nameMatch[1].trim().replace(/["']/g, '')
-                    if (name) fontFamilies.add(name)
+              }
+            } catch { /* skip */ }
+          }
+        }
+        // Deduplicate Google Font names
+        const uniqueGoogleFonts = [...new Set(googleFontFamilies)]
+
+        // 12b. Adobe Fonts / Typekit
+        const typekitFonts: string[] = []
+        const typekitLinks = html.match(/<link[^>]*use\.typekit\.net[^>]*>/gi) || []
+        const typekitScripts = html.match(/<script[^>]*use\.typekit\.net[^>]*>/gi) || []
+        for (const link of [...typekitLinks, ...typekitScripts]) {
+          const hrefMatch = link.match(/(?:href|src)=["']([^"']+)["']/)
+          if (hrefMatch) {
+            try {
+              let tkUrl = hrefMatch[1]
+              if (tkUrl.startsWith('//')) tkUrl = 'https:' + tkUrl
+              const tkRes = await fetch(tkUrl, {
+                headers: { 'User-Agent': 'Mozilla/5.0' },
+                signal: AbortSignal.timeout(5000),
+              })
+              if (tkRes.ok) {
+                const tkCss = await tkRes.text()
+                const tkFontMatches = tkCss.match(/font-family\s*:\s*["']?([^"';}\n]+)/gi) || []
+                for (const fm of tkFontMatches) {
+                  const name = fm.replace(/font-family\s*:\s*/i, '').trim().replace(/["']/g, '').trim()
+                  if (name && !GENERIC_FONTS.has(name)) {
+                    typekitFonts.push(name)
+                    fontFaceFamilies.add(name)
                   }
                 }
               }
@@ -248,12 +262,89 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        // Check for CSS custom properties with font info
-        const fontVarMatches = allCssText.match(/--[a-zA-Z-]*font[a-zA-Z-]*\s*:\s*[^;}\n]+/gi) || []
+        // 12c. Font preload tags (reliable — sites explicitly declare important fonts)
+        const preloadFonts: string[] = []
+        const preloadMatches = html.match(/<link[^>]*rel=["']preload["'][^>]*as=["']font["'][^>]*>/gi) || []
+        for (const pl of preloadMatches) {
+          const hrefMatch = pl.match(/href=["']([^"']+)["']/)
+          if (hrefMatch) {
+            // Extract font name from filename: /fonts/Inter-Bold.woff2 → Inter
+            const filename = hrefMatch[1].split('/').pop() || ''
+            const fontName = filename.replace(/[-_]?(regular|bold|italic|light|medium|semibold|thin|black|extra|variable|subset|latin|woff2?|ttf|otf|eot)\b.*/gi, '').replace(/[-_.]/g, ' ').trim()
+            if (fontName && fontName.length > 1) preloadFonts.push(fontName)
+          }
+        }
 
+        // 12d. @font-face in inline <style> blocks
+        const allCssText = styles + '\n' + inlineStyles
+        const inlineFontFaces = allCssText.match(/@font-face\s*\{[^}]*\}/gi) || []
+        for (const ff of inlineFontFaces) {
+          const nameMatch = ff.match(/font-family\s*:\s*["']?([^"';}\n]+)/i)
+          if (nameMatch) {
+            const name = nameMatch[1].trim().replace(/["']/g, '').trim()
+            if (name && !GENERIC_FONTS.has(name) && !name.startsWith('__')) fontFaceFamilies.add(name)
+          }
+        }
+
+        // 12e. font-family declarations from inline styles + style blocks
+        const fontFamilyMatches = allCssText.match(/font-family\s*:\s*([^;}"]+)/gi) || []
+        for (const fm of fontFamilyMatches) {
+          const value = fm.replace(/font-family\s*:\s*/i, '').trim()
+          const name = extractFontName(value)
+          // Skip next/font generated names (start with __)
+          if (name && !name.startsWith('__')) fontFamilies.add(name)
+        }
+
+        // 12f. External CSS files — extract font-family + @font-face from cached CSS (already fetched in step 10)
+        for (const [, cssText] of fetchedCssTexts) {
+          // font-family usage
+          const cssFontMatches = cssText.match(/font-family\s*:\s*([^;}"]+)/gi) || []
+          for (const fm of cssFontMatches) {
+            const value = fm.replace(/font-family\s*:\s*/i, '').trim()
+            const name = extractFontName(value)
+            if (name && !name.startsWith('__')) fontFamilies.add(name)
+          }
+          // @font-face declarations
+          const fontFaceBlocks = cssText.match(/@font-face\s*\{[^}]*\}/gi) || []
+          for (const ff of fontFaceBlocks) {
+            const nameMatch = ff.match(/font-family\s*:\s*["']?([^"';}\n]+)/i)
+            if (nameMatch) {
+              const name = nameMatch[1].trim().replace(/["']/g, '').trim()
+              if (name && !GENERIC_FONTS.has(name) && !name.startsWith('__')) fontFaceFamilies.add(name)
+            }
+          }
+          // Also check for Google Fonts @import in CSS
+          const importMatches = cssText.match(/@import\s+url\(['"]?([^'")]+fonts\.googleapis\.com[^'")]+)['"]?\)/gi) || []
+          for (const imp of importMatches) {
+            const urlMatch = imp.match(/url\(['"]?([^'")]+)['"]?\)/)
+            if (urlMatch) {
+              const familyMatches2 = urlMatch[1].match(/family=([^&"']+)/gi) || []
+              for (const fm of familyMatches2) {
+                const name = decodeURIComponent(fm.replace('family=', '').split(':')[0].replace(/\+/g, ' '))
+                if (name) uniqueGoogleFonts.push(name)
+              }
+            }
+          }
+        }
+
+        // 12g. Next.js / Nuxt font config — look for data attributes and script config
+        const nextFontMatches = html.match(/data-font-family=["']([^"']+)["']/gi) || []
+        for (const nf of nextFontMatches) {
+          const name = nf.replace(/data-font-family=["']/i, '').replace(/["']$/, '').trim()
+          if (name && !GENERIC_FONTS.has(name)) fontFamilies.add(name)
+        }
+
+        // 12h. CSS custom properties with font info
+        const fontVarMatches = (allCssText + '\n' + (html.match(/--[a-zA-Z-]*font[a-zA-Z-]*\s*:\s*[^;}\n"']+/gi) || []).join('\n'))
+          .match(/--[a-zA-Z-]*font[a-zA-Z-]*\s*:\s*[^;}\n"']+/gi) || []
+
+        // Build comprehensive font info for Claude
         const fontInfo = `
-GOOGLE FONTS LOADED: ${googleFontFamilies.length > 0 ? googleFontFamilies.join(', ') : 'none detected'}
-FONT-FAMILY DECLARATIONS FOUND: ${[...fontFamilies].join(', ') || 'none detected'}
+GOOGLE FONTS LOADED: ${uniqueGoogleFonts.length > 0 ? [...new Set(uniqueGoogleFonts)].join(', ') : 'none detected'}
+ADOBE FONTS / TYPEKIT: ${typekitFonts.length > 0 ? [...new Set(typekitFonts)].join(', ') : 'none detected'}
+@FONT-FACE FAMILIES (custom web fonts): ${fontFaceFamilies.size > 0 ? [...fontFaceFamilies].join(', ') : 'none detected'}
+FONT-FAMILY DECLARATIONS (CSS usage): ${fontFamilies.size > 0 ? [...fontFamilies].join(', ') : 'none detected'}
+PRELOADED FONT FILES: ${preloadFonts.length > 0 ? preloadFonts.join(', ') : 'none detected'}
 CSS FONT VARIABLES: ${fontVarMatches.slice(0, 10).join('\n') || 'none'}
 `
 
