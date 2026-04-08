@@ -203,11 +203,13 @@ export default function LandingPagesPage() {
   const [parallaxError, setParallaxError] = useState<string | null>(null)
   const [customParallaxPrompt, setCustomParallaxPrompt] = useState('')
 
-  // Section images (steps + benefits)
+  // Section images (two_column + steps + benefits)
+  const [twoColumnImageUrl, setTwoColumnImageUrl] = useState<string | null>(null)
   const [stepsImageUrl, setStepsImageUrl] = useState<string | null>(null)
   const [benefitsImageUrl, setBenefitsImageUrl] = useState<string | null>(null)
   const [uploadingSectionImage, setUploadingSectionImage] = useState<string | null>(null)
   const [generatingSectionImage, setGeneratingSectionImage] = useState<string | null>(null)
+  const [customTwoColumnPrompt, setCustomTwoColumnPrompt] = useState('')
   const [customStepsPrompt, setCustomStepsPrompt] = useState('')
   const [customBenefitsPrompt, setCustomBenefitsPrompt] = useState('')
 
@@ -397,6 +399,7 @@ export default function LandingPagesPage() {
     const media = ct.media_defaults as Record<string, string> | null
     if (media?.hero_image) setHeroImageUrl(media.hero_image)
     if (media?.parallax_image) setParallaxImageUrl(media.parallax_image)
+    if (media?.two_column_image) setTwoColumnImageUrl(media.two_column_image)
     if (media?.steps_image) setStepsImageUrl(media.steps_image)
     if (media?.benefits_image) setBenefitsImageUrl(media.benefits_image)
 
@@ -484,12 +487,12 @@ export default function LandingPagesPage() {
     }
   }, [client, selectedAvatarId, selectedOfferId, customParallaxPrompt])
 
-  // Generate section images (steps / benefits) with AI
-  const handleGenerateSectionImage = useCallback(async (sectionType: 'steps' | 'benefits', customPrompt?: string) => {
+  // Generate section images (two_column / steps / benefits) with AI
+  const handleGenerateSectionImage = useCallback(async (sectionType: 'two_column' | 'steps' | 'benefits', customPrompt?: string) => {
     if (!client || !selectedAvatarId) return
     setGeneratingSectionImage(sectionType)
     try {
-      const roleMap = { steps: 'process_step', benefits: 'gallery' } as const
+      const roleMap = { two_column: 'photo', steps: 'process_step', benefits: 'gallery' } as const
       const result = await generateHeroImage(
         client.id,
         selectedAvatarId,
@@ -499,14 +502,18 @@ export default function LandingPagesPage() {
         roleMap[sectionType]
       )
       if (result.image_url) {
-        if (sectionType === 'steps') {
+        if (sectionType === 'two_column') {
+          setTwoColumnImageUrl(result.image_url)
+          setCopySlots(prev => ({ ...prev, two_column_image: result.image_url }))
+        } else if (sectionType === 'steps') {
           setStepsImageUrl(result.image_url)
           setCopySlots(prev => ({ ...prev, steps_image: result.image_url }))
         } else {
           setBenefitsImageUrl(result.image_url)
           setCopySlots(prev => ({ ...prev, benefits_image: result.image_url }))
         }
-        showToast(`${sectionType === 'steps' ? 'Steps' : 'Benefits'} image generated`)
+        const labels = { two_column: 'Services', steps: 'Steps', benefits: 'Benefits' }
+        showToast(`${labels[sectionType]} image generated`)
         if (client) refreshMediaAssets(client.id)
       } else {
         showToast('No image returned. Try again.')
@@ -518,19 +525,19 @@ export default function LandingPagesPage() {
     }
   }, [client, selectedAvatarId, selectedOfferId, refreshMediaAssets])
 
-  // Upload an image file to Supabase storage (for hero or parallax)
+  // Upload an image file to Supabase storage (for hero, parallax, or section images)
   const handleImageUpload = useCallback(async (
     file: File,
-    type: 'hero' | 'parallax' | 'steps' | 'benefits'
+    type: 'hero' | 'parallax' | 'two_column' | 'steps' | 'benefits'
   ) => {
     if (!client) return
-    const setterMap = { hero: setHeroImageUrl, parallax: setParallaxImageUrl, steps: setStepsImageUrl, benefits: setBenefitsImageUrl }
+    const setterMap = { hero: setHeroImageUrl, parallax: setParallaxImageUrl, two_column: setTwoColumnImageUrl, steps: setStepsImageUrl, benefits: setBenefitsImageUrl }
     const setter = setterMap[type]
-    const loadingSetterMap = { hero: setGeneratingImage, parallax: setUploadingParallax, steps: (v: boolean) => setUploadingSectionImage(v ? 'steps' : null), benefits: (v: boolean) => setUploadingSectionImage(v ? 'benefits' : null) }
+    const loadingSetterMap = { hero: setGeneratingImage, parallax: setUploadingParallax, two_column: (v: boolean) => setUploadingSectionImage(v ? 'two_column' : null), steps: (v: boolean) => setUploadingSectionImage(v ? 'steps' : null), benefits: (v: boolean) => setUploadingSectionImage(v ? 'benefits' : null) }
     const loadingSetter = loadingSetterMap[type]
-    const roleMap = { hero: 'hero_image', parallax: 'parallax', steps: 'process_step', benefits: 'gallery' } as const
-    const slotMap = { hero: 'hero_image', parallax: 'parallax_image', steps: 'steps_image', benefits: 'benefits_image' }
-    const labelMap = { hero: 'Hero', parallax: 'Parallax', steps: 'Steps', benefits: 'Benefits' }
+    const roleMap = { hero: 'hero_image', parallax: 'parallax', two_column: 'photo', steps: 'process_step', benefits: 'gallery' } as const
+    const slotMap = { hero: 'hero_image', parallax: 'parallax_image', two_column: 'two_column_image', steps: 'steps_image', benefits: 'benefits_image' }
+    const labelMap = { hero: 'Hero', parallax: 'Parallax', two_column: 'Services', steps: 'Steps', benefits: 'Benefits' }
 
     loadingSetter(true)
     try {
@@ -2350,7 +2357,7 @@ export default function LandingPagesPage() {
 
             </div>
 
-            {/* ── Section Images (Steps + Benefits) ── */}
+            {/* ── Section Images (Services + Steps + Benefits) ── */}
             <div style={{
               background: 'var(--bg-card)',
               border: '1px solid var(--border)',
@@ -2360,8 +2367,62 @@ export default function LandingPagesPage() {
             }}>
               <h4 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Section Images <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></h4>
               <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-                Add images for the Steps and Benefits sections. If left empty, sections will use a clean full-width layout.
+                Add images for each section. These make the page more visual and professional.
               </p>
+
+              {/* Services / Two-Column Image — full width wide banner */}
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
+                  Services Section Image <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(wide banner)</span>
+                </label>
+                {/* Saved images gallery */}
+                {mediaAssets.filter(a => a.role === 'photo').length > 0 && (
+                  <div style={{ marginBottom: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {mediaAssets.filter(a => a.role === 'photo').map(asset => (
+                      <div
+                        key={asset.id}
+                        onClick={() => { setTwoColumnImageUrl(asset.file_url); setCopySlots(prev => ({ ...prev, two_column_image: asset.file_url })); showToast('Services image selected') }}
+                        style={{
+                          width: 80, height: 48, borderRadius: 6, overflow: 'hidden', cursor: 'pointer',
+                          border: twoColumnImageUrl === asset.file_url ? '2px solid #3b82f6' : '1px solid var(--border)',
+                        }}
+                      >
+                        <img src={asset.file_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {twoColumnImageUrl && (
+                  <div style={{ marginBottom: 8, position: 'relative', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                    <img src={twoColumnImageUrl} alt="" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', display: 'block' }} />
+                    <button onClick={() => { setTwoColumnImageUrl(null); setCopySlots(prev => { const n = { ...prev }; delete n.two_column_image; return n }) }}
+                      style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >&#10005;</button>
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      type="text"
+                      value={customTwoColumnPrompt}
+                      onChange={e => setCustomTwoColumnPrompt(e.target.value)}
+                      placeholder="Optional: describe the image..."
+                      style={{ width: '100%', padding: '6px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 11 }}
+                    />
+                  </div>
+                  <button
+                    style={{ padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: 'none', background: generatingSectionImage === 'two_column' ? 'var(--bg-input)' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' as const }}
+                    disabled={generatingSectionImage === 'two_column' || !selectedAvatarId}
+                    onClick={() => handleGenerateSectionImage('two_column', customTwoColumnPrompt)}
+                  >
+                    {generatingSectionImage === 'two_column' ? 'Generating...' : 'AI Generate'}
+                  </button>
+                  <label style={{ padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' as const, display: 'flex', alignItems: 'center' }}>
+                    Upload
+                    <input type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, 'two_column'); e.target.value = '' }} />
+                  </label>
+                </div>
+              </div>
 
               <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 {/* Steps Image */}
@@ -2656,6 +2717,7 @@ export default function LandingPagesPage() {
           sections={generatedSections}
           heroImageUrl={heroImageUrl || ''}
           parallaxImageUrl={parallaxImageUrl || ''}
+          twoColumnImageUrl={twoColumnImageUrl || ''}
           stepsImageUrl={stepsImageUrl || ''}
           benefitsImageUrl={benefitsImageUrl || ''}
           logoUrl={client?.logo_url || ''}
@@ -2776,6 +2838,7 @@ function BuildStep({
   sections,
   heroImageUrl,
   parallaxImageUrl,
+  twoColumnImageUrl,
   stepsImageUrl,
   benefitsImageUrl,
   logoUrl,
@@ -2802,6 +2865,7 @@ function BuildStep({
   sections?: unknown[] | null
   heroImageUrl: string
   parallaxImageUrl: string
+  twoColumnImageUrl: string
   stepsImageUrl: string
   benefitsImageUrl: string
   logoUrl: string
@@ -2872,6 +2936,7 @@ function BuildStep({
         media_assets: {
           hero_image: heroImageUrl || undefined,
           parallax_image: parallaxImageUrl || undefined,
+          two_column_image: twoColumnImageUrl || undefined,
           steps_image: stepsImageUrl || undefined,
           benefits_image: benefitsImageUrl || undefined,
           logo: logoUrl || undefined,

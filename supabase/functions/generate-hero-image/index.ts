@@ -75,21 +75,24 @@ function buildScenePrompt(
   businessContext?: string
 ): string {
   const context = businessContext || deriveContext(avatarDescription, offerDescription)
-  return `Professional photograph of a scene or setting related to this business context: ${context}
+  return `Professional wide-format photograph of a scene or setting related to this business context: ${context}
 
 Generate a contextual image that shows the world this business operates in — a setting, workspace, tool, or environment that the target audience would recognize and relate to.
 
-- NOT a portrait of a single person (show environments, tools, workspaces, or activities)
-- People can appear as part of the scene but should not be the isolated subject
-- Clean, well-lit commercial photography style
+- Wide landscape format (16:9 aspect ratio) — this will be used as a prominent banner image on a landing page
+- People can appear as part of the scene — show them working, serving customers, or in their professional environment
+- Clean, well-lit commercial photography style with rich detail
+- The image should feel premium and professional — think corporate website hero or portfolio shot
+- Show the actual work, service, or product in context — not just an empty space
 - Relevant to the business and audience described above
 - NO text, logos, or watermarks
 
 STRICT RULES:
+- Wide landscape format — wider than tall (16:9 or similar)
 - High resolution, professional commercial photography
-- Clean composition with good lighting
+- Clean composition with good lighting and strong visual interest
 - Authentic and relatable — not overly staged or stock-photo generic
-- Sharp focus, natural colors`
+- Sharp focus, natural colors, cinematic quality`
 }
 
 /**

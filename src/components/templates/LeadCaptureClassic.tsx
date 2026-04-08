@@ -320,7 +320,7 @@ export default function LeadCaptureClassic({ sections, media, brandKit, formConf
       {features && <FeatureCardsBar section={features} primaryColor={resolvedPrimary} accentColor={resolvedAccent} trustpilotWidget={media.trustpilot_widget} />}
 
       {/* ─── TWO COLUMN INFO ─── */}
-      {info && <TwoColumnInfo section={info} />}
+      {info && <TwoColumnInfo section={info} media={media} />}
 
       {/* ─── STEPS ─── */}
       {steps && <StepsBlock section={steps} media={media} primaryColor={resolvedPrimary} accentColor={resolvedAccent} />}
@@ -603,11 +603,12 @@ function FeatureCardsBar({ section, primaryColor, accentColor, trustpilotWidget 
 /* ═══════════════════════════════════════════════════════
    TWO COLUMN INFO — Gradient bg, frosted glass boxes
    ═══════════════════════════════════════════════════════ */
-function TwoColumnInfo({ section }: { section: Section }) {
+function TwoColumnInfo({ section, media }: { section: Section; media: MediaAssets }) {
   const items = section.items || []
   const half = Math.ceil(items.length / 2)
   const left = items.slice(0, half)
   const right = items.slice(half)
+  const img = media.two_column_image
 
   return (
     <section className="relative py-16 md:py-20 overflow-hidden"
@@ -638,6 +639,13 @@ function TwoColumnInfo({ section }: { section: Section }) {
             <p className="text-base text-gray-500 leading-relaxed">{section.subheadline}</p>
           )}
         </div>
+
+        {/* Full-width image banner above info boxes when available */}
+        {img && (
+          <div className="mb-10 rounded-2xl overflow-hidden shadow-2xl">
+            <img src={img} alt="" className="w-full object-cover" style={{ maxHeight: 420 }} />
+          </div>
+        )}
 
         <div className="grid md:grid-cols-2 gap-5 md:gap-6 mb-10">
           <FrostedInfoBox items={left} title={left[0]?.title} />
@@ -723,22 +731,22 @@ function StepsBlock({ section, media, primaryColor, accentColor }: { section: Se
           )}
         </div>
 
-        <div className={`flex flex-col lg:flex-row items-center gap-10 lg:gap-14${!img ? ' lg:justify-center' : ''}`}>
-          {/* Left: image with blob */}
+        <div className={`flex flex-col lg:flex-row items-center gap-10 lg:gap-12${!img ? ' lg:justify-center' : ''}`}>
+          {/* Left: prominent image */}
           {img && (
-            <div className="lg:w-4/12 flex justify-center">
-              <div className="relative w-[280px]">
+            <div className="w-full lg:w-5/12 flex justify-center">
+              <div className="relative w-full max-w-[480px]">
                 <div
-                  className="absolute inset-[-8%]"
-                  style={{ borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%', background: `${primaryColor}12` }}
+                  className="absolute inset-[-5%]"
+                  style={{ borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%', background: `${primaryColor}10` }}
                 />
-                <img src={img} alt="" className="relative z-10 rounded-3xl shadow-xl w-full" />
+                <img src={img} alt="" className="relative z-10 rounded-2xl shadow-2xl w-full object-cover" style={{ aspectRatio: '4/3' }} />
               </div>
             </div>
           )}
 
           {/* Step cards with numbered badges */}
-          <div className={img ? 'lg:w-8/12 space-y-4' : 'lg:w-10/12 space-y-4'}>
+          <div className={img ? 'w-full lg:w-7/12 space-y-4' : 'lg:w-10/12 space-y-4'}>
             {items.map((item, i) => (
               <div
                 key={i}
@@ -891,9 +899,9 @@ function BenefitsGrid({ section, media, primaryColor, accentColor }: { section: 
         </div>
 
         <div className="flex flex-col lg:flex-row gap-10 lg:gap-12 items-center">
-          {/* Left: 2x2 frosted card grid */}
-          <div className={img ? 'lg:w-8/12' : 'w-full'}>
-            <div className="grid sm:grid-cols-2 gap-4">
+          {/* Left: 2-column (or 3-column) frosted card grid */}
+          <div className={img ? 'w-full lg:w-7/12' : 'w-full'}>
+            <div className={`grid ${img ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3'} gap-4`}>
               {items.map((item, i) => (
                 <div
                   key={i}
@@ -930,15 +938,15 @@ function BenefitsGrid({ section, media, primaryColor, accentColor }: { section: 
             )}
           </div>
 
-          {/* Right: image + CTA */}
+          {/* Right: prominent image + CTA */}
           {img && (
-            <div className="lg:w-4/12 flex flex-col items-center gap-6">
-              <div className="relative w-full max-w-[280px]">
+            <div className="w-full lg:w-5/12 flex flex-col items-center gap-6">
+              <div className="relative w-full max-w-[480px]">
                 <div
-                  className="absolute inset-[-6%]"
+                  className="absolute inset-[-5%]"
                   style={{ borderRadius: '30% 70% 70% 30% / 30% 30% 70% 70%', background: 'var(--color-primary)', opacity: 0.08 }}
                 />
-                <img src={img} alt="" className="relative z-10 rounded-2xl shadow-lg w-full" />
+                <img src={img} alt="" className="relative z-10 rounded-2xl shadow-2xl w-full object-cover" style={{ aspectRatio: '4/3' }} />
               </div>
               {section.cta && (
                 <a

@@ -80,6 +80,7 @@ export interface MediaAssets {
   process_image?: string
   before_after?: string[]
   gallery?: string[]
+  two_column_image?: string
   steps_image?: string
   benefits_image?: string
   trustpilot_widget?: TrustpilotWidget
