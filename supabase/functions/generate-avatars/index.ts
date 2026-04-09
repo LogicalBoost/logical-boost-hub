@@ -107,35 +107,55 @@ Respond ONLY with valid JSON: { "avatars": [{ "name": "...", "avatar_type": "...
 
 No markdown, no explanation outside the JSON.`
 
-    const generalPrompt = `You are a senior audience strategist at a performance marketing agency. You build broad, market-level audience segments that capture the largest addressable groups for a business.
+    const generalPrompt = `You are a marketing strategist building BROAD audience segments for ad targeting. Your job is to identify the major customer categories for a business, NOT create detailed individual personas.
 
-You are generating ${generateCount} NEW audience segments for a client. These segments represent BROAD customer categories, not hyper-specific individuals. Think market segments, not individual personas.
+CRITICAL RULE: You are in GENERAL mode. Every avatar name must be a simple, short, plain-English label that describes a GROUP of people. Think Facebook ad audience targeting, not character profiles.
 
-WHAT MAKES A GREAT GENERAL AUDIENCE:
-- BROAD but meaningful. "Homeowners" is good. "First-time homeowner who just discovered mold in the basement and has two kids under 5" is too specific.
-- Names should be simple, clear audience labels: "Small Business Owners", "Young Families", "Commercial Property Managers", "Budget-Conscious Shoppers"
-- Avatar types should be broad categories: "Residential", "Commercial", "B2B", "Consumer", "Professional", etc.
-- Pain points should capture what THIS WHOLE GROUP generally struggles with, not one person's specific crisis
-- Motivations should reflect group-level desires (convenience, savings, quality, peace of mind)
-- Objections should be common concerns shared across the group
-- Trigger events should be general life events or seasonal patterns that drive demand for this group
-- Messaging style should describe general communication approach for this audience tier
-- Think about your major MARKET SEGMENTS, not individual buyer stories
+GOOD NAMES (this is what you must produce):
+- "Families Moving Out of State"
+- "Corporate Relocations"
+- "Downsizing Retirees"
+- "College Students"
+- "First-Time Homebuyers"
+- "Military Families"
+- "Small Business Owners"
+- "Budget-Conscious Movers"
+- "Luxury Home Sellers"
+- "Apartment Renters"
 
-AUDIENCE DIVERSITY:
-- Each segment should represent a distinctly DIFFERENT market
-- Vary by: B2B vs B2C, residential vs commercial, income tier, service urgency, relationship type (one-time vs recurring)
-- Cover the full addressable market: core customers, adjacent segments, underserved niches, growth opportunities
-- Keep descriptions broad enough that each segment could represent thousands of potential customers
+BAD NAMES (NEVER do this — these are too specific):
+- "Grand Rapids Medical Professional Joining Practice" — TOO SPECIFIC
+- "Houston Energy Executive Fleeing Hurricane Zone" — TOO SPECIFIC
+- "West Virginia Coal Industry Refugee" — TOO SPECIFIC
+- "Recently Divorced Mother of Three Downsizing" — TOO SPECIFIC
+- "Tech Startup CTO Relocating for Series B Funding" — TOO SPECIFIC
+
+The name should NEVER mention a specific city, job title, life crisis, or scenario. It should be a category that represents THOUSANDS of potential customers.
+
+You are generating ${generateCount} broad audience segments for this client.
+
+RULES FOR GENERAL AUDIENCES:
+1. Names: 2-4 words max. Simple group labels. No cities, no job titles, no backstories.
+2. Avatar type: Use broad categories only: "Residential", "Commercial", "Seniors", "Students", "Families", "Military", "Corporate", etc.
+3. Description: 1-2 sentences about WHO this group is at a high level. No individual stories.
+4. Pain points: What does this ENTIRE GROUP worry about? General concerns, not one person's crisis.
+5. Motivations: Group-level desires. "Want a smooth, stress-free move" not "terrified their kids will hate the new school."
+6. Objections: Common concerns the whole group shares. "Worried about cost" not "skeptical because their uncle got scammed."
+7. Trigger events: General life events that cause this group to need the service. "Job relocation", "retirement", "lease ending" — not "got fired Tuesday and spouse is threatening divorce."
+8. Messaging style: How to talk to this group broadly.
+
+SEGMENT DIVERSITY:
+- Cover the full addressable market
+- Mix of: residential/commercial, budget/premium, urgent/planned, local/long-distance
+- Think: Who are the 5-10 major customer types for this business?
 
 ${ANGLE_DEFINITIONS}
 
 FORMATTING RULES:
-- NEVER use em dashes (—) in any generated text. Use commas, periods, colons, or separate sentences instead.
-- pain_points, motivations, objections, desired_outcome, trigger_events should each be 2-3 sentences covering the group broadly.
-- messaging_style should be 1-2 sentences describing how to communicate with this group.
-- preferred_platforms should be an array of 2-4 platforms where this group is most reachable (Facebook, Google, Instagram, YouTube, TikTok, LinkedIn, Nextdoor, Yelp, etc.)
-- recommended_angles should be an array of 3-5 angle slugs from the framework above.
+- NEVER use em dashes in any text. Use commas, periods, colons, or separate sentences.
+- Keep all text fields concise and group-focused, not individual-focused.
+- preferred_platforms: array of 2-4 platforms
+- recommended_angles: array of 3-5 angle slugs
 
 RESPONSE FORMAT:
 Respond ONLY with valid JSON: { "avatars": [{ "name": "...", "avatar_type": "...", "description": "...", "pain_points": "...", "motivations": "...", "objections": "...", "desired_outcome": "...", "trigger_events": "...", "messaging_style": "...", "preferred_platforms": ["..."], "recommended_angles": ["..."] }] }
