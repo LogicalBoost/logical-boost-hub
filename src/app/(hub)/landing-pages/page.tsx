@@ -213,6 +213,11 @@ export default function LandingPagesPage() {
   const [customStepsPrompt, setCustomStepsPrompt] = useState('')
   const [customBenefitsPrompt, setCustomBenefitsPrompt] = useState('')
 
+  // Gallery state
+  const [includeGallery, setIncludeGallery] = useState(false)
+  const [galleryImages, setGalleryImages] = useState<string[]>([])
+  const [uploadingGalleryImage, setUploadingGalleryImage] = useState(false)
+
   // Lightbox state for full image preview
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
@@ -563,16 +568,19 @@ export default function LandingPagesPage() {
       setter(urlData.publicUrl)
       setCopySlots(prev => ({ ...prev, [slotMap[type]]: urlData.publicUrl }))
 
-      // Save to media_assets table
+      // Save to media_assets table — tag with avatar_id if one is selected
       await supabase.from('media_assets').insert({
         client_id: client.id,
+        avatar_id: selectedAvatarId || null,
         role: roleMap[type],
         file_url: urlData.publicUrl,
         file_type: 'image',
         storage_path: storagePath,
         filename: file.name,
-        display_name: file.name,
-        metadata: { source: 'uploaded', section: type },
+        display_name: selectedAvatarId
+          ? `${avatars.find(a => a.id === selectedAvatarId)?.name || 'Avatar'} - ${labelMap[type]}`
+          : file.name,
+        metadata: { source: 'uploaded', section: type, avatar_id: selectedAvatarId || null },
       })
       refreshMediaAssets(client.id)
 
@@ -582,7 +590,55 @@ export default function LandingPagesPage() {
     } finally {
       loadingSetter(false)
     }
-  }, [client])
+  }, [client, selectedAvatarId, avatars])
+
+  // Gallery image upload (supports multiple files)
+  const handleGalleryUpload = useCallback(async (files: FileList | File[]) => {
+    if (!client) return
+    setUploadingGalleryImage(true)
+    const newUrls: string[] = []
+    try {
+      for (const file of Array.from(files)) {
+        if (!file.type.startsWith('image/')) continue
+        const ext = file.name.split('.').pop() || 'png'
+        const filename = `gallery-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`
+        const storagePath = `${client.id}/${filename}`
+
+        const { error: uploadError } = await supabase
+          .storage
+          .from('client-assets')
+          .upload(storagePath, file, { contentType: file.type, upsert: true })
+        if (uploadError) { showToast(`Upload error: ${uploadError.message}`); continue }
+
+        const { data: urlData } = supabase.storage.from('client-assets').getPublicUrl(storagePath)
+        newUrls.push(urlData.publicUrl)
+
+        // Save to media_assets with avatar tag and gallery role
+        await supabase.from('media_assets').insert({
+          client_id: client.id,
+          avatar_id: selectedAvatarId || null,
+          role: 'gallery',
+          file_url: urlData.publicUrl,
+          file_type: 'image',
+          storage_path: storagePath,
+          filename: file.name,
+          display_name: selectedAvatarId
+            ? `${avatars.find(a => a.id === selectedAvatarId)?.name || 'Avatar'} - Gallery`
+            : file.name,
+          metadata: { source: 'uploaded', section: 'gallery', avatar_id: selectedAvatarId || null },
+        })
+      }
+      if (newUrls.length > 0) {
+        setGalleryImages(prev => [...prev, ...newUrls])
+        refreshMediaAssets(client.id)
+        showToast(`${newUrls.length} gallery image${newUrls.length > 1 ? 's' : ''} uploaded`)
+      }
+    } catch (err) {
+      showToast(`Upload error: ${(err as Error).message}`)
+    } finally {
+      setUploadingGalleryImage(false)
+    }
+  }, [client, selectedAvatarId, avatars])
 
   // Handle drag & drop / file input for images
   const handleImageDrop = useCallback((
@@ -606,6 +662,21 @@ export default function LandingPagesPage() {
     const file = e.target.files?.[0]
     if (file) handleImageUpload(file, type)
   }, [handleImageUpload])
+
+  // Gallery drag & drop (multiple files)
+  const handleGalleryDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      handleGalleryUpload(files)
+    }
+  }, [handleGalleryUpload])
+
+  const handleGalleryFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (files && files.length > 0) handleGalleryUpload(files)
+  }, [handleGalleryUpload])
 
   // ─── AI Auto-Fill: Generate complete landing page copy ───
   const handleGenerateLandingPageCopy = useCallback(async () => {
@@ -2702,6 +2773,203 @@ export default function LandingPagesPage() {
             </div>
 
           </div>
+
+          {/* ─── Gallery Section ─── */}
+          <div style={{ ...card({ padding: 20 }), marginTop: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: includeGallery ? 16 : 0 }}>
+              <div>
+                <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Work Gallery</h3>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+                  Showcase completed projects, before/after photos, or portfolio work
+                </p>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flexShrink: 0 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>Include</span>
+                <div
+                  onClick={() => setIncludeGallery(!includeGallery)}
+                  style={{
+                    width: 40, height: 22, borderRadius: 11,
+                    background: includeGallery ? 'var(--accent)' : 'var(--bg-input)',
+                    border: `1px solid ${includeGallery ? 'var(--accent)' : 'var(--border)'}`,
+                    position: 'relative', cursor: 'pointer', transition: 'all 0.2s',
+                  }}
+                >
+                  <div style={{
+                    width: 16, height: 16, borderRadius: '50%',
+                    background: '#fff', position: 'absolute', top: 2,
+                    left: includeGallery ? 20 : 2, transition: 'left 0.2s',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  }} />
+                </div>
+              </label>
+            </div>
+
+            {includeGallery && (
+              <div>
+                {/* Saved gallery images for this avatar */}
+                {(() => {
+                  const avatarGalleryAssets = mediaAssets.filter(a =>
+                    a.role === 'gallery' &&
+                    (selectedAvatarId ? a.avatar_id === selectedAvatarId : true)
+                  )
+                  const otherGalleryAssets = selectedAvatarId
+                    ? mediaAssets.filter(a => a.role === 'gallery' && a.avatar_id !== selectedAvatarId)
+                    : []
+
+                  return (avatarGalleryAssets.length > 0 || otherGalleryAssets.length > 0) ? (
+                    <div style={{ marginBottom: 16 }}>
+                      {avatarGalleryAssets.length > 0 && (
+                        <>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                            {selectedAvatarId ? `Gallery images for ${avatars.find(a => a.id === selectedAvatarId)?.name || 'this avatar'}` : 'All gallery images'}
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: otherGalleryAssets.length > 0 ? 12 : 0 }}>
+                            {avatarGalleryAssets.map(asset => {
+                              const isSelected = galleryImages.includes(asset.file_url)
+                              return (
+                                <div
+                                  key={asset.id}
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setGalleryImages(prev => prev.filter(u => u !== asset.file_url))
+                                    } else {
+                                      setGalleryImages(prev => [...prev, asset.file_url])
+                                    }
+                                  }}
+                                  style={{
+                                    width: 72, height: 72, borderRadius: 8, overflow: 'hidden', cursor: 'pointer',
+                                    border: isSelected ? '2px solid var(--accent)' : '2px solid transparent',
+                                    opacity: isSelected ? 1 : 0.7,
+                                    transition: 'all 0.15s',
+                                    position: 'relative',
+                                  }}
+                                >
+                                  <img src={asset.file_url} alt={asset.display_name || ''} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  {isSelected && (
+                                    <div style={{
+                                      position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%',
+                                      background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      fontSize: 10, color: '#fff', fontWeight: 700,
+                                    }}>✓</div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </>
+                      )}
+                      {otherGalleryAssets.length > 0 && (
+                        <>
+                          <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)', marginBottom: 6 }}>
+                            Other gallery images
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                            {otherGalleryAssets.map(asset => {
+                              const isSelected = galleryImages.includes(asset.file_url)
+                              return (
+                                <div
+                                  key={asset.id}
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setGalleryImages(prev => prev.filter(u => u !== asset.file_url))
+                                    } else {
+                                      setGalleryImages(prev => [...prev, asset.file_url])
+                                    }
+                                  }}
+                                  style={{
+                                    width: 60, height: 60, borderRadius: 8, overflow: 'hidden', cursor: 'pointer',
+                                    border: isSelected ? '2px solid var(--accent)' : '2px solid transparent',
+                                    opacity: isSelected ? 1 : 0.5,
+                                    transition: 'all 0.15s',
+                                    position: 'relative',
+                                  }}
+                                >
+                                  <img src={asset.file_url} alt={asset.display_name || ''} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  {isSelected && (
+                                    <div style={{
+                                      position: 'absolute', top: 2, right: 2, width: 16, height: 16, borderRadius: '50%',
+                                      background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      fontSize: 9, color: '#fff', fontWeight: 700,
+                                    }}>✓</div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : null
+                })()}
+
+                {/* Selected gallery images preview */}
+                {galleryImages.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', marginBottom: 8 }}>
+                      {galleryImages.length} image{galleryImages.length > 1 ? 's' : ''} selected for gallery
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {galleryImages.map((url, i) => (
+                        <div key={i} style={{ position: 'relative', width: 56, height: 56, borderRadius: 6, overflow: 'hidden' }}>
+                          <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <button
+                            onClick={() => setGalleryImages(prev => prev.filter((_, idx) => idx !== i))}
+                            style={{
+                              position: 'absolute', top: 1, right: 1, width: 16, height: 16, borderRadius: '50%',
+                              background: 'rgba(239,68,68,0.9)', border: 'none', color: '#fff', fontSize: 9,
+                              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              lineHeight: 1,
+                            }}
+                          >&times;</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Drag & drop zone for gallery images */}
+                <div
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+                  onDrop={handleGalleryDrop}
+                  style={{
+                    border: '2px dashed var(--border)',
+                    borderRadius: 12,
+                    padding: '24px 16px',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    background: 'var(--bg-input)',
+                  }}
+                  onClick={() => {
+                    const input = document.createElement('input')
+                    input.type = 'file'
+                    input.accept = 'image/*'
+                    input.multiple = true
+                    input.onchange = (e) => handleGalleryFileSelect(e as unknown as React.ChangeEvent<HTMLInputElement>)
+                    input.click()
+                  }}
+                >
+                  {uploadingGalleryImage ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                      <span style={{ width: 16, height: 16, border: '2px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 1s linear infinite', display: 'inline-block' }} />
+                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Uploading...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 28, marginBottom: 4 }}>+</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        Drop images here or click to upload
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                        PNG, JPG, WebP &middot; Multiple files supported
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
       )}
 
@@ -2720,6 +2988,7 @@ export default function LandingPagesPage() {
           twoColumnImageUrl={twoColumnImageUrl || ''}
           stepsImageUrl={stepsImageUrl || ''}
           benefitsImageUrl={benefitsImageUrl || ''}
+          galleryImages={includeGallery ? galleryImages : []}
           logoUrl={client?.logo_url || ''}
           selectedAvatar={selectedAvatarId || ''}
           selectedOffer={selectedOfferId || ''}
@@ -2842,6 +3111,7 @@ function BuildStep({
   twoColumnImageUrl,
   stepsImageUrl,
   benefitsImageUrl,
+  galleryImages,
   logoUrl,
   selectedAvatar,
   selectedOffer,
@@ -2870,6 +3140,7 @@ function BuildStep({
   twoColumnImageUrl: string
   stepsImageUrl: string
   benefitsImageUrl: string
+  galleryImages: string[]
   logoUrl: string
   selectedAvatar: string
   selectedOffer: string
@@ -2962,6 +3233,7 @@ function BuildStep({
           steps_image: stepsImageUrl || undefined,
           benefits_image: benefitsImageUrl || undefined,
           logo: logoUrl || undefined,
+          ...(galleryImages.length > 0 ? { gallery: galleryImages } : {}),
           ...(trustpilotWidget ? { trustpilot_widget: trustpilotWidget } : {}),
           ...(reviewSites && reviewSites.length > 0 ? { review_sites: reviewSites } : {}),
           ...(platformReviews.length > 0 ? { platform_reviews: platformReviews } : {}),
@@ -3014,6 +3286,12 @@ function BuildStep({
               <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Parallax</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: parallaxImageUrl ? 'var(--accent)' : 'var(--text-muted)' }}>
                 {parallaxImageUrl ? '✓ Set' : 'Not set'}
+              </div>
+            </div>
+            <div style={{ padding: 12, borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg-input)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Gallery</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: galleryImages.length > 0 ? 'var(--accent)' : 'var(--text-muted)' }}>
+                {galleryImages.length > 0 ? `✓ ${galleryImages.length} image${galleryImages.length > 1 ? 's' : ''}` : 'Not included'}
               </div>
             </div>
             <div style={{ padding: 12, borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg-input)' }}>

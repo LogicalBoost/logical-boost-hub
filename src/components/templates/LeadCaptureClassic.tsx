@@ -456,6 +456,11 @@ export default function LeadCaptureClassic({ sections, media, brandKit, formConf
       {/* ─── REVIEW BADGES (condensed badge bar) ─── */}
       <ReviewBadgesBlock trustpilotWidget={media.trustpilot_widget} reviewSites={media.review_sites} />
 
+      {/* ─── GALLERY ─── */}
+      {media.gallery && media.gallery.length > 0 && (
+        <GalleryBlock images={media.gallery} primaryColor={resolvedPrimary} safeAccentOnLight={safeAccentOnLightBg} />
+      )}
+
       {/* ─── FAQ ─── */}
       {faq && <FaqBlock section={faq} safeAccentOnLight={safeAccentOnLightBg} />}
 
@@ -1448,6 +1453,122 @@ function PlatformReviewsBlock({ group }: { group: ReviewGroup }) {
           </div>
         )}
       </div>
+    </section>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════
+   GALLERY — Masonry-style responsive image showcase
+   Modern lightbox with smooth transitions
+   ═══════════════════════════════════════════════════════ */
+function GalleryBlock({ images, primaryColor, safeAccentOnLight }: { images: string[]; primaryColor: string; safeAccentOnLight: string }) {
+  const [lightbox, setLightbox] = useState<number | null>(null)
+
+  if (!images || images.length === 0) return null
+
+  return (
+    <section className="relative py-16 md:py-20 overflow-hidden bg-white">
+      <SectionLines color="var(--color-primary)" opacity={0.03} />
+
+      <div className="absolute top-0 left-0 w-[300px] h-[300px] rounded-full blur-[100px] pointer-events-none"
+        style={{ background: primaryColor, opacity: 0.04 }}
+      />
+
+      <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-10">
+        <h2
+          className="text-3xl md:text-4xl font-bold text-[var(--color-text)] text-center mb-4"
+          style={{ fontFamily: 'var(--font-heading)' }}
+        >
+          <span style={{ color: safeAccentOnLight }}>Our</span> Work
+        </h2>
+        <p className="text-center text-gray-500 text-base mb-10 max-w-xl mx-auto">
+          See the quality and craftsmanship we bring to every project
+        </p>
+
+        {/* Responsive grid: 2 cols mobile, 3 cols tablet, 4 cols desktop */}
+        <div className="columns-2 sm:columns-3 lg:columns-4 gap-3 md:gap-4">
+          {images.map((src, i) => (
+            <div
+              key={i}
+              className="break-inside-avoid mb-3 md:mb-4 group cursor-pointer"
+              onClick={() => setLightbox(i)}
+            >
+              <div className="relative rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300">
+                <img
+                  src={src}
+                  alt={`Project ${i + 1}`}
+                  className="w-full block transition-transform duration-500 group-hover:scale-105"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-300 flex items-center justify-center">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="w-10 h-10 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-lg">
+                      <svg className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Lightbox overlay */}
+      {lightbox !== null && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+        >
+          {/* Close button */}
+          <button
+            onClick={() => setLightbox(null)}
+            className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+          >
+            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          {/* Previous button */}
+          {lightbox > 0 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setLightbox(lightbox - 1) }}
+              className="absolute left-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+            >
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
+
+          {/* Next button */}
+          {lightbox < images.length - 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setLightbox(lightbox + 1) }}
+              className="absolute right-4 z-10 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+            >
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
+
+          {/* Image */}
+          <img
+            src={images[lightbox]}
+            alt={`Project ${lightbox + 1}`}
+            className="max-w-full max-h-[85vh] rounded-lg shadow-2xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          {/* Image counter */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-sm font-medium">
+            {lightbox + 1} / {images.length}
+          </div>
+        </div>
+      )}
     </section>
   )
 }

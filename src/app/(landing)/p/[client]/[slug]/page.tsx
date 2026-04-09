@@ -335,6 +335,7 @@ export default function LandingPage() {
     two_column_image: page.media_assets?.two_column_image || undefined,
     steps_image: page.media_assets?.steps_image || undefined,
     benefits_image: page.media_assets?.benefits_image || undefined,
+    gallery: (page.media_assets?.gallery as string[] | undefined) || undefined,
     process_image: page.media_assets?.process_image || undefined,
     team_photo: page.media_assets?.team_photo || undefined,
     testimonial_photos: (page.media_assets?.testimonial_photos as string[] | undefined) || undefined,
