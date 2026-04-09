@@ -724,20 +724,29 @@ export default function SettingsPage() {
   }
 
   async function handleSavePrompt(promptId: string) {
+    // Check if this is an agency default (affects all clients) and confirm
+    const promptRecord = promptTemplates.find(p => p.id === promptId)
+    if (promptRecord && !promptRecord.client_id) {
+      const confirmed = window.confirm(
+        'This is an Agency Default prompt. Saving will affect ALL clients that don\'t have their own override for this prompt.\n\nAre you sure you want to save?'
+      )
+      if (!confirmed) return
+    }
+
     setSavingPrompt(true)
     const { error } = await supabase
       .from('prompt_templates')
       .update({
         system_prompt: editPromptText,
         updated_at: new Date().toISOString(),
-        version: (promptTemplates.find(p => p.id === promptId)?.version || 1) + 1,
+        version: (promptRecord?.version || 1) + 1,
       })
       .eq('id', promptId)
     setSavingPrompt(false)
     if (error) {
       showToast('Failed to save prompt: ' + error.message)
     } else {
-      showToast('Prompt saved')
+      showToast(promptRecord?.client_id ? 'Client prompt saved' : 'Agency default prompt saved (affects all clients)')
       setEditingPromptId(null)
       setEditPromptText('')
       loadPromptTemplates()
@@ -2888,6 +2897,42 @@ export default function SettingsPage() {
             {client ? ` Showing prompts for ${client.name} with agency defaults.` : ' Showing agency-wide default prompts.'}
           </p>
 
+          {/* Scope warning banner */}
+          <div style={{
+            padding: '12px 16px',
+            borderRadius: 8,
+            marginBottom: 16,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 10,
+            background: client ? 'rgba(59,130,246,0.08)' : 'rgba(245,158,11,0.08)',
+            border: `1px solid ${client ? 'rgba(59,130,246,0.25)' : 'rgba(245,158,11,0.25)'}`,
+          }}>
+            <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0, marginTop: 1 }}>
+              {client ? '\u2139\ufe0f' : '\u26a0\ufe0f'}
+            </span>
+            <div style={{ fontSize: 12, lineHeight: 1.6 }}>
+              {client ? (
+                <>
+                  <strong style={{ color: '#3b82f6' }}>Client-specific view:</strong>{' '}
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    Prompts marked <span style={{ fontWeight: 600, color: '#3b82f6' }}>Client Override</span> apply ONLY to <strong>{client.name}</strong>.
+                    Prompts marked <span style={{ fontWeight: 600, color: '#22c55e' }}>Agency Default</span> apply to <strong>ALL clients</strong> that don&apos;t have their own override.
+                    Use &quot;Customize for {client.name}&quot; to create a client-specific version without affecting other clients.
+                  </span>
+                </>
+              ) : (
+                <>
+                  <strong style={{ color: '#f59e0b' }}>No client selected:</strong>{' '}
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    Changes to Agency Default prompts will affect <strong>ALL clients</strong> that don&apos;t have their own override.
+                    Select a client from the header dropdown to view or create client-specific prompt overrides.
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+
           {/* Placeholder legend */}
           <details style={{ marginBottom: 16 }}>
             <summary style={{
@@ -2948,7 +2993,20 @@ export default function SettingsPage() {
                         background: isOverride ? 'rgba(59,130,246,0.15)' : 'rgba(34,197,94,0.15)',
                         color: isOverride ? '#3b82f6' : '#22c55e',
                       }}>
-                        {isOverride ? 'Client Override' : 'Agency Default'}
+                        {isOverride ? `Client Override` : 'Agency Default'}
+                      </span>
+                      <span style={{
+                        fontSize: 10,
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        fontWeight: 500,
+                        background: isOverride ? 'rgba(59,130,246,0.08)' : 'rgba(245,158,11,0.08)',
+                        color: isOverride ? '#60a5fa' : '#f59e0b',
+                      }}>
+                        {isOverride
+                          ? `${client?.name || 'This client'} only`
+                          : 'All clients'
+                        }
                       </span>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                         v{prompt.version}

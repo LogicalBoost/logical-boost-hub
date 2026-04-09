@@ -51,6 +51,7 @@ export default function AvatarsPage() {
   const [promptText, setPromptText] = useState('')
   const [promptQuantity, setPromptQuantity] = useState(5)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
+  const [audienceMode, setAudienceMode] = useState<'general' | 'granular'>('granular')
 
   // All hooks must be above early returns (React Rules of Hooks)
   const categories = useMemo(() => {
@@ -66,6 +67,7 @@ export default function AvatarsPage() {
       const result = await generateAvatars(client.id, {
         quantity: promptQuantity,
         userPrompt: promptText || undefined,
+        audienceMode,
       })
       await refreshAvatars(client.id)
       showToast(`${result.avatars_created} new avatars generated!`)
@@ -124,6 +126,8 @@ export default function AvatarsPage() {
           setPromptText={setPromptText}
           promptQuantity={promptQuantity}
           setPromptQuantity={setPromptQuantity}
+          audienceMode={audienceMode}
+          setAudienceMode={setAudienceMode}
           onGenerate={handleGenerateAvatars}
           onClose={() => setShowPrompter(false)}
           existingCount={0}
@@ -371,6 +375,8 @@ export default function AvatarsPage() {
         setPromptText={setPromptText}
         promptQuantity={promptQuantity}
         setPromptQuantity={setPromptQuantity}
+        audienceMode={audienceMode}
+        setAudienceMode={setAudienceMode}
         onGenerate={handleGenerateAvatars}
         onClose={() => setShowPrompter(false)}
         existingCount={avatars.length}
@@ -669,6 +675,8 @@ function AvatarPrompterModal({
   setPromptText,
   promptQuantity,
   setPromptQuantity,
+  audienceMode,
+  setAudienceMode,
   onGenerate,
   onClose,
   existingCount,
@@ -677,6 +685,8 @@ function AvatarPrompterModal({
   setPromptText: (v: string) => void
   promptQuantity: number
   setPromptQuantity: (v: number) => void
+  audienceMode: 'general' | 'granular'
+  setAudienceMode: (v: 'general' | 'granular') => void
   onGenerate: () => void
   onClose: () => void
   existingCount: number
@@ -694,6 +704,54 @@ function AvatarPrompterModal({
               You already have {existingCount} avatar{existingCount !== 1 ? 's' : ''}. AI will create new, distinct personas that don&apos;t overlap with existing ones.
             </div>
           )}
+
+          {/* Audience Mode Toggle */}
+          <div style={{ marginBottom: 16 }}>
+            <label className="form-label">Audience specificity</label>
+            <div style={{ display: 'flex', gap: 0, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }}>
+              <button
+                type="button"
+                onClick={() => setAudienceMode('general')}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  transition: 'all 0.15s ease',
+                  background: audienceMode === 'general' ? 'var(--accent)' : 'var(--bg-card)',
+                  color: audienceMode === 'general' ? '#fff' : 'var(--text-secondary)',
+                }}
+              >
+                General Audiences
+              </button>
+              <button
+                type="button"
+                onClick={() => setAudienceMode('granular')}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  border: 'none',
+                  borderLeft: '1px solid var(--border)',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  transition: 'all 0.15s ease',
+                  background: audienceMode === 'granular' ? 'var(--accent)' : 'var(--bg-card)',
+                  color: audienceMode === 'granular' ? '#fff' : 'var(--text-secondary)',
+                }}
+              >
+                Granular Personas
+              </button>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
+              {audienceMode === 'general'
+                ? 'Broad market segments like "Small Business Owners" or "Young Families". Best for wide-reach campaigns.'
+                : 'Hyper-specific personas with detailed pain points and trigger events. Best for targeted, high-converting campaigns.'
+              }
+            </div>
+          </div>
 
           <div style={{ marginBottom: 16 }}>
             <label className="form-label">How many avatars?</label>
@@ -716,7 +774,10 @@ function AvatarPrompterModal({
             <textarea
               className="form-input"
               rows={5}
-              placeholder={`Examples:\n\n"Generate 10 more avatars for a plumbing company. Include people in emergency situations, people doing renovations, commercial property managers, and landlords."\n\n"Add avatars for people who are price-shopping, people who got a bad experience elsewhere, and first-time homeowners who don't know anything about plumbing."\n\n"Focus on high-income homeowners who want premium service and don't care about price."`}
+              placeholder={audienceMode === 'general'
+                ? `Examples:\n\n"Generate broad audience segments for a plumbing company. Include residential homeowners, commercial property managers, landlords, and real estate agents."\n\n"Focus on the major market segments: residential, commercial, and emergency services."`
+                : `Examples:\n\n"Generate 10 more avatars for a plumbing company. Include people in emergency situations, people doing renovations, commercial property managers, and landlords."\n\n"Add avatars for people who are price-shopping, people who got a bad experience elsewhere, and first-time homeowners who don't know anything about plumbing."\n\n"Focus on high-income homeowners who want premium service and don't care about price."`
+              }
               value={promptText}
               onChange={(e) => setPromptText(e.target.value)}
             />
@@ -730,7 +791,7 @@ function AvatarPrompterModal({
             Cancel
           </button>
           <button className="btn btn-primary" onClick={onGenerate}>
-            Generate {promptQuantity} Avatars
+            Generate {promptQuantity} {audienceMode === 'general' ? 'Audiences' : 'Avatars'}
           </button>
         </div>
       </div>

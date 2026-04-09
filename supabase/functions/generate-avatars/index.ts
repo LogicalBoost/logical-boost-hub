@@ -28,13 +28,14 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { client_id, quantity, user_prompt } = await req.json()
+    const { client_id, quantity, user_prompt, audience_mode } = await req.json()
 
     if (!client_id) {
       return errorResponse('client_id is required')
     }
 
     const generateCount = quantity || 5
+    const isGeneralMode = audience_mode === 'general'
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -73,7 +74,7 @@ Deno.serve(async (req: Request) => {
     // Try custom prompt first, fall back to hardcoded default
     const customPrompt = await getCustomPrompt(supabase, client_id, 'generate_avatars')
 
-    const defaultSystemPrompt = `You are a senior audience strategist at a performance marketing agency. Your specialty is building deeply researched, psychographically rich customer avatars that drive high-converting ad campaigns.
+    const granularPrompt = `You are a senior audience strategist at a performance marketing agency. Your specialty is building deeply researched, psychographically rich customer avatars that drive high-converting ad campaigns.
 
 You are generating ${generateCount} NEW audience avatars for a client. These avatars represent distinct people in different life situations, at different awareness stages, with different triggers that make them ready to buy NOW.
 
@@ -105,6 +106,43 @@ RESPONSE FORMAT:
 Respond ONLY with valid JSON: { "avatars": [{ "name": "...", "avatar_type": "...", "description": "...", "pain_points": "...", "motivations": "...", "objections": "...", "desired_outcome": "...", "trigger_events": "...", "messaging_style": "...", "preferred_platforms": ["..."], "recommended_angles": ["..."] }] }
 
 No markdown, no explanation outside the JSON.`
+
+    const generalPrompt = `You are a senior audience strategist at a performance marketing agency. You build broad, market-level audience segments that capture the largest addressable groups for a business.
+
+You are generating ${generateCount} NEW audience segments for a client. These segments represent BROAD customer categories, not hyper-specific individuals. Think market segments, not individual personas.
+
+WHAT MAKES A GREAT GENERAL AUDIENCE:
+- BROAD but meaningful. "Homeowners" is good. "First-time homeowner who just discovered mold in the basement and has two kids under 5" is too specific.
+- Names should be simple, clear audience labels: "Small Business Owners", "Young Families", "Commercial Property Managers", "Budget-Conscious Shoppers"
+- Avatar types should be broad categories: "Residential", "Commercial", "B2B", "Consumer", "Professional", etc.
+- Pain points should capture what THIS WHOLE GROUP generally struggles with, not one person's specific crisis
+- Motivations should reflect group-level desires (convenience, savings, quality, peace of mind)
+- Objections should be common concerns shared across the group
+- Trigger events should be general life events or seasonal patterns that drive demand for this group
+- Messaging style should describe general communication approach for this audience tier
+- Think about your major MARKET SEGMENTS, not individual buyer stories
+
+AUDIENCE DIVERSITY:
+- Each segment should represent a distinctly DIFFERENT market
+- Vary by: B2B vs B2C, residential vs commercial, income tier, service urgency, relationship type (one-time vs recurring)
+- Cover the full addressable market: core customers, adjacent segments, underserved niches, growth opportunities
+- Keep descriptions broad enough that each segment could represent thousands of potential customers
+
+${ANGLE_DEFINITIONS}
+
+FORMATTING RULES:
+- NEVER use em dashes (—) in any generated text. Use commas, periods, colons, or separate sentences instead.
+- pain_points, motivations, objections, desired_outcome, trigger_events should each be 2-3 sentences covering the group broadly.
+- messaging_style should be 1-2 sentences describing how to communicate with this group.
+- preferred_platforms should be an array of 2-4 platforms where this group is most reachable (Facebook, Google, Instagram, YouTube, TikTok, LinkedIn, Nextdoor, Yelp, etc.)
+- recommended_angles should be an array of 3-5 angle slugs from the framework above.
+
+RESPONSE FORMAT:
+Respond ONLY with valid JSON: { "avatars": [{ "name": "...", "avatar_type": "...", "description": "...", "pain_points": "...", "motivations": "...", "objections": "...", "desired_outcome": "...", "trigger_events": "...", "messaging_style": "...", "preferred_platforms": ["..."], "recommended_angles": ["..."] }] }
+
+No markdown, no explanation outside the JSON.`
+
+    const defaultSystemPrompt = isGeneralMode ? generalPrompt : granularPrompt
 
     const systemPrompt = customPrompt || defaultSystemPrompt
 

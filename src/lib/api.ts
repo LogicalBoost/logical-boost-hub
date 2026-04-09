@@ -86,12 +86,13 @@ export async function recommendAngles(avatarId: string, offerId: string) {
 // Generate avatars via AI prompter
 export async function generateAvatars(
   clientId: string,
-  options?: { quantity?: number; userPrompt?: string }
+  options?: { quantity?: number; userPrompt?: string; audienceMode?: 'general' | 'granular' }
 ) {
   return callEdgeFunction('generate-avatars', {
     client_id: clientId,
     quantity: options?.quantity,
     user_prompt: options?.userPrompt,
+    audience_mode: options?.audienceMode || 'granular',
   })
 }
 
