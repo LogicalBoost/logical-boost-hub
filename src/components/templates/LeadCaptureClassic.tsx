@@ -609,34 +609,7 @@ function HeroBlock({ section, media, primaryColor, accentColor, safeAccentOnLigh
    ═══════════════════════════════════════════════════════ */
 function FeatureCardsBar({ section, primaryColor, accentColor, trustpilotWidget }: { section: Section; primaryColor: string; accentColor: string; trustpilotWidget?: TrustpilotWidget }) {
   const items = section.items || []
-  const tpWidgetRef = useRef<HTMLDivElement>(null)
   const hasTrustpilot = !!(trustpilotWidget?.businessUnitId)
-
-  useEffect(() => {
-    if (!hasTrustpilot) return
-
-    function initWidget() {
-      const tp = (window as unknown as Record<string, unknown>).Trustpilot as
-        { loadFromElement: (el: HTMLElement, flag: boolean) => void } | undefined
-      if (tp && tpWidgetRef.current) {
-        tp.loadFromElement(tpWidgetRef.current, true)
-      }
-    }
-
-    const existing = document.querySelector('script[src*="widget.trustpilot.com"]')
-    if (!existing) {
-      const script = document.createElement('script')
-      script.src = '//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js'
-      script.async = true
-      document.head.appendChild(script)
-      script.onload = () => initWidget()
-    } else {
-      initWidget()
-      const t1 = setTimeout(initWidget, 300)
-      const t2 = setTimeout(initWidget, 1000)
-      return () => { clearTimeout(t1); clearTimeout(t2) }
-    }
-  }, [hasTrustpilot, trustpilotWidget])
 
   return (
     <section
@@ -680,24 +653,29 @@ function FeatureCardsBar({ section, primaryColor, accentColor, trustpilotWidget 
           ))}
         </div>
 
-        {/* Trustpilot widget — inline below feature cards */}
+        {/* Trustpilot mini badge — inline below feature cards */}
         {hasTrustpilot && (
-          <div className="mt-5 md:mt-6 flex flex-col items-center">
-            <div
-              ref={tpWidgetRef}
-              className="trustpilot-widget"
-              data-locale="en-US"
-              data-template-id="5419b6ffb0d04a076446a9af"
-              data-businessunit-id={trustpilotWidget!.businessUnitId}
-              data-style-height="20px"
-              data-style-width="100%"
-              data-theme="dark"
-              data-stars="4,5"
+          <div className="mt-5 md:mt-6 flex justify-center">
+            <a
+              href={trustpilotWidget!.reviewUrl || `https://www.trustpilot.com/review/${trustpilotWidget!.domain || ''}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-white/70 hover:text-white transition-colors"
             >
-              <a href={trustpilotWidget!.reviewUrl || '#'} target="_blank" rel="noopener noreferrer" className="text-white/60 text-xs">
-                Trustpilot
-              </a>
-            </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M12 1.5l2.76 8.495h8.94l-7.23 5.253 2.76 8.495L12 18.49l-7.23 5.253 2.76-8.495L.3 9.995h8.94L12 1.5z" fill="#00b67a"/>
+              </svg>
+              <span className="text-xs font-medium">Rated on Trustpilot</span>
+              <div className="flex gap-px ml-1">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="w-3.5 h-3.5 flex items-center justify-center" style={{ background: '#00b67a' }}>
+                    <svg width="8" height="8" viewBox="0 0 24 24" fill="white">
+                      <path d="M12 1.5l2.76 8.495h8.94l-7.23 5.253 2.76 8.495L12 18.49l-7.23 5.253 2.76-8.495L.3 9.995h8.94L12 1.5z"/>
+                    </svg>
+                  </div>
+                ))}
+              </div>
+            </a>
           </div>
         )}
       </div>
@@ -1178,74 +1156,47 @@ function TestimonialsBlock({ section, media, safeAccentOnLight }: { section: Sec
 }
 
 /* ═══════════════════════════════════════════════════════
-   TRUSTPILOT WIDGET — Embedded review widget
+   TRUSTPILOT BADGE — Branded trust signal with link to
+   Trustpilot profile. The embedded widget requires domain
+   verification so we show a clean branded badge instead.
    ═══════════════════════════════════════════════════════ */
 function TrustpilotBlock({ widget }: { widget: TrustpilotWidget }) {
-  const widgetRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!widget.businessUnitId) return
-
-    function initWidget() {
-      const tp = (window as unknown as Record<string, unknown>).Trustpilot as
-        { loadFromElement: (el: HTMLElement, flag: boolean) => void } | undefined
-      if (tp && widgetRef.current) {
-        tp.loadFromElement(widgetRef.current, true)
-      }
-    }
-
-    const existing = document.querySelector('script[src*="widget.trustpilot.com"]')
-    if (!existing) {
-      const script = document.createElement('script')
-      script.src = '//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js'
-      script.async = true
-      document.head.appendChild(script)
-      script.onload = () => initWidget()
-    } else {
-      // Script already loaded — try immediately, then retry after short delays
-      initWidget()
-      const t1 = setTimeout(initWidget, 300)
-      const t2 = setTimeout(initWidget, 1000)
-      return () => { clearTimeout(t1); clearTimeout(t2) }
-    }
-  }, [widget])
-
   if (!widget.businessUnitId) return null
 
   return (
-    <section className="relative py-12 md:py-16 overflow-hidden"
+    <section className="relative py-10 md:py-14 overflow-hidden"
       style={{ background: 'linear-gradient(180deg, #f8faf9 0%, #f0f5f2 100%)' }}
     >
       <SectionLines color="var(--color-primary)" opacity={0.03} />
-      <div className="relative z-10 max-w-5xl mx-auto px-4 md:px-10">
-        <div className="text-center mb-8">
-          <p className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-2">Verified Reviews</p>
-          {widget.reviewUrl && (
-            <a
-              href={widget.reviewUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-gray-400 hover:text-[var(--color-primary)] transition-colors"
-            >
-              See all reviews on Trustpilot &#8599;
-            </a>
-          )}
-        </div>
-        <div
-          ref={widgetRef}
-          className="trustpilot-widget"
-          data-locale="en-US"
-          data-template-id="53aa8912dec7e10d38f59f36"
-          data-businessunit-id={widget.businessUnitId}
-          data-style-height="140px"
-          data-style-width="100%"
-          data-theme="light"
-          data-stars="4,5"
+      <div className="relative z-10 max-w-4xl mx-auto px-4 md:px-10">
+        <a
+          href={widget.reviewUrl || `https://www.trustpilot.com/review/${widget.domain || ''}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 group"
         >
-          <a href={widget.reviewUrl || '#'} target="_blank" rel="noopener noreferrer">
-            Trustpilot
-          </a>
-        </div>
+          {/* Trustpilot logo + stars */}
+          <div className="flex items-center gap-3">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+              <path d="M12 1.5l2.76 8.495h8.94l-7.23 5.253 2.76 8.495L12 18.49l-7.23 5.253 2.76-8.495L.3 9.995h8.94L12 1.5z" fill="#00b67a"/>
+            </svg>
+            <span className="text-lg font-bold text-[#191919]">Trustpilot</span>
+          </div>
+          {/* 5-star display */}
+          <div className="flex gap-0.5">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="w-7 h-7 flex items-center justify-center" style={{ background: '#00b67a' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+                  <path d="M12 1.5l2.76 8.495h8.94l-7.23 5.253 2.76 8.495L12 18.49l-7.23 5.253 2.76-8.495L.3 9.995h8.94L12 1.5z"/>
+                </svg>
+              </div>
+            ))}
+          </div>
+          {/* CTA text */}
+          <span className="text-sm text-gray-500 group-hover:text-[var(--color-primary)] transition-colors">
+            See our reviews on Trustpilot &#8599;
+          </span>
+        </a>
       </div>
     </section>
   )
