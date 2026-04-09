@@ -501,24 +501,22 @@ function HeroBlock({ section, media, primaryColor, accentColor, safeAccentOnLigh
               </p>
             )}
             {hasForm ? (
-              /* Form replaces the CTA button — frosted glass card */
+              /* Form card — primary brand color bg with frosted glass fields */
               <div
-                className="rounded-2xl overflow-hidden"
+                className="rounded-2xl overflow-hidden branded-form-card"
                 style={{
-                  background: 'rgba(255,255,255,0.75)',
-                  backdropFilter: 'blur(24px)',
-                  WebkitBackdropFilter: 'blur(24px)',
-                  border: '1px solid rgba(0,0,0,0.06)',
-                  boxShadow: '0 20px 50px rgba(0,0,0,0.10), 0 6px 20px rgba(0,0,0,0.06)',
+                  background: `linear-gradient(145deg, ${primaryColor} 0%, ${primaryColor}ee 100%)`,
+                  boxShadow: '0 20px 50px rgba(0,0,0,0.15), 0 6px 20px rgba(0,0,0,0.08)',
                 }}
               >
-                <div className="px-4 py-3 md:px-6 md:py-5">
+                <div className="px-4 py-4 md:px-6 md:py-5">
                   <LeadFormDynamic
                     formConfig={formConfig!}
                     pageSlug={pageSlug}
                     clientSlug={clientSlug}
                     publishedPageId={publishedPageId}
                     embedded
+                    darkBg
                   />
                 </div>
               </div>
