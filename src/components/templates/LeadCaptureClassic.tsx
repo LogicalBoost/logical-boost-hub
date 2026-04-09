@@ -609,27 +609,32 @@ function HeroBlock({ section, media, primaryColor, accentColor, safeAccentOnLigh
    ═══════════════════════════════════════════════════════ */
 function FeatureCardsBar({ section, primaryColor, accentColor, trustpilotWidget }: { section: Section; primaryColor: string; accentColor: string; trustpilotWidget?: TrustpilotWidget }) {
   const items = section.items || []
-  const tpRef = useRef<HTMLDivElement>(null)
+  const tpWidgetRef = useRef<HTMLDivElement>(null)
   const hasTrustpilot = !!(trustpilotWidget?.businessUnitId)
 
   useEffect(() => {
     if (!hasTrustpilot) return
-    if (!document.querySelector('script[src*="widget.trustpilot.com"]')) {
+
+    function initWidget() {
+      const tp = (window as unknown as Record<string, unknown>).Trustpilot as
+        { loadFromElement: (el: HTMLElement, flag: boolean) => void } | undefined
+      if (tp && tpWidgetRef.current) {
+        tp.loadFromElement(tpWidgetRef.current, true)
+      }
+    }
+
+    const existing = document.querySelector('script[src*="widget.trustpilot.com"]')
+    if (!existing) {
       const script = document.createElement('script')
       script.src = '//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js'
       script.async = true
       document.head.appendChild(script)
-      script.onload = () => {
-        if ((window as unknown as Record<string, unknown>).Trustpilot && tpRef.current) {
-          (window as unknown as Record<string, { loadFromElement: (el: HTMLElement, flag: boolean) => void }>).Trustpilot.loadFromElement(tpRef.current, true)
-        }
-      }
+      script.onload = () => initWidget()
     } else {
-      setTimeout(() => {
-        if ((window as unknown as Record<string, unknown>).Trustpilot && tpRef.current) {
-          (window as unknown as Record<string, { loadFromElement: (el: HTMLElement, flag: boolean) => void }>).Trustpilot.loadFromElement(tpRef.current, true)
-        }
-      }, 100)
+      initWidget()
+      const t1 = setTimeout(initWidget, 300)
+      const t2 = setTimeout(initWidget, 1000)
+      return () => { clearTimeout(t1); clearTimeout(t2) }
     }
   }, [hasTrustpilot, trustpilotWidget])
 
@@ -677,8 +682,9 @@ function FeatureCardsBar({ section, primaryColor, accentColor, trustpilotWidget 
 
         {/* Trustpilot widget — inline below feature cards */}
         {hasTrustpilot && (
-          <div className="mt-5 md:mt-6 flex flex-col items-center" ref={tpRef}>
+          <div className="mt-5 md:mt-6 flex flex-col items-center">
             <div
+              ref={tpWidgetRef}
               className="trustpilot-widget"
               data-locale="en-US"
               data-template-id="5419b6ffb0d04a076446a9af"
@@ -1175,25 +1181,32 @@ function TestimonialsBlock({ section, media, safeAccentOnLight }: { section: Sec
    TRUSTPILOT WIDGET — Embedded review widget
    ═══════════════════════════════════════════════════════ */
 function TrustpilotBlock({ widget }: { widget: TrustpilotWidget }) {
-  const containerRef = useRef<HTMLDivElement>(null)
+  const widgetRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!document.querySelector('script[src*="widget.trustpilot.com"]')) {
+    if (!widget.businessUnitId) return
+
+    function initWidget() {
+      const tp = (window as unknown as Record<string, unknown>).Trustpilot as
+        { loadFromElement: (el: HTMLElement, flag: boolean) => void } | undefined
+      if (tp && widgetRef.current) {
+        tp.loadFromElement(widgetRef.current, true)
+      }
+    }
+
+    const existing = document.querySelector('script[src*="widget.trustpilot.com"]')
+    if (!existing) {
       const script = document.createElement('script')
       script.src = '//widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js'
       script.async = true
       document.head.appendChild(script)
-      script.onload = () => {
-        if ((window as unknown as Record<string, unknown>).Trustpilot && containerRef.current) {
-          (window as unknown as Record<string, { loadFromElement: (el: HTMLElement, flag: boolean) => void }>).Trustpilot.loadFromElement(containerRef.current, true)
-        }
-      }
+      script.onload = () => initWidget()
     } else {
-      setTimeout(() => {
-        if ((window as unknown as Record<string, unknown>).Trustpilot && containerRef.current) {
-          (window as unknown as Record<string, { loadFromElement: (el: HTMLElement, flag: boolean) => void }>).Trustpilot.loadFromElement(containerRef.current, true)
-        }
-      }, 100)
+      // Script already loaded — try immediately, then retry after short delays
+      initWidget()
+      const t1 = setTimeout(initWidget, 300)
+      const t2 = setTimeout(initWidget, 1000)
+      return () => { clearTimeout(t1); clearTimeout(t2) }
     }
   }, [widget])
 
@@ -1204,7 +1217,7 @@ function TrustpilotBlock({ widget }: { widget: TrustpilotWidget }) {
       style={{ background: 'linear-gradient(180deg, #f8faf9 0%, #f0f5f2 100%)' }}
     >
       <SectionLines color="var(--color-primary)" opacity={0.03} />
-      <div className="relative z-10 max-w-5xl mx-auto px-4 md:px-10" ref={containerRef}>
+      <div className="relative z-10 max-w-5xl mx-auto px-4 md:px-10">
         <div className="text-center mb-8">
           <p className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-2">Verified Reviews</p>
           {widget.reviewUrl && (
@@ -1219,6 +1232,7 @@ function TrustpilotBlock({ widget }: { widget: TrustpilotWidget }) {
           )}
         </div>
         <div
+          ref={widgetRef}
           className="trustpilot-widget"
           data-locale="en-US"
           data-template-id="53aa8912dec7e10d38f59f36"
