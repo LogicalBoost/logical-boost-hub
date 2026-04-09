@@ -129,9 +129,10 @@ function SectionLines({ color, opacity = 0.07 }: { color: string; opacity?: numb
 
 /* ═══════════════════════════════════════════════════════
    COLOR USAGE GUIDE:
-   - --color-primary: Icons, icon backgrounds, borders, decorative elements, blobs, section backgrounds
+   - --color-primary: Icons, icon backgrounds, borders, decorative elements, blobs, section backgrounds,
+                      AND headline accent word highlights (gives brand presence without overwhelming)
    - --color-secondary: Dark sections (trust bar, footer), overlays
-   - --color-accent: CTA buttons ONLY, accent word highlights, stat numbers
+   - --color-accent: CTA buttons ONLY. Never headlines, never icons, never decorative elements.
    - --color-text: Headings and body text
    - --color-bg: Page background
    ═══════════════════════════════════════════════════════ */
@@ -354,9 +355,13 @@ export default function LeadCaptureClassic({ sections, media, brandKit, formConf
   // Compute safe button colors using WCAG contrast
   const safeBtnLight = getSafeButtonColors(resolvedAccent, secondaryColor, '#ffffff')
   const safeBtnDark = getSafeButtonColors(resolvedAccent, secondaryColor, secondaryColor)
-  // Safe accent highlight colors for light and dark sections
-  const safeAccentOnLightBg = getSafeAccentOnLight(resolvedAccent, resolvedPrimary)
-  const safeAccentOnDarkBg = getSafeHighlightOnDark(resolvedAccent, secondaryColor)
+  // Headline accent word color — uses PRIMARY (brand identity color), NOT accent.
+  // Accent is reserved for CTA buttons only. Primary gives the page brand presence.
+  const safeAccentOnLightBg = getSafeAccentOnLight(resolvedPrimary, resolvedPrimary)
+  // On dark sections: accent word highlights use white for guaranteed readability
+  const safeAccentOnDarkBg = '#ffffff'
+  // Trust bar stat numbers — use accent if it has contrast, otherwise white
+  const safeStatColor = getSafeHighlightOnDark(resolvedAccent, secondaryColor)
 
   // Safety: if text_color is too light for white/light backgrounds, force it to dark
   // This prevents white-on-white text when the brand kit extracts a light text color
@@ -420,7 +425,7 @@ export default function LeadCaptureClassic({ sections, media, brandKit, formConf
       {steps && <StepsBlock section={steps} media={media} primaryColor={resolvedPrimary} accentColor={resolvedAccent} safeAccentOnLight={safeAccentOnLightBg} />}
 
       {/* ─── TRUST BAR ─── */}
-      {trust && <TrustBar section={trust} media={media} safeAccentOnDark={safeAccentOnDarkBg} secondaryColor={secondaryColor} />}
+      {trust && <TrustBar section={trust} media={media} safeAccentOnDark={safeAccentOnDarkBg} safeStatColor={safeStatColor} secondaryColor={secondaryColor} />}
 
       {/* ─── BENEFITS GRID ─── */}
       {benefits && <BenefitsGrid section={benefits} media={media} primaryColor={resolvedPrimary} accentColor={resolvedAccent} safeAccentOnLight={safeAccentOnLightBg} />}
@@ -911,7 +916,7 @@ function StepsBlock({ section, media, primaryColor, accentColor, safeAccentOnLig
 /* ═══════════════════════════════════════════════════════
    TRUST BAR — Dark bg, frosted stat cards
    ═══════════════════════════════════════════════════════ */
-function TrustBar({ section, media, safeAccentOnDark, secondaryColor }: { section: Section; media: MediaAssets; safeAccentOnDark: string; secondaryColor: string }) {
+function TrustBar({ section, media, safeAccentOnDark, safeStatColor, secondaryColor }: { section: Section; media: MediaAssets; safeAccentOnDark: string; safeStatColor: string; secondaryColor: string }) {
   const items = section.items || []
   const parallax = media.parallax_image
   return (
@@ -967,7 +972,7 @@ function TrustBar({ section, media, safeAccentOnDark, secondaryColor }: { sectio
               {item.image ? (
                 <img src={item.image} alt="" className="h-12 mx-auto mb-3 object-contain" />
               ) : item.stat ? (
-                <p className="text-2xl md:text-3xl font-bold mb-2 whitespace-nowrap" style={{ color: safeAccentOnDark }}>{item.stat}</p>
+                <p className="text-2xl md:text-3xl font-bold mb-2 whitespace-nowrap" style={{ color: safeStatColor }}>{item.stat}</p>
               ) : null}
               <div className="w-12 h-px bg-white/20 mx-auto mb-3" />
               <p className="text-xs md:text-sm text-white/70">{item.label}</p>
