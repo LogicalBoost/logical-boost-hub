@@ -83,13 +83,13 @@ function DuotoneIcon({ name, size = 28, color }: { name?: string; size?: number;
 /* DetailedIcon removed — replaced by Phosphor duotone icons (DuotoneIcon) */
 
 /* ─── Accent word highlight ─── */
-function AH({ text, word, className }: { text: string; word?: string; className?: string }) {
+function AH({ text, word, className, color }: { text: string; word?: string; className?: string; color?: string }) {
   if (!word || !text.includes(word)) return <span className={className}>{text}</span>
   const i = text.indexOf(word)
   return (
     <span className={className}>
       {text.slice(0, i)}
-      <span className="text-[var(--color-accent)]">{word}</span>
+      <span style={{ color: color || 'var(--color-accent)' }}>{word}</span>
       {text.slice(i + word.length)}
     </span>
   )
@@ -137,27 +137,120 @@ function SectionLines({ color, opacity = 0.07 }: { color: string; opacity?: numb
    ═══════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════
-   UTILITY: compute contrasting text color for CTA buttons
+   COLOR SAFETY UTILITIES
+   Enforces readability rules:
+   - No low-contrast text (e.g. red on blue, yellow on white)
+   - Button text always readable against button bg
+   - Accent highlights readable on dark and light sections
    ═══════════════════════════════════════════════════════ */
-function getContrastTextColor(bgColor: string): string {
-  const hex = bgColor.replace('#', '')
-  if (hex.length < 6) return '#ffffff'
-  const r = parseInt(hex.substring(0, 2), 16)
-  const g = parseInt(hex.substring(2, 4), 16)
-  const b = parseInt(hex.substring(4, 6), 16)
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  return luminance > 0.5 ? '#1a1a2e' : '#ffffff'
+
+/** Parse hex to RGB */
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const h = hex.replace('#', '')
+  if (h.length < 6) return null
+  return {
+    r: parseInt(h.substring(0, 2), 16),
+    g: parseInt(h.substring(2, 4), 16),
+    b: parseInt(h.substring(4, 6), 16),
+  }
 }
 
-/* Check if accent color is too light to stand out on white backgrounds */
+/** Relative luminance (0 = black, 1 = white) per WCAG */
+function getLuminance(r: number, g: number, b: number): number {
+  const [rs, gs, bs] = [r, g, b].map(c => {
+    const s = c / 255
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+  })
+  return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs
+}
+
+/** WCAG contrast ratio between two colors (1:1 to 21:1) */
+function getContrastRatio(color1: string, color2: string): number {
+  const c1 = hexToRgb(color1)
+  const c2 = hexToRgb(color2)
+  if (!c1 || !c2) return 1
+  const l1 = getLuminance(c1.r, c1.g, c1.b)
+  const l2 = getLuminance(c2.r, c2.g, c2.b)
+  const lighter = Math.max(l1, l2)
+  const darker = Math.min(l1, l2)
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
+/** Get readable text color for a given background. Always returns white or dark. */
+function getContrastTextColor(bgColor: string): string {
+  const rgb = hexToRgb(bgColor)
+  if (!rgb) return '#ffffff'
+  const lum = getLuminance(rgb.r, rgb.g, rgb.b)
+  return lum > 0.4 ? '#1a1a2e' : '#ffffff'
+}
+
+/** Check if a color is too light to be used on white backgrounds */
 function isLightColor(color: string): boolean {
-  const hex = color.replace('#', '')
-  if (hex.length < 6) return false
-  const r = parseInt(hex.substring(0, 2), 16)
-  const g = parseInt(hex.substring(2, 4), 16)
-  const b = parseInt(hex.substring(4, 6), 16)
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  return luminance > 0.6
+  const rgb = hexToRgb(color)
+  if (!rgb) return false
+  const lum = getLuminance(rgb.r, rgb.g, rgb.b)
+  return lum > 0.4
+}
+
+/**
+ * Get a safe highlight color for use on a dark background.
+ * If accent has poor contrast against the dark bg, fall back to white.
+ * Minimum contrast ratio: 4.5:1 (WCAG AA for normal text)
+ */
+function getSafeHighlightOnDark(accentColor: string, darkBg: string): string {
+  const ratio = getContrastRatio(accentColor, darkBg)
+  // If accent has good contrast on dark bg, use it
+  if (ratio >= 3.5) return accentColor
+  // Otherwise use white — always readable on dark
+  return '#ffffff'
+}
+
+/**
+ * Get a safe accent color for text on light/white backgrounds.
+ * If accent is too light (yellow, light green), darken or fall back to primary.
+ */
+function getSafeAccentOnLight(accentColor: string, primaryColor: string): string {
+  const ratio = getContrastRatio(accentColor, '#ffffff')
+  if (ratio >= 3.5) return accentColor
+  // Try primary as fallback
+  const primaryRatio = getContrastRatio(primaryColor, '#ffffff')
+  if (primaryRatio >= 3.5) return primaryColor
+  // Ultimate fallback — dark text
+  return '#1a1a2e'
+}
+
+/**
+ * Get safe button styles: bg color + text color with guaranteed readability.
+ * Rules:
+ * - Button text must have >= 4.5:1 contrast against button bg
+ * - Button bg must have >= 3:1 contrast against section bg
+ * - No yellow/light buttons on white backgrounds
+ * - No white text on yellow/light buttons
+ */
+function getSafeButtonColors(
+  accentColor: string,
+  secondaryColor: string,
+  sectionBg: string = '#ffffff'
+): { bg: string; text: string } {
+  // Check if accent has good contrast against section bg
+  const accentVsBg = getContrastRatio(accentColor, sectionBg)
+  let btnBg = accentColor
+
+  if (accentVsBg < 3) {
+    // Accent doesn't stand out — use secondary (dark) instead
+    btnBg = secondaryColor
+  }
+
+  // Determine text color with guaranteed contrast
+  const textColor = getContrastTextColor(btnBg)
+  const textContrast = getContrastRatio(textColor, btnBg)
+
+  // If even our auto text color doesn't have enough contrast, force the opposite
+  if (textContrast < 4.5) {
+    return { bg: btnBg, text: textColor === '#ffffff' ? '#1a1a2e' : '#ffffff' }
+  }
+
+  return { bg: btnBg, text: textColor }
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -258,10 +351,12 @@ export default function LeadCaptureClassic({ sections, media, brandKit, formConf
     }
   }, [brandKit])
 
-  const accentIsLight = isLightColor(resolvedAccent)
-  // If accent is too light for white bg, use secondary (dark) for buttons on light sections
-  const ctaBgColor = accentIsLight ? 'var(--color-secondary)' : 'var(--color-accent)'
-  const ctaTextColor = accentIsLight ? '#ffffff' : getContrastTextColor(resolvedAccent)
+  // Compute safe button colors using WCAG contrast
+  const safeBtnLight = getSafeButtonColors(resolvedAccent, secondaryColor, '#ffffff')
+  const safeBtnDark = getSafeButtonColors(resolvedAccent, secondaryColor, secondaryColor)
+  // Safe accent highlight colors for light and dark sections
+  const safeAccentOnLightBg = getSafeAccentOnLight(resolvedAccent, resolvedPrimary)
+  const safeAccentOnDarkBg = getSafeHighlightOnDark(resolvedAccent, secondaryColor)
 
   // Safety: if text_color is too light for white/light backgrounds, force it to dark
   // This prevents white-on-white text when the brand kit extracts a light text color
@@ -282,17 +377,16 @@ export default function LeadCaptureClassic({ sections, media, brandKit, formConf
 
   return (
     <div className="min-h-screen bg-white" style={{ fontFamily: 'var(--font-body)', ...cssVars } as React.CSSProperties}>
-      {/* Inject CTA button styles — ensures extreme contrast */}
+      {/* Inject CTA button styles — WCAG-safe contrast */}
       <style>{`
         .cta-button {
-          background-color: ${ctaBgColor} !important;
-          color: ${ctaTextColor} !important;
-          text-shadow: ${ctaTextColor === '#ffffff' ? '0 1px 2px rgba(0,0,0,0.3)' : 'none'};
+          background-color: ${safeBtnLight.bg} !important;
+          color: ${safeBtnLight.text} !important;
+          text-shadow: ${safeBtnLight.text === '#ffffff' ? '0 1px 2px rgba(0,0,0,0.3)' : 'none'};
         }
-        /* Keep accent for buttons on dark sections where it provides contrast */
         .cta-button-on-dark {
-          background-color: var(--color-accent) !important;
-          color: ${getContrastTextColor(resolvedAccent)} !important;
+          background-color: ${safeBtnDark.bg} !important;
+          color: ${safeBtnDark.text} !important;
         }
       `}</style>
 
@@ -314,25 +408,25 @@ export default function LeadCaptureClassic({ sections, media, brandKit, formConf
       </header>
 
       {/* ─── HERO ─── */}
-      {hero && <HeroBlock section={hero} media={media} primaryColor={resolvedPrimary} accentColor={resolvedAccent} formConfig={formConfig || undefined} pageSlug={pageSlug} clientSlug={clientSlug} publishedPageId={publishedPageId} />}
+      {hero && <HeroBlock section={hero} media={media} primaryColor={resolvedPrimary} accentColor={resolvedAccent} safeAccentOnLight={safeAccentOnLightBg} formConfig={formConfig || undefined} pageSlug={pageSlug} clientSlug={clientSlug} publishedPageId={publishedPageId} />}
 
       {/* ─── FEATURE CARDS BAR ─── */}
       {features && <FeatureCardsBar section={features} primaryColor={resolvedPrimary} accentColor={resolvedAccent} trustpilotWidget={media.trustpilot_widget} />}
 
       {/* ─── TWO COLUMN INFO ─── */}
-      {info && <TwoColumnInfo section={info} media={media} />}
+      {info && <TwoColumnInfo section={info} media={media} safeAccentOnLight={safeAccentOnLightBg} />}
 
       {/* ─── STEPS ─── */}
-      {steps && <StepsBlock section={steps} media={media} primaryColor={resolvedPrimary} accentColor={resolvedAccent} />}
+      {steps && <StepsBlock section={steps} media={media} primaryColor={resolvedPrimary} accentColor={resolvedAccent} safeAccentOnLight={safeAccentOnLightBg} />}
 
       {/* ─── TRUST BAR ─── */}
-      {trust && <TrustBar section={trust} media={media} />}
+      {trust && <TrustBar section={trust} media={media} safeAccentOnDark={safeAccentOnDarkBg} secondaryColor={secondaryColor} />}
 
       {/* ─── BENEFITS GRID ─── */}
-      {benefits && <BenefitsGrid section={benefits} media={media} primaryColor={resolvedPrimary} accentColor={resolvedAccent} />}
+      {benefits && <BenefitsGrid section={benefits} media={media} primaryColor={resolvedPrimary} accentColor={resolvedAccent} safeAccentOnLight={safeAccentOnLightBg} />}
 
       {/* ─── TESTIMONIALS ─── */}
-      {testimonials && <TestimonialsBlock section={testimonials} media={media} />}
+      {testimonials && <TestimonialsBlock section={testimonials} media={media} safeAccentOnLight={safeAccentOnLightBg} />}
 
       {/* ─── TRUSTPILOT REVIEWS ─── */}
       {media.trustpilot_widget?.businessUnitId && (
@@ -340,7 +434,7 @@ export default function LeadCaptureClassic({ sections, media, brandKit, formConf
       )}
 
       {/* ─── FAQ ─── */}
-      {faq && <FaqBlock section={faq} />}
+      {faq && <FaqBlock section={faq} safeAccentOnLight={safeAccentOnLightBg} />}
 
       {/* Lead form is now embedded in the hero section */}
 
@@ -369,7 +463,7 @@ function sanitizeText(text: string): string {
    HERO — Gradient bg, text left, person image right with
    frosted glass callout bubble on bottom-right of image
    ═══════════════════════════════════════════════════════ */
-function HeroBlock({ section, media, primaryColor, accentColor, formConfig, pageSlug, clientSlug, publishedPageId }: { section: Section; media: MediaAssets; primaryColor: string; accentColor: string; formConfig?: FormConfig; pageSlug?: string; clientSlug?: string; publishedPageId?: string }) {
+function HeroBlock({ section, media, primaryColor, accentColor, safeAccentOnLight, formConfig, pageSlug, clientSlug, publishedPageId }: { section: Section; media: MediaAssets; primaryColor: string; accentColor: string; safeAccentOnLight: string; formConfig?: FormConfig; pageSlug?: string; clientSlug?: string; publishedPageId?: string }) {
   const img = media.hero_image
   const hasForm = !!formConfig
   return (
@@ -392,7 +486,7 @@ function HeroBlock({ section, media, primaryColor, accentColor, formConfig, page
               className="text-4xl sm:text-5xl lg:text-[3.5rem] font-bold text-[var(--color-text)] leading-[1.1] mb-5"
               style={{ fontFamily: 'var(--font-heading)' }}
             >
-              <AH text={section.headline || ''} word={section.accent_word} />
+              <AH text={section.headline || ''} word={section.accent_word} color={safeAccentOnLight} />
             </h1>
             {(section.subheadline || section.content) && (
               <p className="text-base md:text-lg text-gray-500 leading-relaxed mb-6 max-w-lg mx-auto md:mx-0">
@@ -603,7 +697,7 @@ function FeatureCardsBar({ section, primaryColor, accentColor, trustpilotWidget 
 /* ═══════════════════════════════════════════════════════
    TWO COLUMN INFO — Gradient bg, frosted glass boxes
    ═══════════════════════════════════════════════════════ */
-function TwoColumnInfo({ section, media }: { section: Section; media: MediaAssets }) {
+function TwoColumnInfo({ section, media, safeAccentOnLight }: { section: Section; media: MediaAssets; safeAccentOnLight: string }) {
   const items = section.items || []
   const half = Math.ceil(items.length / 2)
   const left = items.slice(0, half)
@@ -653,7 +747,7 @@ function TwoColumnInfo({ section, media }: { section: Section; media: MediaAsset
             className="text-3xl md:text-4xl font-bold text-[var(--color-text)] mb-4"
             style={{ fontFamily: 'var(--font-heading)' }}
           >
-            <AH text={section.headline || ''} word={section.accent_word} />
+            <AH text={section.headline || ''} word={section.accent_word} color={safeAccentOnLight} />
           </h2>
           {section.subheadline && (
             <p className="text-base text-gray-500 leading-relaxed">{section.subheadline}</p>
@@ -726,7 +820,7 @@ function FrostedInfoBox({ items, title }: { items: SectionItem[]; title?: string
    STEPS — Image left, numbered step cards right,
    subtle gradient bg with decorative elements
    ═══════════════════════════════════════════════════════ */
-function StepsBlock({ section, media, primaryColor, accentColor }: { section: Section; media: MediaAssets; primaryColor: string; accentColor: string }) {
+function StepsBlock({ section, media, primaryColor, accentColor, safeAccentOnLight }: { section: Section; media: MediaAssets; primaryColor: string; accentColor: string; safeAccentOnLight: string }) {
   const items = section.items || []
   const img = media.steps_image
 
@@ -744,7 +838,7 @@ function StepsBlock({ section, media, primaryColor, accentColor }: { section: Se
             className="text-3xl md:text-4xl font-bold text-[var(--color-text)] mb-3"
             style={{ fontFamily: 'var(--font-heading)' }}
           >
-            <AH text={section.headline || ''} word={section.accent_word} />
+            <AH text={section.headline || ''} word={section.accent_word} color={safeAccentOnLight} />
           </h2>
           {section.subheadline && (
             <p className="text-base text-gray-500">{section.subheadline}</p>
@@ -817,7 +911,7 @@ function StepsBlock({ section, media, primaryColor, accentColor }: { section: Se
 /* ═══════════════════════════════════════════════════════
    TRUST BAR — Dark bg, frosted stat cards
    ═══════════════════════════════════════════════════════ */
-function TrustBar({ section, media }: { section: Section; media: MediaAssets }) {
+function TrustBar({ section, media, safeAccentOnDark, secondaryColor }: { section: Section; media: MediaAssets; safeAccentOnDark: string; secondaryColor: string }) {
   const items = section.items || []
   const parallax = media.parallax_image
   return (
@@ -854,7 +948,7 @@ function TrustBar({ section, media }: { section: Section; media: MediaAssets }) 
             className="text-2xl md:text-3xl font-bold text-white text-center mb-10 italic"
             style={{ fontFamily: 'var(--font-heading)' }}
           >
-            <AH text={section.headline} word={section.accent_word} />
+            <AH text={section.headline} word={section.accent_word} color={safeAccentOnDark} />
           </h2>
         )}
         <div className="grid sm:grid-cols-3 gap-5 md:gap-8">
@@ -873,7 +967,7 @@ function TrustBar({ section, media }: { section: Section; media: MediaAssets }) 
               {item.image ? (
                 <img src={item.image} alt="" className="h-12 mx-auto mb-3 object-contain" />
               ) : item.stat ? (
-                <p className="text-2xl md:text-3xl font-bold text-[var(--color-accent)] mb-2 whitespace-nowrap">{item.stat}</p>
+                <p className="text-2xl md:text-3xl font-bold mb-2 whitespace-nowrap" style={{ color: safeAccentOnDark }}>{item.stat}</p>
               ) : null}
               <div className="w-12 h-px bg-white/20 mx-auto mb-3" />
               <p className="text-xs md:text-sm text-white/70">{item.label}</p>
@@ -889,7 +983,7 @@ function TrustBar({ section, media }: { section: Section; media: MediaAssets }) 
    BENEFITS GRID — Gradient bg, frosted glass cards with
    left border accent, icon circles
    ═══════════════════════════════════════════════════════ */
-function BenefitsGrid({ section, media, primaryColor, accentColor }: { section: Section; media: MediaAssets; primaryColor: string; accentColor: string }) {
+function BenefitsGrid({ section, media, primaryColor, accentColor, safeAccentOnLight }: { section: Section; media: MediaAssets; primaryColor: string; accentColor: string; safeAccentOnLight: string }) {
   const items = section.items || []
   const img = media.benefits_image
 
@@ -911,7 +1005,7 @@ function BenefitsGrid({ section, media, primaryColor, accentColor }: { section: 
             className="text-3xl md:text-4xl font-bold text-[var(--color-text)] mb-3"
             style={{ fontFamily: 'var(--font-heading)' }}
           >
-            <AH text={section.headline || ''} word={section.accent_word} />
+            <AH text={section.headline || ''} word={section.accent_word} color={safeAccentOnLight} />
           </h2>
           {section.content && (
             <p className="text-base text-gray-500">{section.content}</p>
@@ -988,7 +1082,7 @@ function BenefitsGrid({ section, media, primaryColor, accentColor }: { section: 
    TESTIMONIALS — Cards with stars, quotes, avatars,
    subtle gradient bg with decorative elements
    ═══════════════════════════════════════════════════════ */
-function TestimonialsBlock({ section, media }: { section: Section; media: MediaAssets }) {
+function TestimonialsBlock({ section, media, safeAccentOnLight }: { section: Section; media: MediaAssets; safeAccentOnLight: string }) {
   const items = section.items || []
   const [active, setActive] = useState(0)
   const perPage = 3
@@ -1006,7 +1100,7 @@ function TestimonialsBlock({ section, media }: { section: Section; media: MediaA
           className="text-3xl md:text-4xl font-bold text-[var(--color-text)] text-center mb-10"
           style={{ fontFamily: 'var(--font-heading)' }}
         >
-          <AH text={section.headline || ''} word={section.accent_word} />
+          <AH text={section.headline || ''} word={section.accent_word} color={safeAccentOnLight} />
         </h2>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -1142,7 +1236,7 @@ function TrustpilotBlock({ widget }: { widget: TrustpilotWidget }) {
    FAQ — Accordion with frosted glass cards,
    gradient bg
    ═══════════════════════════════════════════════════════ */
-function FaqBlock({ section }: { section: Section }) {
+function FaqBlock({ section, safeAccentOnLight }: { section: Section; safeAccentOnLight: string }) {
   const [open, setOpen] = useState<number | null>(null)
   const items = section.items || []
 
@@ -1160,7 +1254,7 @@ function FaqBlock({ section }: { section: Section }) {
           className="text-3xl md:text-4xl font-bold text-[var(--color-text)] text-center mb-10"
           style={{ fontFamily: 'var(--font-heading)' }}
         >
-          <AH text={section.headline || ''} word={section.accent_word} />
+          <AH text={section.headline || ''} word={section.accent_word} color={safeAccentOnLight} />
         </h2>
 
         <div className="space-y-3">
