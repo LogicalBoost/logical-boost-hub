@@ -224,10 +224,10 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                 key={field.id}
                 className={field.width === 'half' ? 'col-span-1' : 'col-span-2'}
               >
-                {field.type !== 'checkbox' && field.type !== 'radio' && (
+                {field.type !== 'checkbox' && field.type !== 'radio' && !darkBg && (
                   <label className={`hidden md:block text-xs font-semibold uppercase tracking-wider mb-1 ${labelCls}`}>
                     {field.label}
-                    {field.required && <span className={`ml-0.5 ${darkBg ? 'text-red-300' : 'text-red-500'}`}>*</span>}
+                    {field.required && <span className="text-red-500 ml-0.5">*</span>}
                   </label>
                 )}
 
