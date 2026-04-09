@@ -28,7 +28,7 @@ export default function DashboardPage() {
     {
       label: '1. Set Up Business Profile',
       description: 'Enter your client\'s name, website, and call notes. AI will analyze the business.',
-      href: '/business-overview/',
+      href: '/settings/',
       isComplete: !!(client?.business_summary && client.business_summary.trim().length > 0),
       icon: '&#128188;',
       order: 1,
@@ -153,7 +153,7 @@ export default function DashboardPage() {
         <div className="empty-state-sub">
           Add your first client to begin building AI-powered campaign funnels.
         </div>
-        <Link href="/business-overview/" className="btn btn-primary" style={{ marginTop: 24 }}>
+        <Link href="/settings/" className="btn btn-primary" style={{ marginTop: 24 }}>
           + Add Your First Client
         </Link>
         <div className="empty-state-sub" style={{ marginTop: 12, fontSize: 13 }}>

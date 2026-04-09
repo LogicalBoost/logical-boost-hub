@@ -22,7 +22,6 @@ src/
   app/                     — Next.js App Router pages
     (hub)/                 — Hub pages (wrapped in AppShell with sidebar + header)
       avatars/page.tsx     — Avatar management (approve/deny AI-generated personas)
-      business-overview/   — Client setup + AI business analysis
       competitor-intel/    — Unified competitor intelligence hub (3 tabs: Ads, Analysis, Playbook)
       copy/page.tsx        — Copy page (formerly "Funnel") — all copy components for Avatar+Offer+Angle
       dashboard/page.tsx   — Main dashboard with getting started checklist
@@ -30,7 +29,7 @@ src/
       landing-pages/page.tsx — Landing page builder (template-based pipeline)
       login/page.tsx       — Login page with forgot password / password reset flow
       offers/page.tsx      — Offer management (approve/deny)
-      settings/page.tsx    — Settings (user management, brand kit, Trustpilot, prompt templates)
+      settings/page.tsx    — Settings (business info, brand kit, company assets, review profiles, image assets, Trustpilot, prompts, user management, phone numbers)
       stats/page.tsx       — Campaign stats overview (placeholder)
     (landing)/             — Landing page rendering (no Hub chrome)
       p/
@@ -107,11 +106,10 @@ supabase/
 2. Stats (placeholder)
 3. Copy (centerpiece — formerly "Funnel")
 4. Landing Pages
-5. Business Overview
-6. Intake
-7. Avatars
-8. Offers
-9. Competitor Intel
+5. Avatars
+6. Offers
+7. Competitor Intel
+8. Settings (business info, brand kit, assets, reviews, prompts, users)
 
 ## Access Levels / Roles
 
@@ -143,7 +141,7 @@ Defined in `src/types/database.ts` with `ANGLES` constant, `ANGLE_COLORS` map, a
 ## Client Management
 
 - **Header dropdown** — Lists all clients. Select to switch, or "+ Add New Client"
-- **Business Overview** → "+ Add New Client" button
+- **Settings** → "+ Add New Client" button (Business tab)
 - **Dashboard** → Shows "Add Your First Client" when none selected
 - Clients stored in `clients` table, loaded via `loadAllClients()`
 - Switching clients loads all related data (avatars, offers, copy, intake, competitors, landing pages, client assets, client templates)
@@ -151,7 +149,7 @@ Defined in `src/types/database.ts` with `ANGLES` constant, `ANGLE_COLORS` map, a
 
 ## AI Workflow Pipeline
 
-1. **Business Overview** → Enter name, URL, call notes → `analyze-business` edge function
+1. **Settings (Business tab)** → Enter name, URL, call notes → `analyze-business` edge function
    - AI generates: business_summary, services, differentiators, trust_signals, tone, ad_copy_rules, competitors, avatars, offers
    - Detects Trustpilot reviews → saves widget data to `clients.metadata.trustpilot`
    - Extracts testimonials, stats, FAQs → saves to `client_content` table
@@ -303,7 +301,7 @@ Create two `published_pages` records with same avatar+offer but different `templ
 - Custom domain middleware
 - Build remaining 3 templates (bold-split, social-proof-heavy, minimal-direct)
 - Hub inline page editor (edit copy directly in Hub UI without Claude Code)
-- Brand Kit editor UI (Business Overview page)
+- Brand Kit editor UI (Settings page)
 - Media Assets manager UI (upload, tag with role + avatar)
 
 ## Prompt Management System
@@ -319,7 +317,7 @@ Admin-only "Prompts" tab in Settings page. Agency can view/edit all AI prompts u
 ## Review Sites & Trustpilot Integration
 
 ### Multi-Platform Review Badges
-- **Business Overview** page has "Review Profiles" section for manually adding review site URLs
+- **Settings (Business tab)** has "Review Profiles" section for manually adding review site URLs
 - Supported platforms: Google, Yelp, BBB, Facebook, Trustpilot
 - Each review site entry has: platform, URL, rating (1-5), review count, enabled toggle
 - Saved to `clients.metadata.review_sites` as array of `ReviewSite` objects

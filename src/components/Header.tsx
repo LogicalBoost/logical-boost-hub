@@ -65,7 +65,7 @@ export default function Header() {
   async function handleClientChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const value = e.target.value
     if (value === '__new__') {
-      router.push('/business-overview/?new=1')
+      router.push('/settings/?new=1')
       return
     }
     if (value) {

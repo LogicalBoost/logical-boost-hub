@@ -35,6 +35,7 @@ export default function SettingsPage() {
     setClient, setLoading, setError, createClient, loadClientData, loadAllClients,
     intakeQuestions, refreshIntake, refreshClient,
     clientPhoneNumbers, refreshClientPhoneNumbers,
+    mediaAssets, refreshMediaAssets,
   } = useAppStore()
 
   const [activeTab, setActiveTab] = useState<SettingsTab>(isClientRole ? 'profile' : (client ? 'business' : 'profile'))
@@ -1809,6 +1810,85 @@ export default function SettingsPage() {
                 })() as React.ReactNode}
               </div>
             )}
+          </div>
+
+          {/* Image Assets */}
+          <div className="card">
+            <div className="card-title">Image Assets</div>
+            <div style={{ marginTop: 16 }}>
+              {mediaAssets.length > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+                  {mediaAssets.map(asset => (
+                    <div key={asset.id} style={{
+                      borderRadius: 8,
+                      overflow: 'hidden',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-card)',
+                    }}>
+                      <div style={{ height: 120, position: 'relative' }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={asset.file_url}
+                          alt={asset.role}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        />
+                      </div>
+                      <div style={{ padding: '8px 10px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <span style={{
+                            fontSize: 10,
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            color: asset.role === 'hero_image' ? '#8b5cf6' : asset.role === 'parallax' ? '#3b82f6' : 'var(--text-muted)',
+                            background: asset.role === 'hero_image' ? 'rgba(139,92,246,0.12)' : asset.role === 'parallax' ? 'rgba(59,130,246,0.12)' : 'var(--bg-input)',
+                            padding: '2px 6px',
+                            borderRadius: 4,
+                          }}>
+                            {asset.role === 'hero_image' ? 'Hero' : asset.role}
+                          </span>
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                            {asset.style || ((asset.metadata as Record<string, unknown>)?.source === 'uploaded' ? 'Uploaded' : 'AI')}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {new Date(asset.created_at).toLocaleDateString()}
+                        </div>
+                        {canEdit && (
+                          <button
+                            onClick={async () => {
+                              if (!confirm('Delete this asset?')) return
+                              const { supabase: sb } = await import('@/lib/supabase')
+                              await sb.from('media_assets').delete().eq('id', asset.id)
+                              if (asset.storage_path) {
+                                await sb.storage.from('client-assets').remove([asset.storage_path])
+                              }
+                              if (client) refreshMediaAssets(client.id)
+                            }}
+                            style={{
+                              marginTop: 6,
+                              fontSize: 11,
+                              color: 'var(--text-muted)',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: 0,
+                              textDecoration: 'underline',
+                            }}
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state" style={{ padding: 24, textAlign: 'center' }}>
+                  <span className="empty-state-text">No image assets yet</span>
+                  <span className="empty-state-sub">Generate or upload images in the Landing Page Builder</span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Review Profiles */}
