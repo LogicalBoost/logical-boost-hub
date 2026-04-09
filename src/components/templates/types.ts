@@ -78,6 +78,14 @@ export interface ReviewSite {
   enabled?: boolean      // whether to show on landing pages (default true)
 }
 
+export interface PlatformReview {
+  platform: string
+  author: string
+  text: string
+  rating?: number
+  source_url?: string
+}
+
 export interface MediaAssets {
   hero_image?: string
   parallax_image?: string
@@ -93,7 +101,8 @@ export interface MediaAssets {
   benefits_image?: string
   trustpilot_widget?: TrustpilotWidget
   review_sites?: ReviewSite[]
-  [key: string]: string | string[] | TrustpilotWidget | ReviewSite[] | undefined
+  platform_reviews?: PlatformReview[]
+  [key: string]: string | string[] | TrustpilotWidget | ReviewSite[] | PlatformReview[] | undefined
 }
 
 // Form system types

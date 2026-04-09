@@ -2927,6 +2927,25 @@ function BuildStep({
     setSlugError('')
 
     try {
+      // Fetch platform reviews from client_content (reviews with non-manual sources)
+      const { data: reviewContent } = await supabase
+        .from('client_content')
+        .select('body, person_name, rating, source')
+        .eq('client_id', clientId)
+        .eq('content_type', 'review')
+        .not('source', 'is', null)
+        .order('is_featured', { ascending: false })
+        .order('rating', { ascending: false })
+        .limit(20)
+      const platformReviews = (reviewContent || [])
+        .filter(r => r.body && r.person_name && r.source && r.source !== 'manual')
+        .map(r => ({
+          platform: r.source!,
+          author: r.person_name!,
+          text: r.body!,
+          rating: r.rating || undefined,
+        }))
+
       const result = await deployLandingPage({
         client_id: clientId,
         client_slug: clientSlug,
@@ -2945,6 +2964,7 @@ function BuildStep({
           logo: logoUrl || undefined,
           ...(trustpilotWidget ? { trustpilot_widget: trustpilotWidget } : {}),
           ...(reviewSites && reviewSites.length > 0 ? { review_sites: reviewSites } : {}),
+          ...(platformReviews.length > 0 ? { platform_reviews: platformReviews } : {}),
         },
         avatar_id: selectedAvatar || undefined,
         offer_id: selectedOffer || undefined,

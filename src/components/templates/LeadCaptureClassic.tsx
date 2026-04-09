@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import type { Section, SectionItem, MediaAssets, TrustpilotWidget, ReviewSite, FormConfig } from './types'
+import type { Section, SectionItem, MediaAssets, TrustpilotWidget, ReviewSite, PlatformReview, FormConfig } from './types'
 import LeadFormDynamic from './LeadFormDynamic'
 import AnimatedBackground from '../shared/AnimatedBackground'
 import { CaretDown as ChevronDown } from '@phosphor-icons/react'
@@ -420,6 +420,15 @@ export default function LeadCaptureClassic({ sections, media, brandKit, formConf
       {/* ─── FEATURE CARDS BAR ─── */}
       {features && <FeatureCardsBar section={features} primaryColor={resolvedPrimary} accentColor={resolvedAccent} trustpilotWidget={media.trustpilot_widget} reviewSites={media.review_sites} />}
 
+      {/* ─── PLATFORM REVIEWS (best-rated first, early in page) ─── */}
+      {(() => {
+        const grouped = groupReviewsByPlatform(media.platform_reviews, media.review_sites)
+        const sorted = grouped.sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0))
+        const primary = sorted[0]  // best-rated platform — shows early
+        const rest = sorted.slice(1) // additional platforms — show later
+        return primary ? <PlatformReviewsBlock group={primary} /> : null
+      })()}
+
       {/* ─── TWO COLUMN INFO ─── */}
       {info && <TwoColumnInfo section={info} media={media} safeAccentOnLight={safeAccentOnLightBg} />}
 
@@ -435,7 +444,16 @@ export default function LeadCaptureClassic({ sections, media, brandKit, formConf
       {/* ─── TESTIMONIALS ─── */}
       {testimonials && <TestimonialsBlock section={testimonials} media={media} safeAccentOnLight={safeAccentOnLightBg} />}
 
-      {/* ─── REVIEW BADGES (Trustpilot, Google, Yelp, BBB, etc.) ─── */}
+      {/* ─── ADDITIONAL PLATFORM REVIEWS (lower on page) ─── */}
+      {(() => {
+        const grouped = groupReviewsByPlatform(media.platform_reviews, media.review_sites)
+        const sorted = grouped.sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0))
+        return sorted.slice(1).map(group => (
+          <PlatformReviewsBlock key={group.platform} group={group} />
+        ))
+      })()}
+
+      {/* ─── REVIEW BADGES (condensed badge bar) ─── */}
       <ReviewBadgesBlock trustpilotWidget={media.trustpilot_widget} reviewSites={media.review_sites} />
 
       {/* ─── FAQ ─── */}
@@ -607,8 +625,9 @@ function HeroBlock({ section, media, primaryColor, accentColor, safeAccentOnLigh
    ═══════════════════════════════════════════════════════ */
 function FeatureCardsBar({ section, primaryColor, accentColor, trustpilotWidget, reviewSites }: { section: Section; primaryColor: string; accentColor: string; trustpilotWidget?: TrustpilotWidget; reviewSites?: ReviewSite[] }) {
   const items = section.items || []
-  const hasTrustpilot = !!(trustpilotWidget?.businessUnitId)
-  const enabledReviewSites = (reviewSites || []).filter(rs => rs.enabled !== false && rs.url)
+  const enabledReviewSites = (reviewSites || []).filter(rs => rs.enabled !== false && rs.url && rs.rating)
+  const trustpilotSite = enabledReviewSites.find(rs => rs.platform === 'trustpilot')
+  const hasTrustpilot = !!(trustpilotWidget?.businessUnitId) && !!(trustpilotSite?.rating || trustpilotSite?.review_count)
   const hasAnyReviews = hasTrustpilot || enabledReviewSites.length > 0
 
   return (
@@ -658,31 +677,23 @@ function FeatureCardsBar({ section, primaryColor, accentColor, trustpilotWidget,
           <div className="mt-5 md:mt-6 flex justify-center">
             <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6">
               {hasTrustpilot && (
-                <a
-                  href={trustpilotWidget!.reviewUrl || `https://www.trustpilot.com/review/${trustpilotWidget!.domain || ''}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors"
-                >
+                <div className="flex items-center gap-1.5 text-white/80">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                     <path d="M12 1.5l2.76 8.495h8.94l-7.23 5.253 2.76 8.495L12 18.49l-7.23 5.253 2.76-8.495L.3 9.995h8.94L12 1.5z" fill="#00b67a"/>
                   </svg>
                   <span className="text-[10px] md:text-xs font-medium">Trustpilot</span>
-                  <MiniStars count={5} color="#00b67a" />
-                </a>
+                  <MiniStars count={Math.round(trustpilotSite?.rating || 5)} color="#00b67a" />
+                </div>
               )}
-              {enabledReviewSites.map((rs) => (
-                <a
+              {enabledReviewSites.filter(rs => rs.platform !== 'trustpilot' || !hasTrustpilot).map((rs) => (
+                <div
                   key={rs.platform}
-                  href={rs.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors"
+                  className="flex items-center gap-1.5 text-white/80"
                 >
                   <ReviewPlatformIcon platform={rs.platform} size={14} />
                   <span className="text-[10px] md:text-xs font-medium">{REVIEW_PLATFORM_NAMES[rs.platform]}</span>
                   {rs.rating && <MiniStars count={Math.round(rs.rating)} color={REVIEW_PLATFORM_COLORS[rs.platform]} />}
-                </a>
+                </div>
               ))}
             </div>
           </div>
@@ -1250,23 +1261,30 @@ function ReviewPlatformIcon({ platform, size = 20 }: { platform: string; size?: 
    if there are review sites to show.
    ═══════════════════════════════════════════════════════ */
 function ReviewBadgesBlock({ trustpilotWidget, reviewSites }: { trustpilotWidget?: TrustpilotWidget; reviewSites?: ReviewSite[] }) {
-  const hasTrustpilot = !!(trustpilotWidget?.businessUnitId)
   const enabledSites = (reviewSites || []).filter(rs => rs.enabled !== false && rs.url)
+  // Only show Trustpilot if it's also configured as a review site with a rating,
+  // OR if there's a manually-added trustpilot review site. Auto-detected Trustpilot
+  // without confirmed reviews should NOT show fake 5-star badges.
+  const trustpilotSite = enabledSites.find(rs => rs.platform === 'trustpilot')
+  const hasTrustpilot = !!(trustpilotWidget?.businessUnitId) && !!(trustpilotSite?.rating || trustpilotSite?.review_count)
 
   // Build a unified list of badges to show
   const badges: Array<{ platform: string; url: string; rating?: number; reviewCount?: number }> = []
 
-  if (hasTrustpilot) {
+  if (hasTrustpilot && trustpilotSite) {
     badges.push({
       platform: 'trustpilot',
       url: trustpilotWidget!.reviewUrl || `https://www.trustpilot.com/review/${trustpilotWidget!.domain || ''}`,
-      rating: 5,
+      rating: trustpilotSite.rating,
+      reviewCount: trustpilotSite.review_count,
     })
   }
 
   for (const rs of enabledSites) {
     // Don't duplicate Trustpilot if already added from widget
     if (rs.platform === 'trustpilot' && hasTrustpilot) continue
+    // Only show badges for sites that have a rating (verified reviews)
+    if (!rs.rating) continue
     badges.push({
       platform: rs.platform,
       url: rs.url,
@@ -1285,12 +1303,9 @@ function ReviewBadgesBlock({ trustpilotWidget, reviewSites }: { trustpilotWidget
       <div className="relative z-10 max-w-5xl mx-auto px-4 md:px-10">
         <div className={`flex flex-wrap items-center justify-center ${badges.length === 1 ? 'gap-6' : 'gap-6 md:gap-10'}`}>
           {badges.map((badge) => (
-            <a
+            <div
               key={badge.platform}
-              href={badge.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 group"
+              className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3"
             >
               <div className="flex items-center gap-2">
                 <ReviewPlatformIcon platform={badge.platform} size={24} />
@@ -1310,12 +1325,128 @@ function ReviewBadgesBlock({ trustpilotWidget, reviewSites }: { trustpilotWidget
               {badge.reviewCount && (
                 <span className="text-xs text-gray-400">{badge.reviewCount} reviews</span>
               )}
-              <span className="text-xs text-gray-500 group-hover:text-[var(--color-primary)] transition-colors">
-                See reviews &#8599;
-              </span>
-            </a>
+            </div>
           ))}
         </div>
+      </div>
+    </section>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════
+   PLATFORM REVIEWS — Branded review sections showing
+   actual customer reviews grouped by platform (Google,
+   Yelp, BBB, etc.). Each platform gets its own section
+   with platform branding, stars, and review cards.
+   ═══════════════════════════════════════════════════════ */
+interface ReviewGroup {
+  platform: string
+  reviews: PlatformReview[]
+  siteInfo?: ReviewSite
+  avgRating?: number
+}
+
+function groupReviewsByPlatform(reviews?: PlatformReview[], sites?: ReviewSite[]): ReviewGroup[] {
+  if (!reviews || reviews.length === 0) return []
+  const groups = new Map<string, PlatformReview[]>()
+  for (const r of reviews) {
+    const key = r.platform || 'other'
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(r)
+  }
+  return Array.from(groups.entries()).map(([platform, revs]) => {
+    const site = sites?.find(s => s.platform === platform)
+    const ratings = revs.filter(r => r.rating).map(r => r.rating!)
+    const avgRating = site?.rating || (ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : undefined)
+    return { platform, reviews: revs, siteInfo: site, avgRating }
+  })
+}
+
+function PlatformReviewsBlock({ group }: { group: ReviewGroup }) {
+  const { platform, reviews, siteInfo, avgRating } = group
+  if (reviews.length === 0) return null
+
+  const platformColor = REVIEW_PLATFORM_COLORS[platform] || '#6b7280'
+  const platformName = REVIEW_PLATFORM_NAMES[platform] || platform
+  const profileUrl = siteInfo?.url
+
+  return (
+    <section className="relative py-12 md:py-16 overflow-hidden" style={{ background: '#fafbfc' }}>
+      <SectionLines color={platformColor} opacity={0.04} />
+      <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-10">
+        {/* Platform header */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-8 md:mb-10">
+          <div className="flex items-center gap-2.5">
+            <ReviewPlatformIcon platform={platform} size={28} />
+            <span className="text-xl font-bold text-[#191919]">{platformName} Reviews</span>
+          </div>
+          {avgRating && (
+            <div className="flex items-center gap-2">
+              <div className="flex gap-0.5">
+                {[...Array(Math.round(avgRating))].map((_, i) => (
+                  <div key={i} className="w-5 h-5 flex items-center justify-center rounded-[1px]" style={{ background: platformColor }}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="white">
+                      <path d="M12 1.5l2.76 8.495h8.94l-7.23 5.253 2.76 8.495L12 18.49l-7.23 5.253 2.76-8.495L.3 9.995h8.94L12 1.5z"/>
+                    </svg>
+                  </div>
+                ))}
+              </div>
+              <span className="text-sm font-semibold text-gray-600">{avgRating.toFixed(1)}</span>
+              {siteInfo?.review_count && (
+                <span className="text-xs text-gray-400">({siteInfo.review_count} reviews)</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Review cards */}
+        <div className={`grid gap-4 md:gap-6 ${reviews.length === 1 ? 'max-w-2xl mx-auto' : reviews.length === 2 ? 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
+          {reviews.map((review, i) => (
+            <div
+              key={i}
+              className="rounded-xl p-5 md:p-6"
+              style={{
+                background: 'white',
+                border: '1px solid rgba(0,0,0,0.06)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+              }}
+            >
+              {/* Stars */}
+              {review.rating && (
+                <div className="flex gap-0.5 mb-3">
+                  {[...Array(Math.round(review.rating))].map((_, j) => (
+                    <svg key={j} width="16" height="16" viewBox="0 0 24 24" fill={platformColor}>
+                      <path d="M12 1.5l2.76 8.495h8.94l-7.23 5.253 2.76 8.495L12 18.49l-7.23 5.253 2.76-8.495L.3 9.995h8.94L12 1.5z"/>
+                    </svg>
+                  ))}
+                </div>
+              )}
+              {/* Review text */}
+              <p className="text-sm md:text-base text-gray-700 leading-relaxed mb-4" style={{ fontStyle: 'italic' }}>
+                &ldquo;{review.text}&rdquo;
+              </p>
+              {/* Author */}
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: platformColor }}>
+                  {review.author.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{review.author}</p>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide">via {platformName}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Review count attribution — no outbound links */}
+        {siteInfo?.review_count && (
+          <div className="text-center mt-6">
+            <span className="text-xs text-gray-400">
+              Based on {siteInfo.review_count} {platformName} reviews
+            </span>
+          </div>
+        )}
       </div>
     </section>
   )

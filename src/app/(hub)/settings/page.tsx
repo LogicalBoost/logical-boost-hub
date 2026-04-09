@@ -1891,149 +1891,8 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Review Profiles */}
-          <div className="card">
-            <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Review Profiles</span>
-              {editing && (
-                <button className="btn btn-secondary" onClick={() => setReviewSites([...reviewSites, { platform: 'google', url: '', rating: '', review_count: '', enabled: true }])}>
-                  Add Review Site
-                </button>
-              )}
-            </div>
-            <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>
-              Add review profile URLs to show trust badges on landing pages.
-            </div>
-            <div style={{ marginTop: 16 }}>
-              {editing ? (
-                <>
-                  {reviewSites.map((rs, index) => (
-                    <div key={index} style={{ marginBottom: 12, padding: 16, borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg-input)' }}>
-                      <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10, marginBottom: 10 }}>
-                        <div>
-                          <label className="form-label" style={{ fontSize: 11 }}>Platform</label>
-                          <select
-                            className="form-input"
-                            value={rs.platform}
-                            onChange={(e) => {
-                              const updated = [...reviewSites]
-                              updated[index] = { ...updated[index], platform: e.target.value }
-                              setReviewSites(updated)
-                            }}
-                          >
-                            <option value="google">Google</option>
-                            <option value="yelp">Yelp</option>
-                            <option value="bbb">BBB</option>
-                            <option value="facebook">Facebook</option>
-                            <option value="trustpilot">Trustpilot</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="form-label" style={{ fontSize: 11 }}>Profile URL</label>
-                          <input
-                            className="form-input"
-                            type="url"
-                            placeholder={rs.platform === 'google' ? 'https://g.page/... or Google Maps URL' : rs.platform === 'yelp' ? 'https://yelp.com/biz/...' : rs.platform === 'bbb' ? 'https://bbb.org/...' : rs.platform === 'facebook' ? 'https://facebook.com/.../reviews' : 'https://...'}
-                            value={rs.url}
-                            onChange={(e) => {
-                              const updated = [...reviewSites]
-                              updated[index] = { ...updated[index], url: e.target.value }
-                              setReviewSites(updated)
-                            }}
-                          />
-                        </div>
-                      </div>
-                      <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '100px 120px 1fr auto', gap: 10, alignItems: 'end' }}>
-                        <div>
-                          <label className="form-label" style={{ fontSize: 11 }}>Rating</label>
-                          <input
-                            className="form-input"
-                            type="number"
-                            step="0.1"
-                            min="1"
-                            max="5"
-                            placeholder="4.8"
-                            value={rs.rating}
-                            onChange={(e) => {
-                              const updated = [...reviewSites]
-                              updated[index] = { ...updated[index], rating: e.target.value }
-                              setReviewSites(updated)
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label className="form-label" style={{ fontSize: 11 }}>Reviews</label>
-                          <input
-                            className="form-input"
-                            type="number"
-                            placeholder="150"
-                            value={rs.review_count}
-                            onChange={(e) => {
-                              const updated = [...reviewSites]
-                              updated[index] = { ...updated[index], review_count: e.target.value }
-                              setReviewSites(updated)
-                            }}
-                          />
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={rs.enabled}
-                              onChange={(e) => {
-                                const updated = [...reviewSites]
-                                updated[index] = { ...updated[index], enabled: e.target.checked }
-                                setReviewSites(updated)
-                              }}
-                            />
-                            Show on pages
-                          </label>
-                        </div>
-                        <button
-                          className="btn btn-secondary"
-                          style={{ fontSize: 13, padding: '6px 12px' }}
-                          onClick={() => setReviewSites(reviewSites.filter((_, i) => i !== index))}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  {reviewSites.length === 0 && (
-                    <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
-                      No review sites added yet. Click &quot;Add Review Site&quot; to add Google, Yelp, BBB, or other review profiles.
-                    </div>
-                  )}
-                </>
-              ) : (() => {
-                const savedSites = (client?.metadata as Record<string, unknown>)?.review_sites as Array<Record<string, unknown>> | undefined
-                if (!savedSites || savedSites.length === 0) {
-                  return (
-                    <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
-                      No review profiles configured. Click Edit to add Google, Yelp, BBB, or other review site URLs.
-                    </div>
-                  )
-                }
-                return (
-                  <div style={{ display: 'grid', gap: 8 }}>
-                    {savedSites.map((rs, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg-input)' }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: rs.platform === 'google' ? '#fbbc04' : rs.platform === 'yelp' ? '#d32323' : rs.platform === 'bbb' ? '#005a78' : rs.platform === 'facebook' ? '#1877f2' : 'var(--text-primary)', textTransform: 'uppercase', minWidth: 70 }}>
-                          {String(rs.platform)}
-                        </span>
-                        <a href={String(rs.url)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: 'var(--accent)', flex: 1, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {String(rs.url)}
-                        </a>
-                        {!!rs.rating && <span style={{ fontSize: 12, fontWeight: 600 }}>{String(rs.rating)}</span>}
-                        {!!rs.review_count && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{String(rs.review_count)} reviews</span>}
-                        {rs.enabled === false && <span style={{ fontSize: 10, color: 'var(--text-muted)', background: 'var(--bg-input)', padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)' }}>Hidden</span>}
-                      </div>
-                    ))}
-                  </div>
-                )
-              })()}
-            </div>
-          </div>
+          {/* Review Profiles — standalone, no edit mode needed */}
+          {client && <ReviewProfilesCard clientId={client.id} clientMetadata={client.metadata as Record<string, unknown> | null} onSaved={() => refreshClient(client.id)} canEdit={canEdit} clientContent={clientContent} onContentChange={loadClientContent} />}
 
           {/* Re-analyze Section */}
           {canEdit && (
@@ -3269,6 +3128,271 @@ export default function SettingsPage() {
       {activeTab === 'clients' && isAdmin && renderClientAccessTab()}
       {activeTab === 'prompts' && isAdmin && renderPromptsTab()}
       {activeTab === 'phones' && (isClientRole ? renderPhoneNumbersReadOnly() : renderPhoneNumbersTab())}
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════
+   REVIEW PROFILES CARD — Standalone component that manages
+   review sites + individual review quotes. No edit mode needed.
+   ═══════════════════════════════════════════════════════ */
+const PLATFORM_COLORS: Record<string, string> = { google: '#fbbc04', yelp: '#d32323', bbb: '#005a78', facebook: '#1877f2', trustpilot: '#00b67a' }
+const PLATFORM_LABELS: Record<string, string> = { google: 'Google', yelp: 'Yelp', bbb: 'BBB', facebook: 'Facebook', trustpilot: 'Trustpilot' }
+
+interface ReviewProfilesCardProps {
+  clientId: string
+  clientMetadata: Record<string, unknown> | null
+  onSaved: () => void
+  canEdit: boolean
+  clientContent: Array<{ id: string; content_type: string; body: string | null; person_name: string | null; person_role: string | null; rating: number | null; source: string | null }>
+  onContentChange: () => void
+}
+
+interface RSForm { platform: string; url: string; rating: string; review_count: string; enabled: boolean }
+
+function ReviewProfilesCard({ clientId, clientMetadata, onSaved, canEdit, clientContent, onContentChange }: ReviewProfilesCardProps) {
+  const [sites, setSites] = useState<RSForm[]>([])
+  const [saving, setSaving] = useState(false)
+  const [dirty, setDirty] = useState(false)
+  const [addingReviewFor, setAddingReviewFor] = useState<string | null>(null)
+  const [newReview, setNewReview] = useState({ author: '', text: '', rating: '5' })
+
+  // Load sites from metadata on mount / when metadata changes
+  useEffect(() => {
+    const existing = (clientMetadata?.review_sites as Array<Record<string, unknown>>) || []
+    setSites(existing.map(rs => ({
+      platform: String(rs.platform || 'google'),
+      url: String(rs.url || ''),
+      rating: rs.rating ? String(rs.rating) : '',
+      review_count: rs.review_count ? String(rs.review_count) : '',
+      enabled: rs.enabled !== false,
+    })))
+    setDirty(false)
+  }, [clientMetadata])
+
+  function addSite() {
+    setSites([...sites, { platform: 'google', url: '', rating: '', review_count: '', enabled: true }])
+    setDirty(true)
+  }
+
+  function updateSite(index: number, field: keyof RSForm, value: string | boolean) {
+    const updated = [...sites]
+    updated[index] = { ...updated[index], [field]: value }
+    setSites(updated)
+    setDirty(true)
+  }
+
+  function removeSite(index: number) {
+    setSites(sites.filter((_, i) => i !== index))
+    setDirty(true)
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    const existingMeta = clientMetadata || {}
+    const cleaned = sites
+      .filter(rs => rs.url.trim())
+      .map(rs => ({
+        platform: rs.platform,
+        url: rs.url.trim(),
+        rating: rs.rating ? parseFloat(rs.rating) || undefined : undefined,
+        review_count: rs.review_count ? parseInt(rs.review_count) || undefined : undefined,
+        enabled: rs.enabled,
+      }))
+    const { error } = await (await import('@/lib/supabase')).supabase
+      .from('clients')
+      .update({ metadata: { ...existingMeta, review_sites: cleaned.length > 0 ? cleaned : undefined } })
+      .eq('id', clientId)
+    if (error) {
+      alert('Failed to save: ' + error.message)
+    } else {
+      setDirty(false)
+      onSaved()
+    }
+    setSaving(false)
+  }
+
+  async function handleAddReview(platform: string) {
+    if (!newReview.author.trim() || !newReview.text.trim()) return
+    const { error } = await (await import('@/lib/supabase')).supabase
+      .from('client_content')
+      .insert({
+        client_id: clientId,
+        content_type: 'review',
+        source: platform,
+        person_name: newReview.author.trim(),
+        body: newReview.text.trim(),
+        rating: parseInt(newReview.rating) || 5,
+      })
+    if (error) {
+      alert('Failed to add review: ' + error.message)
+    } else {
+      setNewReview({ author: '', text: '', rating: '5' })
+      setAddingReviewFor(null)
+      onContentChange()
+    }
+  }
+
+  async function handleDeleteReview(id: string) {
+    if (!confirm('Delete this review?')) return
+    await (await import('@/lib/supabase')).supabase.from('client_content').delete().eq('id', id)
+    onContentChange()
+  }
+
+  // Get reviews from client_content grouped by platform
+  const platformReviews = clientContent.filter(c => c.content_type === 'review' && c.source && c.source !== 'manual' && c.source !== 'website')
+
+  return (
+    <div className="card">
+      <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>Review Profiles</span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {dirty && (
+            <button className="btn btn-primary" onClick={handleSave} disabled={saving} style={{ fontSize: 13 }}>
+              {saving ? 'Saving...' : 'Save Profiles'}
+            </button>
+          )}
+          {canEdit && (
+            <button className="btn btn-secondary" onClick={addSite} style={{ fontSize: 13 }}>
+              + Add Review Site
+            </button>
+          )}
+        </div>
+      </div>
+      <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>
+        Add review profile URLs and paste in individual reviews. Reviews show as branded sections on landing pages.
+      </div>
+
+      <div style={{ marginTop: 16, display: 'grid', gap: 16 }}>
+        {sites.map((rs, index) => {
+          const color = PLATFORM_COLORS[rs.platform] || 'var(--text-primary)'
+          const reviews = platformReviews.filter(r => r.source === rs.platform)
+          return (
+            <div key={index} style={{ borderRadius: 'var(--radius)', border: `1px solid var(--border)`, background: 'var(--bg-input)', overflow: 'hidden' }}>
+              {/* Platform header bar */}
+              <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, background: `${color}10` }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  {PLATFORM_LABELS[rs.platform] || rs.platform}
+                </span>
+                <span style={{ flex: 1 }} />
+                <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', color: 'var(--text-muted)' }}>
+                  <input type="checkbox" checked={rs.enabled} onChange={(e) => updateSite(index, 'enabled', e.target.checked)} />
+                  Show on pages
+                </label>
+                <button onClick={() => removeSite(index)} style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Remove</button>
+              </div>
+
+              <div style={{ padding: 16 }}>
+                {/* Profile info */}
+                <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 90px 100px', gap: 10, marginBottom: 12 }}>
+                  <div>
+                    <label className="form-label" style={{ fontSize: 11 }}>Profile URL</label>
+                    <input className="form-input" type="url"
+                      placeholder={rs.platform === 'google' ? 'https://g.page/... or Google Maps link' : rs.platform === 'yelp' ? 'https://yelp.com/biz/...' : 'https://...'}
+                      value={rs.url} onChange={(e) => updateSite(index, 'url', e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: 11 }}>Rating</label>
+                    <input className="form-input" type="number" step="0.1" min="1" max="5" placeholder="4.8"
+                      value={rs.rating} onChange={(e) => updateSite(index, 'rating', e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: 11 }}>Review Count</label>
+                    <input className="form-input" type="number" placeholder="150"
+                      value={rs.review_count} onChange={(e) => updateSite(index, 'review_count', e.target.value)} />
+                  </div>
+                </div>
+                <div>
+                  <select className="form-input" style={{ width: 'auto', fontSize: 12, padding: '4px 8px', marginBottom: 12 }}
+                    value={rs.platform} onChange={(e) => updateSite(index, 'platform', e.target.value)}>
+                    <option value="google">Google</option>
+                    <option value="yelp">Yelp</option>
+                    <option value="bbb">BBB</option>
+                    <option value="facebook">Facebook</option>
+                    <option value="trustpilot">Trustpilot</option>
+                  </select>
+                </div>
+
+                {/* Reviews for this platform */}
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      Reviews ({reviews.length})
+                    </span>
+                    {canEdit && (
+                      <button
+                        className="btn btn-secondary"
+                        style={{ fontSize: 11, padding: '3px 10px' }}
+                        onClick={() => setAddingReviewFor(addingReviewFor === rs.platform ? null : rs.platform)}
+                      >
+                        + Add Review
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Add review form */}
+                  {addingReviewFor === rs.platform && (
+                    <div style={{ marginBottom: 10, padding: 12, borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface-hover)' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 8, marginBottom: 8 }}>
+                        <input className="form-input" placeholder="Reviewer name" style={{ fontSize: 12 }}
+                          value={newReview.author} onChange={(e) => setNewReview({ ...newReview, author: e.target.value })} />
+                        <select className="form-input" style={{ fontSize: 12 }}
+                          value={newReview.rating} onChange={(e) => setNewReview({ ...newReview, rating: e.target.value })}>
+                          <option value="5">5 stars</option>
+                          <option value="4">4 stars</option>
+                          <option value="3">3 stars</option>
+                        </select>
+                      </div>
+                      <textarea className="form-textarea" rows={2} placeholder="Paste the review text here..." style={{ fontSize: 12 }}
+                        value={newReview.text} onChange={(e) => setNewReview({ ...newReview, text: e.target.value })} />
+                      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                        <button className="btn btn-primary" style={{ fontSize: 11, padding: '4px 12px' }}
+                          onClick={() => handleAddReview(rs.platform)} disabled={!newReview.author.trim() || !newReview.text.trim()}>
+                          Save Review
+                        </button>
+                        <button className="btn btn-secondary" style={{ fontSize: 11, padding: '4px 12px' }}
+                          onClick={() => { setAddingReviewFor(null); setNewReview({ author: '', text: '', rating: '5' }) }}>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Existing reviews */}
+                  {reviews.length > 0 ? (
+                    <div style={{ display: 'grid', gap: 6 }}>
+                      {reviews.map(r => (
+                        <div key={r.id} style={{ display: 'flex', gap: 10, padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface-hover)', fontSize: 12 }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{r.person_name}</span>
+                              {r.rating && <span style={{ color, fontSize: 10 }}>{'★'.repeat(r.rating)}</span>}
+                            </div>
+                            <div style={{ color: 'var(--text-secondary)', lineHeight: 1.4 }}>&ldquo;{r.body}&rdquo;</div>
+                          </div>
+                          {canEdit && (
+                            <button onClick={() => handleDeleteReview(r.id)} style={{ fontSize: 10, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', alignSelf: 'start' }}>✕</button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '8px 0' }}>
+                      No reviews added yet. Paste in reviews from this platform to display on landing pages.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+
+        {sites.length === 0 && (
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+            No review sites added yet. Click &quot;+ Add Review Site&quot; to add Google, Yelp, BBB, or other review profiles.
+          </div>
+        )}
+      </div>
     </div>
   )
 }

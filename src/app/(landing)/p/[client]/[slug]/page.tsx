@@ -340,6 +340,7 @@ export default function LandingPage() {
     testimonial_photos: (page.media_assets?.testimonial_photos as string[] | undefined) || undefined,
     trustpilot_widget: (page.media_assets?.trustpilot_widget as TrustpilotWidget | undefined) || undefined,
     review_sites: (page.media_assets?.review_sites as Array<{ platform: 'google' | 'yelp' | 'bbb' | 'facebook' | 'trustpilot'; url: string; rating?: number; review_count?: number; enabled?: boolean }> | undefined) || undefined,
+    platform_reviews: (page.media_assets?.platform_reviews as Array<{ platform: string; author: string; text: string; rating?: number; source_url?: string }> | undefined) || undefined,
   }
 
   // Route to the correct template
