@@ -70,6 +70,14 @@ export interface TrustpilotWidget {
   scriptTag?: string
 }
 
+export interface ReviewSite {
+  platform: 'google' | 'yelp' | 'bbb' | 'facebook' | 'trustpilot'
+  url: string
+  rating?: number       // 1-5 star rating (manually entered or fetched)
+  review_count?: number  // total number of reviews
+  enabled?: boolean      // whether to show on landing pages (default true)
+}
+
 export interface MediaAssets {
   hero_image?: string
   parallax_image?: string
@@ -84,7 +92,8 @@ export interface MediaAssets {
   steps_image?: string
   benefits_image?: string
   trustpilot_widget?: TrustpilotWidget
-  [key: string]: string | string[] | TrustpilotWidget | undefined
+  review_sites?: ReviewSite[]
+  [key: string]: string | string[] | TrustpilotWidget | ReviewSite[] | undefined
 }
 
 // Form system types

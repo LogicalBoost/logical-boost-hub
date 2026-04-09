@@ -45,7 +45,7 @@ src/
     Sidebar.tsx            — Navigation sidebar (9 nav items, collapsed state shows icon.png not full logo)
     LogoUpload.tsx         — Logo upload component
     templates/
-      LeadCaptureClassic.tsx — Lead Capture Classic template (rounded hero, decorative shapes, primary for structure, accent for CTAs only, Trustpilot widget, branded trust bar gradient)
+      LeadCaptureClassic.tsx — Lead Capture Classic template (rounded hero, decorative shapes, primary as dominant brand color, SVG Trustpilot badges, WCAG color safety utilities, branded trust bar gradient)
       types.ts             — TypeScript interfaces: Section, SectionItem, MediaAssets, BrandKit, TrustpilotWidget
     shared/
       AnimatedBackground.tsx — Floating geometric shapes and gradient orbs for hero sections
@@ -197,7 +197,7 @@ The Hub has a dynamic route: `src/app/(landing)/p/[client]/[slug]/page.tsx`
 This route:
 1. Looks up the `published_pages` record by client slug + page slug
 2. Loads sections (AI-generated) or converts from flat copy_slots (legacy)
-3. Builds media assets object (hero, parallax, logo, Trustpilot widget)
+3. Builds media assets object (hero, parallax, logo, Trustpilot data)
 4. Injects brand kit as CSS custom properties
 5. Renders the appropriate template component (e.g., LeadCaptureClassic)
 6. Returns a fully rendered landing page — no Hub chrome (no sidebar, no header)
@@ -205,7 +205,7 @@ This route:
 ### Templates (Built)
 | Slug | Name | Status |
 |------|------|--------|
-| `lead-capture-classic` | Lead Capture Classic | Built — rounded hero with decorative CSS shapes, animated bg, feature cards (primary), two-column info, steps, parallax trust bar (branded gradient overlay), benefits grid, testimonials, Trustpilot widget, FAQ, footer |
+| `lead-capture-classic` | Lead Capture Classic | Built — rounded hero with decorative CSS shapes, animated bg, feature cards (primary), two-column info, steps, parallax trust bar (branded gradient overlay), benefits grid, testimonials, SVG Trustpilot badges, FAQ, footer |
 | `bold-split` | Bold Split | Coming soon |
 | `social-proof-heavy` | Social Proof Heavy | Coming soon |
 | `minimal-direct` | Minimal Direct | Coming soon |
@@ -213,10 +213,10 @@ This route:
 Template components live in `src/components/templates/`. Types in `src/components/templates/types.ts`.
 
 ### Template Color Rules
-- `--color-primary` — Structural elements: feature cards bar, icon backgrounds, borders, decorative shapes
-- `--color-accent` — **CTAs ONLY**: buttons, accent word highlights in headlines
+- `--color-primary` — **Dominant brand color** used for ALL major visual elements: buttons, progress bars, step badges, headline accent words, form focus rings, radio buttons, checkboxes, feature card bars, icon backgrounds, borders, decorative shapes
+- `--color-accent` — Minimal/unused. Never for buttons, headlines, or icons. Reserved only for subtle decorative touches if needed.
 - `--color-secondary` — Dark sections: footer background, trust bar base
-- Never use accent for non-CTA elements
+- **WCAG color safety**: Template includes inline utilities (hexToRgb, getLuminance, getContrastRatio, getContrastTextColor, isLightColor, getSafeHighlightOnDark, getSafeAccentOnLight, getSafeButtonColors) that enforce readability — no low-contrast text, button text always readable, accent highlights readable on all backgrounds
 
 ### Client Templates (Saved from Published Pages)
 - On Published Pages tab, each page has a "Save as Template" icon
@@ -251,7 +251,7 @@ Template components live in `src/components/templates/`. Types in `src/component
 1. **Select Avatar + Offer** — Two dropdowns, approved only, avatars sorted by priority
 2. **Select Template** — Client templates (saved) shown first, then base templates. Coming Soon templates are disabled.
 3. **Review Copy + Media** — AI copy generation, copy slot editing, hero image generator (4 styles + custom prompt), parallax AI generator or upload, saved image galleries with delete
-4. **Build Page** — Assign slug, pre-publish summary (template, slots, hero, parallax, Trustpilot status), deploy button, shows preview URL + GitHub repo link on success
+4. **Build Page** — Assign slug, pre-publish summary (template, slots, hero, parallax, Trustpilot badge status), deploy button, shows preview URL + GitHub repo link on success
 
 ### GitHub Repos + Webhook Sync
 Each client gets a GitHub repo: `LogicalBoost/[client-slug]-pages`
@@ -316,14 +316,35 @@ Admin-only "Prompts" tab in Settings page. Agency can view/edit all AI prompts u
 - Seeded prompts: `landing_page_copy`, `hero_image`, `funnel_copy`
 - Custom prompts get role-aware rules (parallax = cinematic landscape, hero = contextual scene)
 
-## Trustpilot Integration
+## Review Sites & Trustpilot Integration
 
+### Multi-Platform Review Badges
+- **Business Overview** page has "Review Profiles" section for manually adding review site URLs
+- Supported platforms: Google, Yelp, BBB, Facebook, Trustpilot
+- Each review site entry has: platform, URL, rating (1-5), review count, enabled toggle
+- Saved to `clients.metadata.review_sites` as array of `ReviewSite` objects
+- Landing page templates render SVG badges for each enabled review site (platform icon + stars + link)
+- **Two badge placements**: mini badges in feature cards bar, full badge section between testimonials and FAQ
+- If no review sites configured and no Trustpilot detected, badge sections are hidden entirely
+
+### Trustpilot Auto-Detection
 - `analyze-business` edge function detects Trustpilot from website HTML or infers domain
 - Fetches reviews from Trustpilot public page, extracts from JSON-LD structured data
-- Saves widget snippets (mini, carousel, grid) + scriptTag to `clients.metadata.trustpilot`
+- Saves Trustpilot data (businessUnitId, domain, score, review count) to `clients.metadata.trustpilot`
 - Reviews saved as `client_content` records (source: 'trustpilot')
-- Widget data flows through publish pipeline: `client.metadata.trustpilot` → `media_assets.trustpilot_widget` → template renders carousel widget after testimonials
-- Settings page shows Trustpilot business ID, domain, and copyable widget snippets
+- Trustpilot shows automatically if detected — no manual setup needed
+- SVG-based badges (not embedded widget — widgets require domain verification)
+
+### ReviewSite Interface
+```typescript
+interface ReviewSite {
+  platform: 'google' | 'yelp' | 'bbb' | 'facebook' | 'trustpilot'
+  url: string
+  rating?: number        // 1-5 star rating
+  review_count?: number  // total reviews
+  enabled?: boolean      // show on landing pages (default true)
+}
+```
 
 ## Competitor Intel (3-Tab Hub)
 

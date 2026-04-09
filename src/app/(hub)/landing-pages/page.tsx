@@ -2725,6 +2725,7 @@ export default function LandingPagesPage() {
           selectedOffer={selectedOfferId || ''}
           brandKit={(client?.brand_kit as Record<string, unknown>) || undefined}
           trustpilotWidget={(client?.metadata as Record<string, unknown>)?.trustpilot as Record<string, unknown> | undefined}
+          reviewSites={(client?.metadata as Record<string, unknown>)?.review_sites as Array<Record<string, unknown>> | undefined}
           formId={selectedFormId}
           phoneNumber={selectedPhoneId ? clientPhoneNumbers.find(p => p.id === selectedPhoneId)?.phone_number : undefined}
           forms={forms}
@@ -2846,6 +2847,7 @@ function BuildStep({
   selectedOffer,
   brandKit,
   trustpilotWidget,
+  reviewSites,
   formId,
   phoneNumber,
   forms: formsList,
@@ -2873,6 +2875,7 @@ function BuildStep({
   selectedOffer: string
   brandKit?: Record<string, unknown>
   trustpilotWidget?: Record<string, unknown>
+  reviewSites?: Array<Record<string, unknown>>
   formId?: string | null
   phoneNumber?: string
   forms?: Array<{ id: string; name: string; form_type: string; fields: unknown[]; steps?: unknown[] | null }>
@@ -2941,6 +2944,7 @@ function BuildStep({
           benefits_image: benefitsImageUrl || undefined,
           logo: logoUrl || undefined,
           ...(trustpilotWidget ? { trustpilot_widget: trustpilotWidget } : {}),
+          ...(reviewSites && reviewSites.length > 0 ? { review_sites: reviewSites } : {}),
         },
         avatar_id: selectedAvatar || undefined,
         offer_id: selectedOffer || undefined,
@@ -2993,9 +2997,12 @@ function BuildStep({
               </div>
             </div>
             <div style={{ padding: 12, borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg-input)' }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Trustpilot</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: trustpilotWidget?.businessUnitId ? 'var(--accent)' : 'var(--text-muted)' }}>
-                {trustpilotWidget?.businessUnitId ? '✓ Widget included' : 'Not detected'}
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Review Badges</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: (trustpilotWidget?.businessUnitId || (reviewSites && reviewSites.length > 0)) ? 'var(--accent)' : 'var(--text-muted)' }}>
+                {(() => {
+                  const count = (trustpilotWidget?.businessUnitId ? 1 : 0) + (reviewSites?.length || 0)
+                  return count > 0 ? `✓ ${count} platform${count > 1 ? 's' : ''}` : 'None configured'
+                })()}
               </div>
             </div>
           </div>

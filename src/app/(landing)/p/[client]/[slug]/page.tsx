@@ -339,6 +339,7 @@ export default function LandingPage() {
     team_photo: page.media_assets?.team_photo || undefined,
     testimonial_photos: (page.media_assets?.testimonial_photos as string[] | undefined) || undefined,
     trustpilot_widget: (page.media_assets?.trustpilot_widget as TrustpilotWidget | undefined) || undefined,
+    review_sites: (page.media_assets?.review_sites as Array<{ platform: 'google' | 'yelp' | 'bbb' | 'facebook' | 'trustpilot'; url: string; rating?: number; review_count?: number; enabled?: boolean }> | undefined) || undefined,
   }
 
   // Route to the correct template
