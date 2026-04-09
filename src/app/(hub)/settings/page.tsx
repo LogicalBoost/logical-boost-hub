@@ -84,6 +84,9 @@ export default function SettingsPage() {
   const [brandConstraints, setBrandConstraints] = useState('')
   const [complianceNotes, setComplianceNotes] = useState('')
   const [competitors, setCompetitors] = useState<Competitor[]>([])
+  // Review sites
+  interface ReviewSiteEdit { platform: string; url: string; rating: string; review_count: string; enabled: boolean }
+  const [reviewSites, setReviewSites] = useState<ReviewSiteEdit[]>([])
   const [reanalyzeNotes, setReanalyzeNotes] = useState('')
   const [reanalyzing, setReanalyzing] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -445,6 +448,19 @@ export default function SettingsPage() {
     setBrandConstraints(client.ad_copy_rules?.brand_constraints ?? '')
     setComplianceNotes(client.ad_copy_rules?.compliance_notes ?? '')
     setCompetitors(client.competitors ? [...client.competitors] : [])
+    // Sync review sites from metadata
+    const existingReviewSites = (client.metadata as Record<string, unknown>)?.review_sites as Array<Record<string, unknown>> | undefined
+    setReviewSites(
+      existingReviewSites
+        ? existingReviewSites.map((rs) => ({
+            platform: String(rs.platform || 'google'),
+            url: String(rs.url || ''),
+            rating: String(rs.rating || ''),
+            review_count: String(rs.review_count || ''),
+            enabled: rs.enabled !== false,
+          }))
+        : []
+    )
     // Sync brand kit
     const bk = client.brand_kit as Record<string, unknown> | null
     setBkPrimary((bk?.primary_color as string) || '')
@@ -530,6 +546,21 @@ export default function SettingsPage() {
           brand_constraints: brandConstraints.trim(),
           compliance_notes: complianceNotes.trim(),
         },
+      }
+      // Merge review_sites into existing metadata (preserve trustpilot, etc.)
+      const existingMeta = (client.metadata as Record<string, unknown>) || {}
+      const cleanedReviewSites = reviewSites
+        .filter(rs => rs.url.trim())
+        .map(rs => ({
+          platform: rs.platform,
+          url: rs.url.trim(),
+          rating: rs.rating ? parseFloat(rs.rating) || undefined : undefined,
+          review_count: rs.review_count ? parseInt(rs.review_count) || undefined : undefined,
+          enabled: rs.enabled,
+        }))
+      updates.metadata = {
+        ...existingMeta,
+        review_sites: cleanedReviewSites.length > 0 ? cleanedReviewSites : undefined,
       }
       const { error: updateError } = await supabase
         .from('clients')
@@ -1778,6 +1809,150 @@ export default function SettingsPage() {
                 })() as React.ReactNode}
               </div>
             )}
+          </div>
+
+          {/* Review Profiles */}
+          <div className="card">
+            <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Review Profiles</span>
+              {editing && (
+                <button className="btn btn-secondary" onClick={() => setReviewSites([...reviewSites, { platform: 'google', url: '', rating: '', review_count: '', enabled: true }])}>
+                  Add Review Site
+                </button>
+              )}
+            </div>
+            <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>
+              Add review profile URLs to show trust badges on landing pages.
+            </div>
+            <div style={{ marginTop: 16 }}>
+              {editing ? (
+                <>
+                  {reviewSites.map((rs, index) => (
+                    <div key={index} style={{ marginBottom: 12, padding: 16, borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg-input)' }}>
+                      <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10, marginBottom: 10 }}>
+                        <div>
+                          <label className="form-label" style={{ fontSize: 11 }}>Platform</label>
+                          <select
+                            className="form-input"
+                            value={rs.platform}
+                            onChange={(e) => {
+                              const updated = [...reviewSites]
+                              updated[index] = { ...updated[index], platform: e.target.value }
+                              setReviewSites(updated)
+                            }}
+                          >
+                            <option value="google">Google</option>
+                            <option value="yelp">Yelp</option>
+                            <option value="bbb">BBB</option>
+                            <option value="facebook">Facebook</option>
+                            <option value="trustpilot">Trustpilot</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="form-label" style={{ fontSize: 11 }}>Profile URL</label>
+                          <input
+                            className="form-input"
+                            type="url"
+                            placeholder={rs.platform === 'google' ? 'https://g.page/... or Google Maps URL' : rs.platform === 'yelp' ? 'https://yelp.com/biz/...' : rs.platform === 'bbb' ? 'https://bbb.org/...' : rs.platform === 'facebook' ? 'https://facebook.com/.../reviews' : 'https://...'}
+                            value={rs.url}
+                            onChange={(e) => {
+                              const updated = [...reviewSites]
+                              updated[index] = { ...updated[index], url: e.target.value }
+                              setReviewSites(updated)
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '100px 120px 1fr auto', gap: 10, alignItems: 'end' }}>
+                        <div>
+                          <label className="form-label" style={{ fontSize: 11 }}>Rating</label>
+                          <input
+                            className="form-input"
+                            type="number"
+                            step="0.1"
+                            min="1"
+                            max="5"
+                            placeholder="4.8"
+                            value={rs.rating}
+                            onChange={(e) => {
+                              const updated = [...reviewSites]
+                              updated[index] = { ...updated[index], rating: e.target.value }
+                              setReviewSites(updated)
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="form-label" style={{ fontSize: 11 }}>Reviews</label>
+                          <input
+                            className="form-input"
+                            type="number"
+                            placeholder="150"
+                            value={rs.review_count}
+                            onChange={(e) => {
+                              const updated = [...reviewSites]
+                              updated[index] = { ...updated[index], review_count: e.target.value }
+                              setReviewSites(updated)
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={rs.enabled}
+                              onChange={(e) => {
+                                const updated = [...reviewSites]
+                                updated[index] = { ...updated[index], enabled: e.target.checked }
+                                setReviewSites(updated)
+                              }}
+                            />
+                            Show on pages
+                          </label>
+                        </div>
+                        <button
+                          className="btn btn-secondary"
+                          style={{ fontSize: 13, padding: '6px 12px' }}
+                          onClick={() => setReviewSites(reviewSites.filter((_, i) => i !== index))}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {reviewSites.length === 0 && (
+                    <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+                      No review sites added yet. Click &quot;Add Review Site&quot; to add Google, Yelp, BBB, or other review profiles.
+                    </div>
+                  )}
+                </>
+              ) : (() => {
+                const savedSites = (client?.metadata as Record<string, unknown>)?.review_sites as Array<Record<string, unknown>> | undefined
+                if (!savedSites || savedSites.length === 0) {
+                  return (
+                    <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+                      No review profiles configured. Click Edit to add Google, Yelp, BBB, or other review site URLs.
+                    </div>
+                  )
+                }
+                return (
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {savedSites.map((rs, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg-input)' }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: rs.platform === 'google' ? '#fbbc04' : rs.platform === 'yelp' ? '#d32323' : rs.platform === 'bbb' ? '#005a78' : rs.platform === 'facebook' ? '#1877f2' : 'var(--text-primary)', textTransform: 'uppercase', minWidth: 70 }}>
+                          {String(rs.platform)}
+                        </span>
+                        <a href={String(rs.url)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: 'var(--accent)', flex: 1, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {String(rs.url)}
+                        </a>
+                        {!!rs.rating && <span style={{ fontSize: 12, fontWeight: 600 }}>{String(rs.rating)}</span>}
+                        {!!rs.review_count && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{String(rs.review_count)} reviews</span>}
+                        {rs.enabled === false && <span style={{ fontSize: 10, color: 'var(--text-muted)', background: 'var(--bg-input)', padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)' }}>Hidden</span>}
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+            </div>
           </div>
 
           {/* Re-analyze Section */}
