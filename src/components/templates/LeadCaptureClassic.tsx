@@ -129,10 +129,12 @@ function SectionLines({ color, opacity = 0.07 }: { color: string; opacity?: numb
 
 /* ═══════════════════════════════════════════════════════
    COLOR USAGE GUIDE:
-   - --color-primary: Icons, icon backgrounds, borders, decorative elements, blobs, section backgrounds,
-                      AND headline accent word highlights (gives brand presence without overwhelming)
-   - --color-secondary: Dark sections (trust bar, footer), overlays
-   - --color-accent: CTA buttons ONLY. Never headlines, never icons, never decorative elements.
+   - --color-primary: THE dominant brand color. Used for: CTA buttons, icons, icon backgrounds,
+                      borders, decorative elements, blobs, section backgrounds, headline accent
+                      word highlights, step badges, stat numbers. This IS the brand.
+   - --color-secondary: Dark sections (trust bar, footer), overlays, fallback when primary lacks contrast
+   - --color-accent: MINIMAL use. Only as a subtle highlight where primary and secondary are both used.
+                      Never buttons, never headlines, never icons.
    - --color-text: Headings and body text
    - --color-bg: Page background
    ═══════════════════════════════════════════════════════ */
@@ -352,16 +354,16 @@ export default function LeadCaptureClassic({ sections, media, brandKit, formConf
     }
   }, [brandKit])
 
-  // Compute safe button colors using WCAG contrast
-  const safeBtnLight = getSafeButtonColors(resolvedAccent, secondaryColor, '#ffffff')
-  const safeBtnDark = getSafeButtonColors(resolvedAccent, secondaryColor, secondaryColor)
-  // Headline accent word color — uses PRIMARY (brand identity color), NOT accent.
-  // Accent is reserved for CTA buttons only. Primary gives the page brand presence.
+  // Compute safe button colors — prefer PRIMARY for buttons (brand identity),
+  // only fall back to accent/secondary if primary lacks contrast
+  const safeBtnLight = getSafeButtonColors(resolvedPrimary, secondaryColor, '#ffffff')
+  const safeBtnDark = getSafeButtonColors(resolvedPrimary, secondaryColor, secondaryColor)
+  // Headline accent word color — uses PRIMARY (brand identity color)
   const safeAccentOnLightBg = getSafeAccentOnLight(resolvedPrimary, resolvedPrimary)
   // On dark sections: accent word highlights use white for guaranteed readability
   const safeAccentOnDarkBg = '#ffffff'
-  // Trust bar stat numbers — use accent if it has contrast, otherwise white
-  const safeStatColor = getSafeHighlightOnDark(resolvedAccent, secondaryColor)
+  // Trust bar stat numbers — use primary if it has contrast on dark, otherwise white
+  const safeStatColor = getSafeHighlightOnDark(resolvedPrimary, secondaryColor)
 
   // Safety: if text_color is too light for white/light backgrounds, force it to dark
   // This prevents white-on-white text when the brand kit extracts a light text color
@@ -405,7 +407,7 @@ export default function LeadCaptureClassic({ sections, media, brandKit, formConf
           )}
           <a
             href="#lead-form"
-            className="btn-textured cta-button py-2 px-4 md:py-2.5 md:px-6 rounded-[var(--button-radius)] bg-[var(--color-accent)] font-semibold text-xs md:text-sm transition-all whitespace-nowrap"
+            className="btn-textured cta-button py-2 px-4 md:py-2.5 md:px-6 rounded-[var(--button-radius)] bg-[var(--color-primary)] font-semibold text-xs md:text-sm transition-all whitespace-nowrap"
           >
             {hero?.cta || 'Get Started'}
           </a>
@@ -524,7 +526,7 @@ function HeroBlock({ section, media, primaryColor, accentColor, safeAccentOnLigh
               <>
                 <a
                   href={section.cta_url || '#lead-form'}
-                  className="btn-textured cta-button inline-block py-4 px-10 rounded-full bg-[var(--color-accent)] font-bold text-base md:text-lg transition-all shadow-xl"
+                  className="btn-textured cta-button inline-block py-4 px-10 rounded-full bg-[var(--color-primary)] font-bold text-base md:text-lg transition-all shadow-xl"
                 >
                   {section.cta}
                 </a>
@@ -759,7 +761,7 @@ function TwoColumnInfo({ section, media, safeAccentOnLight }: { section: Section
           <div className="text-center">
             <a
               href={section.cta_url || '#lead-form'}
-              className="btn-textured cta-button inline-block py-4 px-10 rounded-full bg-[var(--color-accent)] font-bold text-base transition-all shadow-xl"
+              className="btn-textured cta-button inline-block py-4 px-10 rounded-full bg-[var(--color-primary)] font-bold text-base transition-all shadow-xl"
             >
               {section.cta}
             </a>
@@ -871,7 +873,7 @@ function StepsBlock({ section, media, primaryColor, accentColor, safeAccentOnLig
                   {/* Step number badge */}
                   <div
                     className="absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
-                    style={{ background: accentColor, color: getContrastTextColor(accentColor) }}
+                    style={{ background: primaryColor, color: getContrastTextColor(primaryColor) }}
                   >
                     {i + 1}
                   </div>
@@ -882,7 +884,7 @@ function StepsBlock({ section, media, primaryColor, accentColor, safeAccentOnLig
                   {i === items.length - 1 && section.cta && (
                     <a
                       href={section.cta_url || '#lead-form'}
-                      className="btn-textured cta-button inline-block mt-3 py-2.5 px-6 rounded-full bg-[var(--color-accent)] font-semibold text-sm transition-all"
+                      className="btn-textured cta-button inline-block mt-3 py-2.5 px-6 rounded-full bg-[var(--color-primary)] font-semibold text-sm transition-all"
                     >
                       {section.cta}
                     </a>
@@ -1033,7 +1035,7 @@ function BenefitsGrid({ section, media, primaryColor, accentColor, safeAccentOnL
               <div className="text-center mt-8">
                 <a
                   href={section.cta_url || '#lead-form'}
-                  className="btn-textured cta-button inline-block py-4 px-10 rounded-full bg-[var(--color-accent)] font-bold text-base transition-all shadow-xl"
+                  className="btn-textured cta-button inline-block py-4 px-10 rounded-full bg-[var(--color-primary)] font-bold text-base transition-all shadow-xl"
                 >
                   {section.cta}
                 </a>
@@ -1054,7 +1056,7 @@ function BenefitsGrid({ section, media, primaryColor, accentColor, safeAccentOnL
               {section.cta && (
                 <a
                   href={section.cta_url || '#lead-form'}
-                  className="btn-textured cta-button inline-block py-4 px-10 rounded-full bg-[var(--color-accent)] font-bold text-base transition-all shadow-xl"
+                  className="btn-textured cta-button inline-block py-4 px-10 rounded-full bg-[var(--color-primary)] font-bold text-base transition-all shadow-xl"
                 >
                   {section.cta}
                 </a>

@@ -151,8 +151,8 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
     if (embedded) {
       return (
         <div className="text-center py-8">
-          <div className="w-14 h-14 rounded-full bg-[var(--color-accent)]/10 flex items-center justify-center mx-auto mb-4">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          <div className="w-14 h-14 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center mx-auto mb-4">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
           </div>
           <h3 className="text-lg font-bold text-[var(--color-text)] mb-1" style={{ fontFamily: 'var(--font-heading)' }}>
             {settings.success_message || 'Thank you!'}
@@ -193,7 +193,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                   key={i}
                   className="flex-1 h-1 rounded-full transition-all duration-300"
                   style={{
-                    background: i <= currentStep ? 'var(--color-accent)' : '#e5e7eb',
+                    background: i <= currentStep ? 'var(--color-primary)' : '#e5e7eb',
                     opacity: i < currentStep ? 0.5 : 1,
                   }}
                 />
@@ -229,7 +229,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                       {(field.options || []).map((opt) => (
                         <label key={opt.value} className={`cursor-pointer px-2.5 py-1.5 rounded-lg border text-center transition-all text-[13px] font-medium ${
                           formData[field.name] === opt.value
-                            ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-white shadow-sm'
+                            ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white shadow-sm'
                             : 'border-gray-200 bg-gray-50/80 text-gray-600 hover:border-gray-300 hover:bg-gray-100'
                         }`}>
                           <input
@@ -247,18 +247,18 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                   <input type="number" name={field.name} value={formData[field.name] || ''}
                     onChange={(e) => handleChange(field.name, e.target.value)}
                     placeholder={field.placeholder || ''}
-                    className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 outline-none transition bg-white/80 text-gray-800 text-sm`}
+                    className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20 outline-none transition bg-white/80 text-gray-800 text-sm`}
                   />
                 ) : field.type === 'textarea' ? (
                   <textarea name={field.name} value={formData[field.name] || ''}
                     onChange={(e) => handleChange(field.name, e.target.value)}
                     placeholder={field.placeholder || ''} rows={3}
-                    className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 outline-none transition bg-white/80 text-gray-800 text-sm`}
+                    className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20 outline-none transition bg-white/80 text-gray-800 text-sm`}
                   />
                 ) : field.type === 'select' ? (
                   <select name={field.name} value={formData[field.name] || ''}
                     onChange={(e) => handleChange(field.name, e.target.value)}
-                    className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 outline-none transition bg-white/80 text-gray-800 text-sm`}
+                    className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20 outline-none transition bg-white/80 text-gray-800 text-sm`}
                   >
                     <option value="">{field.placeholder || 'Select...'}</option>
                     {(field.options || []).map((opt) => (
@@ -269,7 +269,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                   <label className="flex items-start gap-2 cursor-pointer py-0.5">
                     <input type="checkbox" checked={formData[field.name] === 'true'}
                       onChange={(e) => handleChange(field.name, e.target.checked ? 'true' : '')}
-                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[var(--color-accent)] focus:ring-[var(--color-accent)]"
+                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
                     />
                     <span className="text-sm text-gray-600">
                       {field.label}{field.required && <span className="text-red-500 ml-0.5">*</span>}
@@ -281,7 +281,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                     name={field.name} value={formData[field.name] || ''}
                     onChange={(e) => handleChange(field.name, e.target.value)}
                     placeholder={field.placeholder || ''}
-                    className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 outline-none transition bg-white/80 text-gray-800 text-sm`}
+                    className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20 outline-none transition bg-white/80 text-gray-800 text-sm`}
                   />
                 )}
 
@@ -304,7 +304,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
             )}
             <button
               type="submit" disabled={submitting}
-              className="btn-textured py-3 rounded-[var(--button-radius)] bg-[var(--color-accent)] text-white font-bold text-sm transition-all disabled:opacity-60 w-full shadow-lg hover:shadow-xl"
+              className="btn-textured cta-button py-3 rounded-[var(--button-radius)] font-bold text-sm transition-all disabled:opacity-60 w-full shadow-lg hover:shadow-xl"
             >
               {submitting ? 'Submitting...' : isLastStep ? submitText : nextText}
             </button>
@@ -336,7 +336,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                         i < currentStep
                           ? 'bg-[var(--color-primary)] text-white'
                           : i === currentStep
-                            ? 'bg-[var(--color-accent)] text-white'
+                            ? 'bg-[var(--color-primary)] text-white'
                             : 'bg-gray-200 text-gray-500'
                       }`}
                     >
@@ -381,7 +381,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                         {(field.options || []).map((opt) => (
                           <label key={opt.value} className={`flex items-center gap-3 cursor-pointer px-4 py-3 rounded-lg border transition ${
                             formData[field.name] === opt.value
-                              ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/5 ring-2 ring-[var(--color-accent)]/20'
+                              ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5 ring-2 ring-[var(--color-primary)]/20'
                               : 'border-gray-300 hover:border-gray-400'
                           }`}>
                             <input
@@ -390,7 +390,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                               value={opt.value}
                               checked={formData[field.name] === opt.value}
                               onChange={(e) => handleChange(field.name, e.target.value)}
-                              className="w-5 h-5 text-[var(--color-accent)] focus:ring-[var(--color-accent)]"
+                              className="w-5 h-5 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
                             />
                             <span className="text-sm text-gray-700 font-medium">{opt.label}</span>
                           </label>
@@ -406,7 +406,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                       placeholder={field.placeholder || ''}
                       className={`w-full px-4 py-3 rounded-lg border ${
                         errors[field.name] ? 'border-red-400' : 'border-gray-300'
-                      } focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 outline-none transition text-gray-800`}
+                      } focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20 outline-none transition text-gray-800`}
                     />
                   ) : field.type === 'textarea' ? (
                     <textarea
@@ -417,7 +417,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                       rows={4}
                       className={`w-full px-4 py-3 rounded-lg border ${
                         errors[field.name] ? 'border-red-400' : 'border-gray-300'
-                      } focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 outline-none transition text-gray-800`}
+                      } focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20 outline-none transition text-gray-800`}
                     />
                   ) : field.type === 'select' ? (
                     <select
@@ -426,7 +426,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                       onChange={(e) => handleChange(field.name, e.target.value)}
                       className={`w-full px-4 py-3 rounded-lg border ${
                         errors[field.name] ? 'border-red-400' : 'border-gray-300'
-                      } focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 outline-none transition text-gray-800 bg-white`}
+                      } focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20 outline-none transition text-gray-800 bg-white`}
                     >
                       <option value="">{field.placeholder || 'Select...'}</option>
                       {(field.options || []).map((opt) => (
@@ -439,7 +439,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                         type="checkbox"
                         checked={formData[field.name] === 'true'}
                         onChange={(e) => handleChange(field.name, e.target.checked ? 'true' : '')}
-                        className="mt-0.5 w-5 h-5 rounded border-gray-300 text-[var(--color-accent)] focus:ring-[var(--color-accent)]"
+                        className="mt-0.5 w-5 h-5 rounded border-gray-300 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
                       />
                       <span className="text-sm text-gray-700">
                         {field.label}
@@ -455,7 +455,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                       placeholder={field.placeholder || ''}
                       className={`w-full px-4 py-3 rounded-lg border ${
                         errors[field.name] ? 'border-red-400' : 'border-gray-300'
-                      } focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 outline-none transition text-gray-800`}
+                      } focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20 outline-none transition text-gray-800`}
                     />
                   )}
 
@@ -489,7 +489,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="btn-textured px-8 py-3.5 rounded-[var(--button-radius)] bg-[var(--color-accent)] text-white font-bold text-base transition-all disabled:opacity-60 w-full max-w-sm"
+                  className="btn-textured cta-button px-8 py-3.5 rounded-[var(--button-radius)] font-bold text-base transition-all disabled:opacity-60 w-full max-w-sm"
                   style={isMultiStep && currentStep > 0 ? { maxWidth: 'none', flex: 1, marginLeft: 12 } : {}}
                 >
                   {submitting ? 'Submitting...' : submitText}
@@ -497,7 +497,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
               ) : (
                 <button
                   type="submit"
-                  className="btn-textured px-8 py-3.5 rounded-[var(--button-radius)] bg-[var(--color-accent)] text-white font-bold text-base transition-all flex-1"
+                  className="btn-textured cta-button px-8 py-3.5 rounded-[var(--button-radius)] font-bold text-base transition-all flex-1"
                   style={currentStep > 0 ? { marginLeft: 12 } : {}}
                 >
                   {nextText}
