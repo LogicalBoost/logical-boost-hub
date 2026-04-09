@@ -766,7 +766,7 @@ function TwoColumnInfo({ section, media, safeAccentOnLight }: { section: Section
         {/* Full-width image banner above info boxes when available */}
         {img && (
           <div className="mb-10 rounded-2xl overflow-hidden shadow-2xl">
-            <img src={img} alt="" className="w-full object-cover" style={{ maxHeight: 420 }} />
+            <img src={img} alt="" className="w-full" style={{ display: 'block' }} />
           </div>
         )}
 
