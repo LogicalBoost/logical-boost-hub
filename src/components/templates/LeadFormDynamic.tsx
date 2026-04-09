@@ -239,7 +239,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                     </legend>
                     <div className="grid grid-cols-2 gap-1.5">
                       {(field.options || []).map((opt) => (
-                        <label key={opt.value} className={`cursor-pointer px-2.5 py-1.5 rounded-lg border text-center transition-all text-[13px] font-medium ${
+                        <label key={opt.value} className={`cursor-pointer px-2 py-1 rounded-lg border text-center transition-all text-xs font-medium ${
                           formData[field.name] === opt.value
                             ? (darkBg ? 'border-white/40 bg-white/25 text-white shadow-sm' : 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white shadow-sm')
                             : (darkBg ? 'border-white/20 bg-white/10 text-white/80 hover:border-white/30 hover:bg-white/15' : 'border-gray-200 bg-gray-50/80 text-gray-600 hover:border-gray-300 hover:bg-gray-100')
@@ -259,18 +259,18 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                   <input type="number" name={field.name} value={formData[field.name] || ''}
                     onChange={(e) => handleChange(field.name, e.target.value)}
                     placeholder={field.placeholder || field.label || ''}
-                    className={`w-full px-3 py-2.5 rounded-lg border outline-none transition text-sm focus:ring-2 ${errors[field.name] ? 'border-red-400' : ''} ${fieldCls}`}
+                    className={`w-full px-2.5 py-1.5 rounded-lg border outline-none transition text-xs focus:ring-2 ${errors[field.name] ? 'border-red-400' : ''} ${fieldCls}`}
                   />
                 ) : field.type === 'textarea' ? (
                   <textarea name={field.name} value={formData[field.name] || ''}
                     onChange={(e) => handleChange(field.name, e.target.value)}
                     placeholder={field.placeholder || field.label || ''} rows={3}
-                    className={`w-full px-3 py-2.5 rounded-lg border outline-none transition text-sm focus:ring-2 ${errors[field.name] ? 'border-red-400' : ''} ${fieldCls}`}
+                    className={`w-full px-2.5 py-1.5 rounded-lg border outline-none transition text-xs focus:ring-2 ${errors[field.name] ? 'border-red-400' : ''} ${fieldCls}`}
                   />
                 ) : field.type === 'select' ? (
                   <select name={field.name} value={formData[field.name] || ''}
                     onChange={(e) => handleChange(field.name, e.target.value)}
-                    className={`w-full px-3 py-2.5 rounded-lg border outline-none transition text-sm focus:ring-2 ${errors[field.name] ? 'border-red-400' : ''} ${fieldCls}`}
+                    className={`w-full px-2.5 py-1.5 rounded-lg border outline-none transition text-xs focus:ring-2 ${errors[field.name] ? 'border-red-400' : ''} ${fieldCls}`}
                   >
                     <option value="">{field.placeholder || field.label || 'Select...'}</option>
                     {(field.options || []).map((opt) => (
@@ -293,7 +293,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                     name={field.name} value={formData[field.name] || ''}
                     onChange={(e) => handleChange(field.name, e.target.value)}
                     placeholder={field.placeholder || field.label || ''}
-                    className={`w-full px-3 py-2.5 rounded-lg border outline-none transition text-sm focus:ring-2 ${errors[field.name] ? 'border-red-400' : ''} ${fieldCls}`}
+                    className={`w-full px-2.5 py-1.5 rounded-lg border outline-none transition text-xs focus:ring-2 ${errors[field.name] ? 'border-red-400' : ''} ${fieldCls}`}
                   />
                 )}
 
@@ -311,12 +311,12 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
           <div className={`mt-3 md:mt-4 flex ${isMultiStep && currentStep > 0 ? 'gap-2.5' : 'flex-col items-center'}`}>
             {isMultiStep && currentStep > 0 && (
               <button type="button" onClick={handleBack}
-                className={`px-4 py-2.5 rounded-lg border font-semibold transition text-sm ${darkBg ? 'border-white/25 text-white/80 hover:bg-white/10' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                className={`px-3 py-2 rounded-lg border font-semibold transition text-xs ${darkBg ? 'border-white/25 text-white/80 hover:bg-white/10' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
               >{backText}</button>
             )}
             <button
               type="submit" disabled={submitting}
-              className={`btn-textured py-3 rounded-[var(--button-radius)] font-bold text-sm transition-all disabled:opacity-60 w-full shadow-lg hover:shadow-xl ${
+              className={`btn-textured py-2.5 rounded-[var(--button-radius)] font-bold text-xs transition-all disabled:opacity-60 w-full shadow-lg hover:shadow-xl ${
                 darkBg ? 'bg-white text-[var(--color-primary)] hover:bg-gray-50' : 'cta-button'
               }`}
             >
