@@ -485,18 +485,18 @@ function HeroBlock({ section, media, primaryColor, accentColor, safeAccentOnLigh
         }}
       />
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24 py-16 md:py-20">
-        <div className="flex flex-col md:flex-row items-center gap-10 md:gap-6">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-10 lg:px-12 xl:px-24 py-8 md:py-20">
+        <div className="flex flex-col md:flex-row items-center gap-6 md:gap-6">
           {/* Left: headline + subheadline + (form OR cta button) */}
           <div className={`flex-1 text-center md:text-left ${hasForm ? 'md:max-w-[50%]' : 'md:max-w-[55%]'}`}>
             <h1
-              className="text-4xl sm:text-5xl lg:text-[3.5rem] font-bold text-[var(--color-text)] leading-[1.1] mb-5"
+              className="text-[1.75rem] sm:text-4xl md:text-5xl lg:text-[3.5rem] font-bold text-[var(--color-text)] leading-[1.1] mb-3 md:mb-5"
               style={{ fontFamily: 'var(--font-heading)' }}
             >
               <AH text={section.headline || ''} word={section.accent_word} color={safeAccentOnLight} />
             </h1>
             {(section.subheadline || section.content) && (
-              <p className="text-base md:text-lg text-gray-500 leading-relaxed mb-6 max-w-lg mx-auto md:mx-0">
+              <p className="text-sm md:text-lg text-gray-500 leading-relaxed mb-4 md:mb-6 max-w-lg mx-auto md:mx-0">
                 {section.subheadline || section.content}
               </p>
             )}
@@ -512,7 +512,7 @@ function HeroBlock({ section, media, primaryColor, accentColor, safeAccentOnLigh
                   boxShadow: '0 20px 50px rgba(0,0,0,0.10), 0 6px 20px rgba(0,0,0,0.06)',
                 }}
               >
-                <div className="px-5 py-5 md:px-6 md:py-5">
+                <div className="px-4 py-3 md:px-6 md:py-5">
                   <LeadFormDynamic
                     formConfig={formConfig!}
                     pageSlug={pageSlug}

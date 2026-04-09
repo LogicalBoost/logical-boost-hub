@@ -184,9 +184,9 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
   if (embedded) {
     return (
       <div>
-        {/* Multi-step progress — segmented pill bar */}
+        {/* Multi-step progress — segmented pill bar (hidden on mobile to save space) */}
         {isMultiStep && settings.show_progress_bar !== false && (
-          <div className="mb-4">
+          <div className="mb-4 hidden md:block">
             <div className="flex gap-1 mb-1.5">
               {steps!.map((_step, i) => (
                 <div
@@ -213,7 +213,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                 className={field.width === 'half' ? 'col-span-1' : 'col-span-2'}
               >
                 {field.type !== 'checkbox' && field.type !== 'radio' && (
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                  <label className="hidden md:block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
                     {field.label}
                     {field.required && <span className="text-red-500 ml-0.5">*</span>}
                   </label>
@@ -246,13 +246,13 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                 ) : field.type === 'number' ? (
                   <input type="number" name={field.name} value={formData[field.name] || ''}
                     onChange={(e) => handleChange(field.name, e.target.value)}
-                    placeholder={field.placeholder || ''}
+                    placeholder={field.placeholder || field.label || ''}
                     className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20 outline-none transition bg-white/80 text-gray-800 text-sm`}
                   />
                 ) : field.type === 'textarea' ? (
                   <textarea name={field.name} value={formData[field.name] || ''}
                     onChange={(e) => handleChange(field.name, e.target.value)}
-                    placeholder={field.placeholder || ''} rows={3}
+                    placeholder={field.placeholder || field.label || ''} rows={3}
                     className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20 outline-none transition bg-white/80 text-gray-800 text-sm`}
                   />
                 ) : field.type === 'select' ? (
@@ -260,7 +260,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                     onChange={(e) => handleChange(field.name, e.target.value)}
                     className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20 outline-none transition bg-white/80 text-gray-800 text-sm`}
                   >
-                    <option value="">{field.placeholder || 'Select...'}</option>
+                    <option value="">{field.placeholder || field.label || 'Select...'}</option>
                     {(field.options || []).map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
@@ -280,7 +280,7 @@ export default function LeadFormDynamic({ formConfig, pageSlug, clientSlug, publ
                     type={field.type === 'email' ? 'email' : field.type === 'phone' ? 'tel' : 'text'}
                     name={field.name} value={formData[field.name] || ''}
                     onChange={(e) => handleChange(field.name, e.target.value)}
-                    placeholder={field.placeholder || ''}
+                    placeholder={field.placeholder || field.label || ''}
                     className={`w-full px-3 py-2.5 rounded-lg border ${errors[field.name] ? 'border-red-400' : 'border-gray-200'} focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20 outline-none transition bg-white/80 text-gray-800 text-sm`}
                   />
                 )}
