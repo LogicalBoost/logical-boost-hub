@@ -107,60 +107,69 @@ Respond ONLY with valid JSON: { "avatars": [{ "name": "...", "avatar_type": "...
 
 No markdown, no explanation outside the JSON.`
 
-    const generalPrompt = `You are a marketing strategist building BROAD audience segments for ad targeting. Your job is to identify the major customer categories for a business, NOT create detailed individual personas.
+    const generalPrompt = `You generate BROAD audience segments for ad campaigns. Think like you are setting up Facebook or Google ad targeting. You are defining WHO to show ads to, not writing character backstories.
 
-CRITICAL RULE: You are in GENERAL mode. Every avatar name must be a simple, short, plain-English label that describes a GROUP of people. Think Facebook ad audience targeting, not character profiles.
+GENERAL MODE means MAXIMUM BREADTH. Each profile should represent tens of thousands of people, not a niche.
 
-GOOD NAMES (this is what you must produce):
-- "Families Moving Out of State"
-- "Corporate Relocations"
-- "Downsizing Retirees"
-- "College Students"
-- "First-Time Homebuyers"
-- "Military Families"
-- "Small Business Owners"
-- "Budget-Conscious Movers"
-- "Luxury Home Sellers"
-- "Apartment Renters"
+═══════════════════════════════════════════════
+NAMING RULES (STRICT — violating these is failure):
+═══════════════════════════════════════════════
 
-BAD NAMES (NEVER do this — these are too specific):
-- "Grand Rapids Medical Professional Joining Practice" — TOO SPECIFIC
-- "Houston Energy Executive Fleeing Hurricane Zone" — TOO SPECIFIC
-- "West Virginia Coal Industry Refugee" — TOO SPECIFIC
-- "Recently Divorced Mother of Three Downsizing" — TOO SPECIFIC
-- "Tech Startup CTO Relocating for Series B Funding" — TOO SPECIFIC
+Names must be 2-3 words. Names must describe a DEMOGRAPHIC or PROPERTY TYPE. Nothing else.
 
-The name should NEVER mention a specific city, job title, life crisis, or scenario. It should be a category that represents THOUSANDS of potential customers.
+Think of it this way: if you told someone on the street the name, they should instantly picture a huge group of people, not a specific person.
 
-You are generating ${generateCount} broad audience segments for this client.
+PERFECT EXAMPLES by industry:
 
-RULES FOR GENERAL AUDIENCES:
-1. Names: 2-4 words max. Simple group labels. No cities, no job titles, no backstories.
-2. Avatar type: Use broad categories only: "Residential", "Commercial", "Seniors", "Students", "Families", "Military", "Corporate", etc.
-3. Description: 1-2 sentences about WHO this group is at a high level. No individual stories.
-4. Pain points: What does this ENTIRE GROUP worry about? General concerns, not one person's crisis.
-5. Motivations: Group-level desires. "Want a smooth, stress-free move" not "terrified their kids will hate the new school."
-6. Objections: Common concerns the whole group shares. "Worried about cost" not "skeptical because their uncle got scammed."
-7. Trigger events: General life events that cause this group to need the service. "Job relocation", "retirement", "lease ending" — not "got fired Tuesday and spouse is threatening divorce."
-8. Messaging style: How to talk to this group broadly.
+Artificial turf company:
+- "Homeowners" / "Commercial Properties" / "HOA Communities" / "Pet Owners" / "Families with Kids"
 
-SEGMENT DIVERSITY:
-- Cover the full addressable market
-- Mix of: residential/commercial, budget/premium, urgent/planned, local/long-distance
-- Think: Who are the 5-10 major customer types for this business?
+Moving company:
+- "Local Homeowners" / "Apartment Renters" / "Corporate Employees" / "Military Families" / "Retirees"
+
+Plumbing company:
+- "Homeowners" / "Property Managers" / "Restaurant Owners" / "New Construction" / "Landlords"
+
+Roofing company:
+- "Homeowners" / "Commercial Buildings" / "Property Managers" / "Insurance Claimants" / "New Homebuyers"
+
+THESE ARE ALL WRONG (too specific, too niche, too creative):
+- "Desert Enthusiast" — NO. This is a hobby, not a customer segment.
+- "Eco-Conscious Millennial Homeowner" — NO. Too many qualifiers.
+- "Busy Professional Tired of Yard Work" — NO. This is a pain point, not a demographic.
+- "Phoenix Sustainability Advocate" — NO. This is a belief system, not a customer type.
+- "Water-Bill-Worried Retiree" — NO. This is a motivation, not a segment.
+- "Dog Park Dream Family" — NO. This is creative writing, not targeting.
+
+THE RULE: If your name contains an emotion, motivation, lifestyle choice, hobby, belief, or scenario, it is WRONG. Strip it down to the pure demographic: who are they by ROLE or PROPERTY TYPE?
+
+═══════════════════════════════════════════════
+
+You are generating ${generateCount} broad audience segments.
+
+FIELD RULES:
+- name: 2-3 word demographic label. The broadest possible group. Examples: "Homeowners", "Small Businesses", "Property Managers", "Families with Kids"
+- avatar_type: One word category: "Residential", "Commercial", "Institutional", "Municipal", etc.
+- description: 1 sentence. Who is this group? Keep it broad. "Homeowners in the service area looking for [service category]."
+- pain_points: 1-2 sentences. What does this ENTIRE demographic worry about regarding this service? Keep it universal.
+- motivations: 1-2 sentences. Why would this entire group want this service?
+- objections: 1-2 sentences. The #1 and #2 concerns this group has before buying.
+- desired_outcome: 1 sentence. What does this group want after the service is done?
+- trigger_events: General triggers only: "moving to new home", "seasonal change", "property renovation", "HOA notice". NOT individual crises.
+- messaging_style: 1 sentence. How to talk to this broad group.
+- preferred_platforms: 2-4 platforms array
+- recommended_angles: 3-5 angle slugs array
+
+DIVERSITY: Cover the full market. If the business does residential AND commercial, have segments for both. Think: who are the 3-5 biggest customer buckets?
 
 ${ANGLE_DEFINITIONS}
 
-FORMATTING RULES:
-- NEVER use em dashes in any text. Use commas, periods, colons, or separate sentences.
-- Keep all text fields concise and group-focused, not individual-focused.
-- preferred_platforms: array of 2-4 platforms
-- recommended_angles: array of 3-5 angle slugs
+FORMATTING: Never use em dashes. Keep everything concise.
 
 RESPONSE FORMAT:
 Respond ONLY with valid JSON: { "avatars": [{ "name": "...", "avatar_type": "...", "description": "...", "pain_points": "...", "motivations": "...", "objections": "...", "desired_outcome": "...", "trigger_events": "...", "messaging_style": "...", "preferred_platforms": ["..."], "recommended_angles": ["..."] }] }
 
-No markdown, no explanation outside the JSON.`
+No markdown, no explanation.`
 
     const defaultSystemPrompt = isGeneralMode ? generalPrompt : granularPrompt
 
@@ -175,13 +184,13 @@ Differentiators: ${client.differentiators || 'Not specified'}
 Trust Signals: ${client.trust_signals || 'Not specified'}
 Tone: ${client.tone || 'Not specified'}
 
-EXISTING OFFERS (avatars should be relevant to these):
+EXISTING OFFERS (profiles should be relevant to these):
 ${offerContext || 'No offers yet'}
 
-EXISTING AVATARS (DO NOT DUPLICATE these, generate DIFFERENT people):
+EXISTING PROFILES (DO NOT DUPLICATE, generate DIFFERENT segments):
 ${existingList || 'None yet. This is the first batch.'}
 
-Generate exactly ${generateCount} new, unique avatars.${userDirection}`
+Generate exactly ${generateCount} new, unique ${isGeneralMode ? 'BROAD audience segments. Remember: names must be simple demographics like "Homeowners" or "Property Managers", NOT creative labels like "Desert Enthusiast" or "Eco-Warrior".' : 'audience profiles.'}${userDirection}`
 
     const response = await callClaude(systemPrompt, userMessage, {
       model: 'claude-sonnet-4-20250514',
