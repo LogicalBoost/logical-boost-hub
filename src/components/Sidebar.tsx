@@ -12,7 +12,7 @@ const allNavItems = [
   { href: '/stats/', label: 'Stats', icon: '◩', clientVisible: false },
   { href: '/copy/', label: 'Copy', icon: '◬', clientVisible: false },
   { href: '/landing-pages/', label: 'Landing Pages', icon: '◰', clientVisible: true },
-  { href: '/avatars/', label: 'Avatars', icon: '◪', clientVisible: false },
+  { href: '/avatars/', label: 'Audience Profiles', icon: '◪', clientVisible: false },
   { href: '/offers/', label: 'Offers', icon: '◭', clientVisible: false },
   { href: '/competitor-intel/', label: 'Competitor Intel', icon: '◮', clientVisible: false },
   { href: '/settings/', label: 'Settings', icon: '◷', clientVisible: true },

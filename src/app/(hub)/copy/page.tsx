@@ -1054,7 +1054,7 @@ export default function FunnelPage() {
         <div className="page-header">
           <div>
             <h1 className="page-title">Copy</h1>
-            <p className="page-subtitle">Select Avatar + Offer, then generate your complete campaign asset library</p>
+            <p className="page-subtitle">Select Audience Profile + Offer, then generate your complete campaign asset library</p>
           </div>
         </div>
         <div className="empty-state" style={{ padding: 80 }}>
@@ -1062,7 +1062,7 @@ export default function FunnelPage() {
           <div className="empty-state-text">
             {!client
               ? 'Select a client to get started'
-              : 'You need approved avatars and offers first. Start in Business Overview.'}
+              : 'You need approved audience profiles and offers first. Start in Settings.'}
           </div>
         </div>
       </div>
@@ -1149,7 +1149,7 @@ export default function FunnelPage() {
         /* ── Agency: Standard selector bar ── */
         <div className="funnel-selector-bar">
           <div className="funnel-selector-col">
-            <label className="funnel-selector-label">Avatar (by priority)</label>
+            <label className="funnel-selector-label">Audience Profile (by priority)</label>
             <select
               className="form-input funnel-avatar-select"
               value={avatarId}
@@ -1816,10 +1816,10 @@ export default function FunnelPage() {
       ) : (
         <div className="empty-state" style={{ padding: 60 }}>
           <div className="empty-state-icon">&#9889;</div>
-          <div className="empty-state-text">No campaign generated for this Avatar + Offer</div>
+          <div className="empty-state-text">No campaign generated for this Audience Profile + Offer</div>
           <div className="empty-state-sub" style={{ maxWidth: 500 }}>
             {canEdit
-              ? 'Select your target avatar and offer above, then click "Generate Campaign" to create ~130-180 copy components across multiple marketing angles.'
+              ? 'Select your target audience profile and offer above, then click "Generate Campaign" to create ~130-180 copy components across multiple marketing angles.'
               : 'No campaign has been generated for this combination yet.'}
           </div>
         </div>

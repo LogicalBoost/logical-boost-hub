@@ -107,7 +107,7 @@ function SlotCopyPicker({
 // Step tracker
 // ============================================================
 const STEPS = [
-  { num: 1, label: 'Select Avatar + Offer' },
+  { num: 1, label: 'Select Audience + Offer' },
   { num: 2, label: 'Choose Template' },
   { num: 3, label: 'Review Copy + Media' },
   { num: 4, label: 'Build Page' },
@@ -364,7 +364,7 @@ export default function LandingPagesPage() {
     )
 
     if (approvedCopy.length === 0) {
-      showToast('No copy components found for this Avatar + Offer. Go to the Copy page and generate copy components first.')
+      showToast('No copy components found for this Audience Profile + Offer. Go to the Copy page and generate copy components first.')
       return
     }
 
@@ -578,7 +578,7 @@ export default function LandingPagesPage() {
         storage_path: storagePath,
         filename: file.name,
         display_name: selectedAvatarId
-          ? `${avatars.find(a => a.id === selectedAvatarId)?.name || 'Avatar'} - ${labelMap[type]}`
+          ? `${avatars.find(a => a.id === selectedAvatarId)?.name || 'Profile'} - ${labelMap[type]}`
           : file.name,
         metadata: { source: 'uploaded', section: type, avatar_id: selectedAvatarId || null },
       })
@@ -623,7 +623,7 @@ export default function LandingPagesPage() {
           storage_path: storagePath,
           filename: file.name,
           display_name: selectedAvatarId
-            ? `${avatars.find(a => a.id === selectedAvatarId)?.name || 'Avatar'} - Gallery`
+            ? `${avatars.find(a => a.id === selectedAvatarId)?.name || 'Profile'} - Gallery`
             : file.name,
           metadata: { source: 'uploaded', section: 'gallery', avatar_id: selectedAvatarId || null },
         })
@@ -929,7 +929,7 @@ export default function LandingPagesPage() {
               return (
                 <div key={key} style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ color: 'var(--accent)' }}>{avatar?.name || 'Unknown Avatar'}</span>
+                    <span style={{ color: 'var(--accent)' }}>{avatar?.name || 'Unknown Profile'}</span>
                     <span style={{ color: 'var(--text-muted)' }}>&times;</span>
                     <span>{offer?.name || 'Unknown Offer'}</span>
                   </div>
@@ -1199,20 +1199,20 @@ export default function LandingPagesPage() {
       </div>
 
       {/* ============================================================ */}
-      {/* STEP 1: Select Avatar + Offer */}
+      {/* STEP 1: Select Audience + Offer */}
       {/* ============================================================ */}
       {step === 1 && (
         <div style={card({ maxWidth: 640 })}>
-          <h3 style={{ fontSize: 18, marginBottom: 16 }}>Select Avatar + Offer</h3>
+          <h3 style={{ fontSize: 18, marginBottom: 16 }}>Select Audience Profile + Offer</h3>
           <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
             <div>
-              <label style={labelStyle}>Avatar</label>
+              <label style={labelStyle}>Audience Profile</label>
               <select
                 style={selectStyle}
                 value={selectedAvatarId || ''}
                 onChange={e => setSelectedAvatarId(e.target.value || null)}
               >
-                <option value="">Choose an avatar...</option>
+                <option value="">Choose a profile...</option>
                 {approvedAvatars.map(a => (
                   <option key={a.id} value={a.id}>
                     {a.name} {a.priority === 1 ? '(Primary)' : `(#${a.priority})`}
@@ -1250,7 +1250,7 @@ export default function LandingPagesPage() {
               <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>⚠️</span>
               <div>
                 <p style={{ fontSize: 13, fontWeight: 600, color: '#f59e0b', margin: 0 }}>
-                  No copy components for this Avatar + Offer
+                  No copy components for this Audience Profile + Offer
                 </p>
                 <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '4px 0 0' }}>
                   Go to the <strong>Copy</strong> page and generate copy components for this combination first. Landing page AI copy generation uses your approved copy components as source material.
@@ -2821,7 +2821,7 @@ export default function LandingPagesPage() {
                       {avatarGalleryAssets.length > 0 && (
                         <>
                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                            {selectedAvatarId ? `Gallery images for ${avatars.find(a => a.id === selectedAvatarId)?.name || 'this avatar'}` : 'All gallery images'}
+                            {selectedAvatarId ? `Gallery images for ${avatars.find(a => a.id === selectedAvatarId)?.name || 'this profile'}` : 'All gallery images'}
                           </div>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: otherGalleryAssets.length > 0 ? 12 : 0 }}>
                             {avatarGalleryAssets.map(asset => {
@@ -3649,7 +3649,7 @@ function ExistingPageCard({
       </div>
 
       <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-        <span style={{ fontWeight: 500 }}>Avatar:</span> {avatarName}
+        <span style={{ fontWeight: 500 }}>Audience:</span> {avatarName}
         <span style={{ margin: '0 8px', color: 'var(--text-muted)' }}>|</span>
         <span style={{ fontWeight: 500 }}>Offer:</span> {offerName}
       </div>

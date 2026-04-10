@@ -42,7 +42,7 @@ export default function DashboardPage() {
       order: 2,
     },
     {
-      label: '3. Review & Approve Avatars',
+      label: '3. Review & Approve Audience Profiles',
       description: 'Generate audience profiles with AI, then approve the best ones.',
       href: '/avatars/',
       isComplete: approvedAvatars >= 3,
@@ -223,7 +223,7 @@ export default function DashboardPage() {
       <div className="funnel-stats-bar" style={{ marginBottom: 24 }}>
         <div className="funnel-stat">
           <div className="funnel-stat-value">{approvedAvatars}</div>
-          <div className="funnel-stat-label">Approved Avatars</div>
+          <div className="funnel-stat-label">Approved Profiles</div>
         </div>
         <div className="funnel-stat">
           <div className="funnel-stat-value">{approvedOffers}</div>
@@ -385,7 +385,7 @@ export default function DashboardPage() {
             </p>
           </Link>
           <Link href="/avatars/" className="funnel-section-card" style={{ textDecoration: 'none', color: 'inherit', padding: '20px', display: 'block' }}>
-            <h3 style={{ fontSize: 15, marginBottom: 4, color: 'var(--accent)' }}>&#128100; Avatars</h3>
+            <h3 style={{ fontSize: 15, marginBottom: 4, color: 'var(--accent)' }}>&#128100; Audience Profiles</h3>
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
               {avatars.length} audience profiles ({approvedAvatars} approved)
             </p>

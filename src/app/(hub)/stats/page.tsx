@@ -31,7 +31,7 @@ export default function StatsPage() {
 
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-label">Avatars</div>
+          <div className="stat-label">Audience Profiles</div>
           <div className="stat-value">{avatars.length}</div>
           <div className="stat-change">
             {approvedAvatars.length} approved
@@ -74,7 +74,7 @@ export default function StatsPage() {
                 <div key={fi.id} className="copy-item" style={{ padding: '16px 0' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                      {avatar?.name || 'Unknown Avatar'} + {offer?.name || 'Unknown Offer'}
+                      {avatar?.name || 'Unknown Profile'} + {offer?.name || 'Unknown Offer'}
                     </div>
                     <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
                       {components.length} copy items &bull; {fi.status}

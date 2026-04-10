@@ -70,7 +70,7 @@ export default function AvatarsPage() {
         audienceMode,
       })
       await refreshAvatars(client.id)
-      showToast(`${result.avatars_created} new avatars generated!`)
+      showToast(`${result.avatars_created} new audience profiles generated!`)
     } catch (err) {
       showToast(`Error: ${(err as Error).message}`)
     } finally {
@@ -102,20 +102,20 @@ export default function AvatarsPage() {
       <div>
         <div className="page-header">
           <div>
-            <h1 className="page-title">Avatars</h1>
-            <p className="page-subtitle">Target audience personas that power all campaign copy</p>
+            <h1 className="page-title">Audience Profiles</h1>
+            <p className="page-subtitle">Target audience profiles that power all campaign copy</p>
           </div>
         </div>
         <div className="empty-state">
           <div className="empty-state-icon">&#128100;</div>
-          <div className="empty-state-text">No avatars yet.</div>
+          <div className="empty-state-text">No audience profiles yet.</div>
           <div className="empty-state-sub">
-            Go to Business Overview to analyze your business and auto-generate initial avatars.
-            <br />Or use the AI avatar builder to create them now.
+            Go to Settings to analyze your business and auto-generate initial profiles.
+            <br />Or use the AI profile builder to create them now.
           </div>
           {canEdit && (
             <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={openPrompter}>
-              + Generate Avatars with AI
+              + Generate Profiles with AI
             </button>
           )}
         </div>
@@ -144,7 +144,7 @@ export default function AvatarsPage() {
 
   function handleApprove(id: string) {
     updateAvatar(id, { status: 'approved' })
-    showToast('Avatar approved')
+    showToast('Profile approved')
     if (selectedAvatar?.id === id) {
       setSelectedAvatar({ ...selectedAvatar, status: 'approved' })
     }
@@ -152,7 +152,7 @@ export default function AvatarsPage() {
 
   function handleDeny(id: string) {
     updateAvatar(id, { status: 'denied' })
-    showToast('Avatar denied')
+    showToast('Profile denied')
     if (selectedAvatar?.id === id) {
       setSelectedAvatar({ ...selectedAvatar, status: 'denied' })
     }
@@ -163,7 +163,7 @@ export default function AvatarsPage() {
     // Check if avatar has published pages
     const avatarPages = publishedPages.filter(p => p.avatar_id === id)
     if (avatarPages.length > 0) {
-      showToast(`Cannot delete: ${avatarPages.length} landing page(s) use this avatar. Archive or remove them first.`)
+      showToast(`Cannot delete: ${avatarPages.length} landing page(s) use this profile. Archive or remove them first.`)
       setShowDeleteConfirm(null)
       return
     }
@@ -171,7 +171,7 @@ export default function AvatarsPage() {
     setSelectedAvatar(null)
     setShowDeleteConfirm(null)
     await refreshAvatars(client.id)
-    showToast('Avatar deleted')
+    showToast('Profile deleted')
   }
 
   function getAvatarPages(avatarId: string): PublishedPage[] {
@@ -189,9 +189,9 @@ export default function AvatarsPage() {
       <div className="page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <h1 className="page-title">Avatars</h1>
+            <h1 className="page-title">Audience Profiles</h1>
             <p className="page-subtitle">
-              {approvedCount} approved avatar{approvedCount !== 1 ? 's' : ''} &bull; {avatars.length} total
+              {approvedCount} approved profile{approvedCount !== 1 ? 's' : ''} &bull; {avatars.length} total
             </p>
           </div>
           {canEdit && (
@@ -200,7 +200,7 @@ export default function AvatarsPage() {
               onClick={openPrompter}
               disabled={generating}
             >
-              {generating ? 'Generating...' : '+ Add Avatars'}
+              {generating ? 'Generating...' : '+ Add Profiles'}
             </button>
           )}
         </div>
@@ -627,7 +627,7 @@ export default function AvatarsPage() {
                     ) : (
                       <button
                         onClick={() => setShowDeleteConfirm(selectedAvatar.id)}
-                        title="Delete avatar"
+                        title="Delete profile"
                         style={{
                           background: 'none', border: 'none', cursor: 'pointer',
                           color: 'var(--text-muted)', padding: 6, borderRadius: 6,
@@ -695,13 +695,13 @@ function AvatarPrompterModal({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal prompter-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
         <div className="modal-header">
-          <h3 className="modal-title">Generate Avatars with AI</h3>
+          <h3 className="modal-title">Generate Audience Profiles with AI</h3>
           <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
         <div className="modal-body">
           {existingCount > 0 && (
             <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: 'var(--accent-muted)', fontSize: 13, color: 'var(--text-secondary)' }}>
-              You already have {existingCount} avatar{existingCount !== 1 ? 's' : ''}. AI will create new, distinct personas that don&apos;t overlap with existing ones.
+              You already have {existingCount} profile{existingCount !== 1 ? 's' : ''}. AI will create new, distinct profiles that don&apos;t overlap with existing ones.
             </div>
           )}
 
@@ -754,18 +754,18 @@ function AvatarPrompterModal({
           </div>
 
           <div style={{ marginBottom: 16 }}>
-            <label className="form-label">How many avatars?</label>
+            <label className="form-label">How many profiles?</label>
             <select
               className="form-input"
               value={promptQuantity}
               onChange={(e) => setPromptQuantity(Number(e.target.value))}
             >
-              <option value={3}>3 avatars</option>
-              <option value={5}>5 avatars</option>
-              <option value={8}>8 avatars</option>
-              <option value={10}>10 avatars</option>
-              <option value={15}>15 avatars</option>
-              <option value={20}>20 avatars</option>
+              <option value={3}>3 profiles</option>
+              <option value={5}>5 profiles</option>
+              <option value={8}>8 profiles</option>
+              <option value={10}>10 profiles</option>
+              <option value={15}>15 profiles</option>
+              <option value={20}>20 profiles</option>
             </select>
           </div>
 
@@ -776,13 +776,13 @@ function AvatarPrompterModal({
               rows={5}
               placeholder={audienceMode === 'general'
                 ? `Examples:\n\n"Generate broad audience segments for a plumbing company. Include residential homeowners, commercial property managers, landlords, and real estate agents."\n\n"Focus on the major market segments: residential, commercial, and emergency services."`
-                : `Examples:\n\n"Generate 10 more avatars for a plumbing company. Include people in emergency situations, people doing renovations, commercial property managers, and landlords."\n\n"Add avatars for people who are price-shopping, people who got a bad experience elsewhere, and first-time homeowners who don't know anything about plumbing."\n\n"Focus on high-income homeowners who want premium service and don't care about price."`
+                : `Examples:\n\n"Generate 10 more profiles for a plumbing company. Include people in emergency situations, people doing renovations, commercial property managers, and landlords."\n\n"Add profiles for people who are price-shopping, people who got a bad experience elsewhere, and first-time homeowners who don't know anything about plumbing."\n\n"Focus on high-income homeowners who want premium service and don't care about price."`
               }
               value={promptText}
               onChange={(e) => setPromptText(e.target.value)}
             />
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-              Leave blank and AI will analyze your business data to suggest the most relevant avatars.
+              Leave blank and AI will analyze your business data to suggest the most relevant profiles.
             </div>
           </div>
         </div>
@@ -791,7 +791,7 @@ function AvatarPrompterModal({
             Cancel
           </button>
           <button className="btn btn-primary" onClick={onGenerate}>
-            Generate {promptQuantity} {audienceMode === 'general' ? 'Audiences' : 'Avatars'}
+            Generate {promptQuantity} {audienceMode === 'general' ? 'Audiences' : 'Profiles'}
           </button>
         </div>
       </div>

@@ -2880,12 +2880,12 @@ export default function SettingsPage() {
     }
 
     const PLACEHOLDER_LEGEND: { key: string; description: string }[] = [
-      { key: '{{avatar_name}}', description: 'Target avatar name' },
+      { key: '{{avatar_name}}', description: 'Target audience profile name' },
       { key: '{{offer_name}}', description: 'Offer name' },
       { key: '{{business_summary}}', description: 'Client business summary' },
       { key: '{{template_slug}}', description: 'Landing page template ID' },
       { key: '{{business_context}}', description: 'Full business context block' },
-      { key: '{{avatar_context}}', description: 'Full avatar details block' },
+      { key: '{{avatar_context}}', description: 'Full audience profile details block' },
       { key: '{{offer_context}}', description: 'Full offer details block' },
     ]
 
