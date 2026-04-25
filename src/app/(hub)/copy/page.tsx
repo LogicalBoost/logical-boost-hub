@@ -1717,6 +1717,8 @@ export default function FunnelPage() {
                 bhs={copyComponents.filter(c => c.type === 'banner_headline')}
                 refreshCopy={() => refreshCopyComponents(client.id)}
                 canEdit={canEdit}
+                selectedAudienceId={avatarId}
+                selectedOfferId={offerId}
               />
             ) : (
               <>

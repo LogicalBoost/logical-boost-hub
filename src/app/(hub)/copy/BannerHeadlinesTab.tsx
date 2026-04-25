@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { showToast } from '@/lib/demo-toast'
 import { generateBannerHeadlines } from '@/lib/api'
@@ -9,8 +9,10 @@ import type { Avatar, Client, CopyComponent, Offer } from '@/types/database'
 
 // Banner Headlines column on /copy/. Each BH lives in copy_components with
 // type = 'banner_headline' and uses avatar_ids to tag the targeted audience(s).
-// AI generation is per (audience, offer) pair so the model has the right
-// context.
+//
+// The audience and offer come from the page-level selectors at the top of
+// /copy/ — the same ones that scope every other tab. We do NOT introduce a
+// second set of dropdowns here.
 
 export default function BannerHeadlinesTab({
   client,
@@ -19,6 +21,8 @@ export default function BannerHeadlinesTab({
   bhs,
   refreshCopy,
   canEdit,
+  selectedAudienceId,
+  selectedOfferId,
 }: {
   client: Client
   avatars: Avatar[]
@@ -26,15 +30,23 @@ export default function BannerHeadlinesTab({
   bhs: CopyComponent[]
   refreshCopy: () => Promise<void>
   canEdit: boolean
+  selectedAudienceId: string
+  selectedOfferId: string
 }) {
-  const [audienceId, setAudienceId] = useState<string>('')
-  const [offerId,    setOfferId]    = useState<string>('')
+  const audience = avatars.find(a => a.id === selectedAudienceId) ?? null
+  const offer    = offers.find(o => o.id === selectedOfferId)   ?? null
 
-  // Manual add state
+  // Manual add state — pre-tag with the page-level audience.
   const [manualOpen, setManualOpen] = useState(false)
   const [manualText, setManualText] = useState('')
   const [manualAudienceIds, setManualAudienceIds] = useState<string[]>([])
   const [manualBusy, setManualBusy] = useState(false)
+
+  // When the page-level audience changes, default the manual-add audience
+  // selection to that audience (user can still pick more).
+  useEffect(() => {
+    if (selectedAudienceId) setManualAudienceIds([selectedAudienceId])
+  }, [selectedAudienceId])
 
   // AI generation state
   const [aiOpen, setAiOpen] = useState(false)
@@ -52,14 +64,16 @@ export default function BannerHeadlinesTab({
   const [editBusy, setEditBusy] = useState(false)
 
   const approvedAvatars = useMemo(() => avatars.filter(a => a.status === 'approved'), [avatars])
-  const approvedOffers  = useMemo(() => offers.filter(o => o.status === 'approved'),  [offers])
 
-  // Filter BHs by the selected audience (or show all if none picked).
+  // Filter BHs by the page-level audience. If no audience is selected at the
+  // page level (rare — the page auto-picks the primary on load), show all.
   const visible = useMemo(() => {
     return bhs
-      .filter(bh => audienceId ? Array.isArray(bh.avatar_ids) && bh.avatar_ids.includes(audienceId) : true)
+      .filter(bh => selectedAudienceId
+        ? Array.isArray(bh.avatar_ids) && bh.avatar_ids.includes(selectedAudienceId)
+        : true)
       .sort((a, b) => a.created_at < b.created_at ? -1 : 1)
-  }, [bhs, audienceId])
+  }, [bhs, selectedAudienceId])
 
   async function getDefaultSegmentId(): Promise<string | null> {
     const { data } = await supabase
@@ -86,7 +100,8 @@ export default function BannerHeadlinesTab({
       await refreshCopy()
       setManualOpen(false)
       setManualText('')
-      setManualAudienceIds([])
+      // Reset the audience tag back to just the page-level audience.
+      setManualAudienceIds(selectedAudienceId ? [selectedAudienceId] : [])
       showToast('Banner Headline added')
     } catch (err) {
       showToast('Error: ' + (err as Error).message)
@@ -96,12 +111,15 @@ export default function BannerHeadlinesTab({
   }
 
   async function handleGenerate() {
-    if (!audienceId || !offerId) { showToast('Pick an audience and offer first'); return }
+    if (!selectedAudienceId || !selectedOfferId) {
+      showToast('Pick an audience and an offer at the top of the page first.')
+      return
+    }
     setAiBusy(true)
     setAiSuggestions([])
     setAiSelected(new Set())
     try {
-      const res = await generateBannerHeadlines(client.id, audienceId, offerId, {
+      const res = await generateBannerHeadlines(client.id, selectedAudienceId, selectedOfferId, {
         count: aiCount,
         userPrompt: aiUserPrompt.trim() || undefined,
       })
@@ -122,7 +140,7 @@ export default function BannerHeadlinesTab({
   async function handleSaveSelected() {
     const picked = aiSuggestions.filter((_, i) => aiSelected.has(i))
     if (picked.length === 0) { showToast('Pick at least one'); return }
-    if (!audienceId) return
+    if (!selectedAudienceId) return
     setAiSaving(true)
     try {
       const segId = await getDefaultSegmentId()
@@ -130,7 +148,7 @@ export default function BannerHeadlinesTab({
         client_id: client.id,
         type: 'banner_headline',
         text,
-        avatar_ids: [audienceId],
+        avatar_ids: [selectedAudienceId],
         segment_id: segId,
         status: 'approved',
       }))
@@ -186,42 +204,24 @@ export default function BannerHeadlinesTab({
     }
   }
 
+  const noContext = !selectedAudienceId || !selectedOfferId
+
   return (
     <div style={{ padding: '12px 0' }}>
-      <div style={{ background: 'var(--bg-secondary, #1a1a1a)', padding: 12, borderRadius: 6, marginBottom: 16, fontSize: 13 }}>
+      <div style={{ background: 'var(--bg-secondary, #1a1a1a)', padding: 12, borderRadius: 6, marginBottom: 12, fontSize: 13 }}>
         <strong>Banner Headlines (BH):</strong> top-slot hooks for ad banners. ≤{BH_LENGTH_HARD} chars. Must call out the audience by name or trait, and open a hook (question, loop, or recognition).
         Used by the <a href="/ads/bulk/" style={{ color: 'var(--accent)' }}>Ad Builder</a> for the BH slot.
+        {audience && <> Showing BHs tagged for <strong>{audience.name}</strong>.</>}
       </div>
 
-      {/* Audience + offer scope */}
-      <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-        <div>
-          <label className="form-label">Audience (filter + AI context)</label>
-          <select className="form-input" value={audienceId} onChange={e => setAudienceId(e.target.value)}>
-            <option value="">All audiences</option>
-            {approvedAvatars.map(a => (
-              <option key={a.id} value={a.id}>{a.code ? `${a.code} · ` : ''}{a.name}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="form-label">Offer (AI context only)</label>
-          <select className="form-input" value={offerId} onChange={e => setOfferId(e.target.value)}>
-            <option value="">— for AI generation —</option>
-            {approvedOffers.map(o => (
-              <option key={o.id} value={o.id}>{o.code ? `${o.code} · ` : ''}{o.name}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Action buttons */}
+      {/* Action buttons — use the page-level audience + offer for context */}
       {canEdit && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
           <button
             className="btn btn-primary btn-sm"
             onClick={() => setAiOpen(o => !o)}
             disabled={aiBusy}
+            title={noContext ? 'Pick an audience + offer at the top of the page first' : ''}
           >
             {aiOpen ? 'Hide AI generator' : '✨ Generate with AI'}
           </button>
@@ -259,10 +259,19 @@ export default function BannerHeadlinesTab({
       {/* AI generation panel */}
       {aiOpen && canEdit && (
         <div className="card" style={{ marginBottom: 12 }}>
-          <div className="card-title">Generate with AI</div>
+          <div className="card-title">
+            Generate with AI
+            {audience && offer && (
+              <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: 'var(--text-secondary)' }}>
+                · for {audience.name} · {offer.name}
+              </span>
+            )}
+          </div>
           <div className="card-body">
-            {!audienceId || !offerId ? (
-              <div style={{ fontSize: 13, color: 'var(--warning)' }}>Pick both an audience and an offer above first — the AI needs them for context.</div>
+            {noContext ? (
+              <div style={{ fontSize: 13, color: 'var(--warning)' }}>
+                Pick an audience and offer at the top of the page first — the AI needs both for context.
+              </div>
             ) : (
               <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
                 <label style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Count:</label>
@@ -292,7 +301,7 @@ export default function BannerHeadlinesTab({
             {aiSuggestions.length > 0 && (
               <>
                 <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                  {aiSelected.size} of {aiSuggestions.length} selected. Each saved BH is tagged to the chosen audience.
+                  {aiSelected.size} of {aiSuggestions.length} selected. Each saved BH is tagged to <strong>{audience?.name}</strong>.
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {aiSuggestions.map((s, i) => {
@@ -335,9 +344,9 @@ export default function BannerHeadlinesTab({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {visible.length === 0 ? (
           <div className="funnel-tab-empty">
-            {audienceId
-              ? 'No Banner Headlines tagged for that audience yet.'
-              : 'No Banner Headlines yet. Use the buttons above to add or generate some.'}
+            {selectedAudienceId
+              ? `No Banner Headlines tagged for ${audience?.name ?? 'this audience'} yet.`
+              : 'No Banner Headlines yet.'}
           </div>
         ) : (
           visible.map(bh => {
@@ -364,12 +373,15 @@ export default function BannerHeadlinesTab({
                   <>
                     <div style={{ fontSize: 15, fontWeight: 600 }}>{bh.text}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>{bh.text.length} chars</div>
-                    <div className="tag-list" style={{ marginTop: 8 }}>
-                      {taggedAudiences.map(aid => {
-                        const a = avatars.find(av => av.id === aid)
-                        return <span key={aid} className="tag">{a?.code ?? '—'} · {a?.name ?? aid}</span>
-                      })}
-                    </div>
+                    {/* Only show audience tags if the BH targets multiple audiences (otherwise it's redundant with the page-level filter). */}
+                    {taggedAudiences.length > 1 && (
+                      <div className="tag-list" style={{ marginTop: 8 }}>
+                        {taggedAudiences.map(aid => {
+                          const a = avatars.find(av => av.id === aid)
+                          return <span key={aid} className="tag">{a?.code ?? '—'} · {a?.name ?? aid}</span>
+                        })}
+                      </div>
+                    )}
                     {canEdit && (
                       <div style={{ display: 'flex', gap: 6, marginTop: 8, justifyContent: 'flex-end' }}>
                         <button className="btn btn-secondary btn-sm" onClick={() => startEdit(bh)}>Edit</button>
