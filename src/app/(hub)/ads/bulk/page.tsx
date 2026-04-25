@@ -6,8 +6,11 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import { showToast } from '@/lib/demo-toast'
-import { AD_BODY_TYPES } from '@/types/database'
-import type { Ad, AdComponent, BannerAsset } from '@/types/database'
+import {
+  AD_BODY_TYPES_FLAT, AD_CTA_TYPES,
+  adBodyGroupCode, bhSeqFor,
+} from '@/types/database'
+import type { Ad, BannerAsset, CopyComponent } from '@/types/database'
 
 const BANNER_BUCKET = 'client-assets'
 const PAGE_SIZE = 50
@@ -33,21 +36,21 @@ const labelStyle: React.CSSProperties = {
 }
 
 export default function AdsBulkPage() {
-  const { client, ads, adComponents, offers, avatars, refreshAds, canEdit } = useAppStore()
+  const {
+    client, ads, copyComponents, offers, avatars,
+    refreshAds, canEdit,
+  } = useAppStore()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
   // ---------------------------------------------------------------------------
-  // Selection state — mirrors /landing-pages/'s Audience + Offer pattern,
-  // but persisted in the URL so refresh / sharing / nav-back keeps the view.
+  // Selection state — persisted in URL search params.
   // ---------------------------------------------------------------------------
   const urlOfferId    = searchParams.get('offer')
   const urlAudienceId = searchParams.get('audience')
   const [selectedOfferId,    setSelectedOfferId]    = useState<string | null>(urlOfferId)
   const [selectedAudienceId, setSelectedAudienceId] = useState<string | null>(urlAudienceId)
-
-  // Keep state in sync with URL when the params change (e.g. via back button).
   useEffect(() => { setSelectedOfferId(urlOfferId) }, [urlOfferId])
   useEffect(() => { setSelectedAudienceId(urlAudienceId) }, [urlAudienceId])
 
@@ -63,9 +66,6 @@ export default function AdsBulkPage() {
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
   }
 
-  // ---------------------------------------------------------------------------
-  // Approved-only options, matching /landing-pages/.
-  // ---------------------------------------------------------------------------
   const approvedAvatars = useMemo(
     () => [...avatars].filter(a => a.status === 'approved').sort((a, b) => a.priority - b.priority),
     [avatars],
@@ -75,15 +75,18 @@ export default function AdsBulkPage() {
     [offers],
   )
 
-  const offer    = useMemo(() => offers.find(o => o.id === selectedOfferId)       ?? null, [offers, selectedOfferId])
-  const audience = useMemo(() => avatars.find(a => a.id === selectedAudienceId)   ?? null, [avatars, selectedAudienceId])
+  const offer    = useMemo(() => offers.find(o => o.id === selectedOfferId)     ?? null, [offers, selectedOfferId])
+  const audience = useMemo(() => avatars.find(a => a.id === selectedAudienceId) ?? null, [avatars, selectedAudienceId])
 
   // ---------------------------------------------------------------------------
-  // Component pools + the ads that already exist for this exact pair.
+  // Component pools — every slot now reads from copy_components.
+  //   - BH:   type = 'banner_headline' AND avatar_ids contains the audience
+  //   - body: type IN ('subheadline','hero_subheadline','proof')
+  //   - cta:  type IN ('cta','hero_cta')
   // ---------------------------------------------------------------------------
-  const bhs    = useMemo(() => offer && audience ? adComponents.filter(c => c.type === 'BH' && c.audience_ids.includes(audience.id)) : [], [adComponents, offer, audience])
-  const bodies = useMemo(() => adComponents.filter(c => AD_BODY_TYPES.includes(c.type)), [adComponents])
-  const ctas   = useMemo(() => adComponents.filter(c => c.type === 'CTA'), [adComponents])
+  const bhs    = useMemo(() => audience ? copyComponents.filter(c => c.type === 'banner_headline' && Array.isArray(c.avatar_ids) && c.avatar_ids.includes(audience.id) && c.status === 'approved') : [], [copyComponents, audience])
+  const bodies = useMemo(() => copyComponents.filter(c => AD_BODY_TYPES_FLAT.includes(c.type) && c.status === 'approved'), [copyComponents])
+  const ctas   = useMemo(() => copyComponents.filter(c => AD_CTA_TYPES.includes(c.type) && c.status === 'approved'), [copyComponents])
   const expectedCombos = bhs.length * bodies.length * ctas.length
 
   const pairAds = useMemo(() => (
@@ -95,7 +98,7 @@ export default function AdsBulkPage() {
   const missingCount = Math.max(0, expectedCombos - pairAds.length)
 
   // ---------------------------------------------------------------------------
-  // Banner assets — fetch only for the currently visible pair's ads.
+  // Banner assets — fetch only for the visible pair's ads.
   // ---------------------------------------------------------------------------
   const [assets, setAssets] = useState<AssetMap>({})
   const [loadingAssets, setLoadingAssets] = useState(false)
@@ -137,7 +140,7 @@ export default function AdsBulkPage() {
   }
 
   // ---------------------------------------------------------------------------
-  // Bulk generate for THIS pair only.
+  // Bulk generate ads for the selected pair.
   // ---------------------------------------------------------------------------
   const [generating, setGenerating] = useState(false)
   const generate = useCallback(async () => {
@@ -147,7 +150,7 @@ export default function AdsBulkPage() {
       return
     }
     if (expectedCombos === 0) {
-      showToast('No combos available — need ≥1 BH tagged for this audience, ≥1 body component, ≥1 CTA.')
+      showToast('Need ≥1 BH for this audience, ≥1 body component, ≥1 CTA before generating.')
       return
     }
     setGenerating(true)
@@ -164,15 +167,11 @@ export default function AdsBulkPage() {
               bh_component_id: bh.id,
               body_component_id: body.id,
               cta_component_id: cta.id,
-              bh_component_version: bh.version,
-              body_component_version: body.version,
-              cta_component_version: cta.version,
               status: 'approved',
             })
           }
         }
       }
-      // Idempotent: ON CONFLICT DO NOTHING via upsert(ignoreDuplicates).
       const CHUNK = 500
       for (let i = 0; i < rows.length; i += CHUNK) {
         const slice = rows.slice(i, i + CHUNK)
@@ -195,8 +194,11 @@ export default function AdsBulkPage() {
     }
   }, [client, offer, audience, bhs, bodies, ctas, expectedCombos, refreshAds])
 
+  // BH AI generation has moved to the /copy page (Banner Headlines tab).
+  // /ads/bulk just composes ads from existing copy_components.
+
   // ---------------------------------------------------------------------------
-  // Banner uploads — rename to {ad.name}_V{n}.{ext}, upload, insert row.
+  // Banner uploads (renames to {ad.name}_V{n}.{ext})
   // ---------------------------------------------------------------------------
   const [uploadingAds, setUploadingAds] = useState<Set<string>>(new Set())
 
@@ -327,9 +329,6 @@ export default function AdsBulkPage() {
   const safePage = Math.min(page, totalPages - 1)
   const visibleAds = pairAds.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
   if (!client) {
     return (
       <div>
@@ -352,7 +351,6 @@ export default function AdsBulkPage() {
         <Link className="btn btn-secondary" href="/ads/">← Back to ads</Link>
       </div>
 
-      {/* Selector card — same layout as /landing-pages/ */}
       <div className="card" style={{ maxWidth: 720, marginBottom: 16 }}>
         <h3 style={{ fontSize: 18, marginBottom: 16 }}>Select Audience Profile + Offer</h3>
         <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 4 }}>
@@ -390,9 +388,7 @@ export default function AdsBulkPage() {
       </div>
 
       {!bothSelected && (
-        <div className="empty-state">
-          Pick an audience and an offer above to see the ads for that pair.
-        </div>
+        <div className="empty-state">Pick an audience and an offer above to see the ads for that pair.</div>
       )}
 
       {bothSelected && codesMissing && (
@@ -401,13 +397,24 @@ export default function AdsBulkPage() {
           <div className="card-body" style={{ fontSize: 14 }}>
             {!offer!.code && <div>The offer <strong>{offer!.name}</strong> has no code.</div>}
             {!audience!.code && <div>The audience <strong>{audience!.name}</strong> has no code.</div>}
-            <div style={{ marginTop: 8 }}>
-              Set codes from <Link href="/ads/new/" style={{ color: 'var(--accent)' }}>/ads/new</Link> (the inline editor at the top), then come back here.
-            </div>
+            <div style={{ marginTop: 8 }}>Set codes from <Link href="/ads/new/" style={{ color: 'var(--accent)' }}>/ads/new</Link>.</div>
           </div>
         </div>
       )}
 
+      {/* Pool summary — what's available for this audience right now */}
+      {bothSelected && !codesMissing && (bhs.length === 0 || bodies.length === 0 || ctas.length === 0) && (
+        <div className="card" style={{ marginBottom: 16, borderColor: 'var(--warning)' }}>
+          <div className="card-title" style={{ color: 'var(--warning)' }}>Missing copy for this pair</div>
+          <div className="card-body" style={{ fontSize: 14 }}>
+            {bhs.length === 0 && <div>No Banner Headlines tagged for <strong>{audience!.name}</strong>. Generate some on the <Link href="/copy/" style={{ color: 'var(--accent)' }}>Copy page</Link> (Banner Headlines column).</div>}
+            {bodies.length === 0 && <div>No body copy (subheadlines or proof) yet — add some via <Link href="/copy/" style={{ color: 'var(--accent)' }}>/copy</Link>.</div>}
+            {ctas.length === 0 && <div>No CTAs yet — add some via <Link href="/copy/" style={{ color: 'var(--accent)' }}>/copy</Link>.</div>}
+          </div>
+        </div>
+      )}
+
+      {/* Ads section for the pair */}
       {bothSelected && !codesMissing && (
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
@@ -449,9 +456,7 @@ export default function AdsBulkPage() {
 
           {expectedCombos === 0 && pairAds.length === 0 ? (
             <div className="card-body" style={{ marginTop: 12, color: 'var(--text-secondary)' }}>
-              No combos available for this pair. You need at least one Banner Headline tagged for{' '}
-              <strong>{audience!.name}</strong>, plus at least one body component (SH/T/PC) and one CTA in the{' '}
-              <Link href="/ads/library/" style={{ color: 'var(--accent)' }}>component library</Link>.
+              No combos available for this pair yet. Generate Banner Headlines for <strong>{audience!.name}</strong> in the panel above, and confirm there&apos;s body copy and CTAs in <Link href="/copy/" style={{ color: 'var(--accent)' }}>/copy</Link>.
             </div>
           ) : pairAds.length === 0 ? (
             <div className="card-body" style={{ marginTop: 12, color: 'var(--text-secondary)' }}>
@@ -477,6 +482,7 @@ export default function AdsBulkPage() {
                         key={ad.id}
                         ad={ad}
                         bhs={bhs}
+                        allCopy={copyComponents}
                         bodies={bodies}
                         ctas={ctas}
                         assets={assets[ad.id] ?? []}
@@ -529,6 +535,7 @@ export default function AdsBulkPage() {
 function BulkAdRow({
   ad,
   bhs,
+  allCopy,
   bodies,
   ctas,
   assets,
@@ -542,9 +549,10 @@ function BulkAdRow({
   publicUrl,
 }: {
   ad: Ad
-  bhs: AdComponent[]
-  bodies: AdComponent[]
-  ctas: AdComponent[]
+  bhs: CopyComponent[]
+  allCopy: CopyComponent[]
+  bodies: CopyComponent[]
+  ctas: CopyComponent[]
   assets: BannerAsset[]
   loadingAssets: boolean
   uploading: boolean
@@ -561,6 +569,7 @@ function BulkAdRow({
   const bh   = useMemo(() => bhs.find(c => c.id === ad.bh_component_id), [bhs, ad.bh_component_id])
   const body = useMemo(() => bodies.find(c => c.id === ad.body_component_id), [bodies, ad.body_component_id])
   const cta  = useMemo(() => ctas.find(c => c.id === ad.cta_component_id), [ctas, ad.cta_component_id])
+  const bodyCode = body ? adBodyGroupCode(body.type) : null
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault()
@@ -575,16 +584,16 @@ function BulkAdRow({
         <Link href={`/ads/${ad.id}/`} style={{ color: 'var(--accent)' }}>{ad.name}</Link>
       </td>
       <td style={{ padding: '8px 6px' }}>
-        <div style={{ fontWeight: 600 }}>{bh?.content ?? '—'}</div>
-        {bh && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>BH{bh.per_client_seq} · v{ad.bh_component_version}</div>}
+        <div style={{ fontWeight: 600 }}>{bh?.text ?? '—'}</div>
+        {bh && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>BH{bhSeqFor(bh, allCopy)}</div>}
       </td>
       <td style={{ padding: '8px 6px' }}>
-        <div>{body?.content ?? '—'}</div>
-        {body && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{body.type}{body.per_client_seq} · v{ad.body_component_version}</div>}
+        <div>{body?.text ?? '—'}</div>
+        {body && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{bodyCode ?? '?'} · {body.type}</div>}
       </td>
       <td style={{ padding: '8px 6px', color: 'var(--accent)' }}>
-        <div>{cta?.content ?? '—'}</div>
-        {cta && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>CTA{cta.per_client_seq} · v{ad.cta_component_version}</div>}
+        <div>{cta?.text ?? '—'}</div>
+        {cta && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{cta.type}</div>}
       </td>
       <td style={{ padding: '8px 6px' }}>
         <div

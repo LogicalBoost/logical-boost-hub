@@ -5,21 +5,19 @@ import Link from 'next/link'
 import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import { showToast } from '@/lib/demo-toast'
-import { AD_BODY_TYPES } from '@/types/database'
+import { adBodyGroupCode } from '@/types/database'
 
-type BodyFilter = 'all' | 'SH' | 'T' | 'PC'
+type BodyFilter = 'all' | 'SH' | 'PC'
 
 export default function AdsListPage() {
-  const { client, ads, adComponents, offers, avatars, refreshAds, canEdit } = useAppStore()
+  const { client, ads, copyComponents, offers, avatars, refreshAds, canEdit } = useAppStore()
   const [search, setSearch] = useState('')
   const [offerFilter, setOfferFilter] = useState<string>('all')
   const [audienceFilter, setAudienceFilter] = useState<string>('all')
   const [bodyFilter, setBodyFilter] = useState<BodyFilter>('all')
 
-  const componentById = useMemo(() => {
-    const map = new Map(adComponents.map(c => [c.id, c]))
-    return map
-  }, [adComponents])
+  // Every ad slot now references copy_components (BH is type='banner_headline').
+  const copyById = useMemo(() => new Map(copyComponents.map(c => [c.id, c])), [copyComponents])
 
   const filteredAds = useMemo(() => {
     return ads.filter(ad => {
@@ -27,12 +25,12 @@ export default function AdsListPage() {
       if (offerFilter !== 'all' && ad.offer_id !== offerFilter) return false
       if (audienceFilter !== 'all' && ad.audience_id !== audienceFilter) return false
       if (bodyFilter !== 'all') {
-        const body = componentById.get(ad.body_component_id)
-        if (!body || body.type !== bodyFilter) return false
+        const body = copyById.get(ad.body_component_id)
+        if (!body || adBodyGroupCode(body.type) !== bodyFilter) return false
       }
       return true
     })
-  }, [ads, componentById, search, offerFilter, audienceFilter, bodyFilter])
+  }, [ads, copyById, search, offerFilter, audienceFilter, bodyFilter])
 
   async function handleDelete(adId: string) {
     if (!client) return
@@ -68,7 +66,6 @@ export default function AdsListPage() {
           <p className="page-subtitle">Composed ads built from your component library</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Link className="btn btn-secondary" href="/ads/library/">Component Library</Link>
           <Link className="btn btn-secondary" href="/ads/bulk/">Bulk View</Link>
           {canEdit && (
             <Link className="btn btn-primary" href="/ads/new/">+ Build New Ad</Link>
@@ -98,9 +95,8 @@ export default function AdsListPage() {
         </select>
         <select className="form-input" value={bodyFilter} onChange={e => setBodyFilter(e.target.value as BodyFilter)} style={{ maxWidth: 160 }}>
           <option value="all">Any body</option>
-          {AD_BODY_TYPES.map(t => (
-            <option key={t} value={t}>{t}</option>
-          ))}
+          <option value="SH">SH</option>
+          <option value="PC">PC</option>
         </select>
       </div>
 
@@ -115,20 +111,21 @@ export default function AdsListPage() {
           {filteredAds.map(ad => {
             const offer    = offers.find(o => o.id === ad.offer_id)
             const audience = avatars.find(a => a.id === ad.audience_id)
-            const bh       = componentById.get(ad.bh_component_id)
-            const body     = componentById.get(ad.body_component_id)
-            const cta      = componentById.get(ad.cta_component_id)
+            const bh       = copyById.get(ad.bh_component_id)
+            const body     = copyById.get(ad.body_component_id)
+            const cta      = copyById.get(ad.cta_component_id)
+            const bodyCode = body ? adBodyGroupCode(body.type) : null
             return (
               <div key={ad.id} className="card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                   <div className="card-title" style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 14, wordBreak: 'break-all' }}>{ad.name}</div>
                   <span className={`badge badge-${ad.status}`}>{ad.status}</span>
                 </div>
-                <div className="card-meta">{offer?.name ?? '—'} &bull; {audience?.name ?? '—'} &bull; body: {body?.type ?? '?'}</div>
+                <div className="card-meta">{offer?.name ?? '—'} &bull; {audience?.name ?? '—'} &bull; body: {bodyCode ?? '?'}</div>
                 <div className="card-body" style={{ marginTop: 8, fontSize: 13 }}>
-                  <div style={{ marginBottom: 4 }}><strong>{bh?.content ?? '—'}</strong></div>
-                  <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>{body?.content ?? '—'}</div>
-                  <div style={{ color: 'var(--accent)' }}>{cta?.content ?? '—'}</div>
+                  <div style={{ marginBottom: 4 }}><strong>{bh?.text ?? '—'}</strong></div>
+                  <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>{body?.text ?? '—'}</div>
+                  <div style={{ color: 'var(--accent)' }}>{cta?.text ?? '—'}</div>
                 </div>
                 <div className="card-actions">
                   <Link className="btn btn-secondary btn-sm" href={`/ads/${ad.id}/`}>Open</Link>

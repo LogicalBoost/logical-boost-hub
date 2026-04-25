@@ -9,9 +9,11 @@ import type { CopyComponent, CopyComponentType, BrandKit, TemplateId, QAReview, 
 import { supabase } from '@/lib/supabase'
 import { TEMPLATE_SLOTS, mapComponentsToSlots } from '@/lib/template-slots'
 import type { CopySlotDef } from '@/lib/template-slots'
+import BannerHeadlinesTab from './BannerHeadlinesTab'
 
 // ── Tab definitions (maps to copy component types) ──────────────────────
 const TABS: { key: string; label: string; types: CopyComponentType[] }[] = [
+  { key: 'banner_headlines', label: 'Banner Headlines', types: ['banner_headline'] },
   { key: 'google_headlines', label: 'Google Headlines', types: ['google_headline'] },
   { key: 'micro_hooks', label: 'Micro Hooks', types: ['video_hook'] },
   { key: 'meta_headlines', label: 'Meta Headlines', types: ['headline'] },
@@ -1707,67 +1709,80 @@ export default function FunnelPage() {
             )}
 
             {/* Content List */}
-            <div className="funnel-tab-content">
-              {tabComponents.length > 0 ? (
-                <>
-                  {tabComponents.map((item) => (
-                    <div key={item.id} id={`copy-${item.id}`}>
-                      <CopyRow
-                        item={item}
-                        onDeny={handleDeny}
-                        onEdit={canEdit ? handleEdit : undefined}
-                        selected={selectedIds.has(item.id)}
-                        onToggleSelect={toggleSelect}
-                        selectionMode={selectionMode}
-                      />
-                    </div>
-                  ))}
-                </>
-              ) : (
-                <div className="funnel-tab-empty">
-                  No items in this section{angleFilter !== 'all' ? ` for ${getAngleLabel(angleFilter)}` : ''}
-                </div>
-              )}
-            </div>
-
-            {/* Tab Footer (team only) */}
-            {canEdit && (
-              <div className="funnel-tab-footer">
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => handleGenerateMore(activeTabDef.types[0])}
-                    disabled={!!generatingSection}
-                  >
-                    {generatingSection === activeTabDef.types[0] ? 'Generating...' : 'Generate More'}
-                  </button>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => openPrompter(activeTabDef.types[0])}
-                  >
-                    Prompt AI
-                  </button>
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {!selectionMode ? (
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => setSelectionMode(true)}
-                      title="Select items to bulk deny"
-                    >
-                      Select &amp; Deny
-                    </button>
+            {activeTab === 'banner_headlines' && client ? (
+              <BannerHeadlinesTab
+                client={client}
+                avatars={avatars}
+                offers={offers}
+                bhs={copyComponents.filter(c => c.type === 'banner_headline')}
+                refreshCopy={() => refreshCopyComponents(client.id)}
+                canEdit={canEdit}
+              />
+            ) : (
+              <>
+                <div className="funnel-tab-content">
+                  {tabComponents.length > 0 ? (
+                    <>
+                      {tabComponents.map((item) => (
+                        <div key={item.id} id={`copy-${item.id}`}>
+                          <CopyRow
+                            item={item}
+                            onDeny={handleDeny}
+                            onEdit={canEdit ? handleEdit : undefined}
+                            selected={selectedIds.has(item.id)}
+                            onToggleSelect={toggleSelect}
+                            selectionMode={selectionMode}
+                          />
+                        </div>
+                      ))}
+                    </>
                   ) : (
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={handleBulkDeny}
-                      disabled={selectedIds.size === 0}
-                    >
-                      Deny {selectedIds.size} Selected
-                    </button>
+                    <div className="funnel-tab-empty">
+                      No items in this section{angleFilter !== 'all' ? ` for ${getAngleLabel(angleFilter)}` : ''}
+                    </div>
                   )}
                 </div>
-              </div>
+
+                {/* Tab Footer (team only) */}
+                {canEdit && (
+                  <div className="funnel-tab-footer">
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => handleGenerateMore(activeTabDef.types[0])}
+                        disabled={!!generatingSection}
+                      >
+                        {generatingSection === activeTabDef.types[0] ? 'Generating...' : 'Generate More'}
+                      </button>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => openPrompter(activeTabDef.types[0])}
+                      >
+                        Prompt AI
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {!selectionMode ? (
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => setSelectionMode(true)}
+                          title="Select items to bulk deny"
+                        >
+                          Select &amp; Deny
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={handleBulkDeny}
+                          disabled={selectedIds.size === 0}
+                        >
+                          Deny {selectedIds.size} Selected
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 

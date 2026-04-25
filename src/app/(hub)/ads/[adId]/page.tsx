@@ -7,6 +7,7 @@ import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import { showToast } from '@/lib/demo-toast'
 import type { Ad, BannerAsset } from '@/types/database'
+import { adBodyGroupCode, bhSeqFor } from '@/types/database'
 
 const BANNER_BUCKET = 'client-assets'
 
@@ -14,18 +15,20 @@ export default function AdDetailPage() {
   const params = useParams<{ adId: string }>()
   const adId = params?.adId
   const router = useRouter()
-  const { client, ads, adComponents, offers, avatars, refreshAds, canEdit } = useAppStore()
+  const { client, ads, copyComponents, offers, avatars, refreshAds, canEdit } = useAppStore()
   const [bannerAssets, setBannerAssets] = useState<BannerAsset[]>([])
   const [loadingAssets, setLoadingAssets] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const ad = useMemo<Ad | undefined>(() => ads.find(a => a.id === adId), [ads, adId])
-  const bh   = adComponents.find(c => c.id === ad?.bh_component_id)
-  const body = adComponents.find(c => c.id === ad?.body_component_id)
-  const cta  = adComponents.find(c => c.id === ad?.cta_component_id)
+  const bh   = copyComponents.find(c => c.id === ad?.bh_component_id)
+  const body = copyComponents.find(c => c.id === ad?.body_component_id)
+  const cta  = copyComponents.find(c => c.id === ad?.cta_component_id)
   const offer    = offers.find(o => o.id === ad?.offer_id)
   const audience = avatars.find(a => a.id === ad?.audience_id)
+  const bodyCode = body ? adBodyGroupCode(body.type) : null
+  const bhSeq    = bh ? bhSeqFor(bh, copyComponents) : null
 
   useEffect(() => {
     if (!adId) return
@@ -100,10 +103,9 @@ export default function AdDetailPage() {
     if (!ad || !client) return
     if (!confirm('Duplicate this ad? You can change components on the new copy. Banner assets are not copied.')) return
     try {
-      // Re-insert with same component refs; trigger will validate + name it.
-      // The name will collide since the components/offer/audience are identical,
-      // so duplicating with the same components produces an identical name.
-      // We let the user know rather than auto-mutating.
+      // Re-insert with same component refs. Same combo = same generated name +
+      // unique-constraint conflict, which is by design — banner variations live
+      // in banner_assets, not as duplicate ads.
       const { data, error } = await supabase.from('ads').insert({
         client_id:         ad.client_id,
         offer_id:          ad.offer_id,
@@ -111,9 +113,6 @@ export default function AdDetailPage() {
         bh_component_id:   ad.bh_component_id,
         body_component_id: ad.body_component_id,
         cta_component_id:  ad.cta_component_id,
-        bh_component_version:   ad.bh_component_version,
-        body_component_version: ad.body_component_version,
-        cta_component_version:  ad.cta_component_version,
         status: 'approved',
       }).select('*').single()
       if (error) throw error
@@ -174,27 +173,24 @@ export default function AdDetailPage() {
         <div className="card-body">
           <div className="detail-grid">
             <div className="detail-item">
-              <span className="detail-label">Banner Headline (BH{bh?.per_client_seq ?? '?'})</span>
-              <span className="detail-value">{bh?.content ?? '—'}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>v{ad.bh_component_version} at compose time</span>
+              <span className="detail-label">Banner Headline (BH{bhSeq ?? '?'})</span>
+              <span className="detail-value">{bh?.text ?? '—'}</span>
             </div>
             <div className="detail-item">
-              <span className="detail-label">Body ({body?.type ?? '?'}{body?.per_client_seq ?? '?'})</span>
-              <span className="detail-value">{body?.content ?? '—'}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>v{ad.body_component_version} at compose time</span>
+              <span className="detail-label">Body ({bodyCode ?? '?'} · {body?.type ?? '?'})</span>
+              <span className="detail-value">{body?.text ?? '—'}</span>
             </div>
             <div className="detail-item">
-              <span className="detail-label">CTA (CTA{cta?.per_client_seq ?? '?'})</span>
-              <span className="detail-value" style={{ color: 'var(--accent)' }}>{cta?.content ?? '—'}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>v{ad.cta_component_version} at compose time</span>
+              <span className="detail-label">CTA ({cta?.type ?? '?'})</span>
+              <span className="detail-value" style={{ color: 'var(--accent)' }}>{cta?.text ?? '—'}</span>
             </div>
           </div>
           <hr style={{ margin: '12px 0', borderColor: 'var(--border, #333)' }} />
           {/* Stylized preview */}
           <div style={{ background: 'var(--bg-secondary, #1a1a1a)', padding: 24, borderRadius: 8, textAlign: 'center', border: '1px solid var(--border, #333)' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 12 }}>{bh?.content ?? '—'}</div>
-            <div style={{ fontSize: 16, marginBottom: 16, color: 'var(--text-secondary)' }}>{body?.content ?? '—'}</div>
-            <button className="btn btn-primary" type="button" disabled>{cta?.content ?? '—'}</button>
+            <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 12 }}>{bh?.text ?? '—'}</div>
+            <div style={{ fontSize: 16, marginBottom: 16, color: 'var(--text-secondary)' }}>{body?.text ?? '—'}</div>
+            <button className="btn btn-primary" type="button" disabled>{cta?.text ?? '—'}</button>
           </div>
         </div>
       </div>

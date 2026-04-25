@@ -6,96 +6,117 @@ import Link from 'next/link'
 import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import { showToast } from '@/lib/demo-toast'
-import { AD_BODY_TYPES, BH_LENGTH_HARD, BH_LENGTH_WARN, CODE_REGEX } from '@/types/database'
-import type { AdComponent, AdComponentType } from '@/types/database'
+import {
+  AD_BODY_SH_TYPES, AD_BODY_PC_TYPES, AD_CTA_TYPES,
+  BH_LENGTH_HARD, BH_LENGTH_WARN, CODE_REGEX,
+} from '@/types/database'
+import type { Avatar, CopyComponent } from '@/types/database'
+import { bhSeqFor } from '@/types/database'
 
-type BodyType = 'SH' | 'T' | 'PC'
+type BodyGroup = 'SH' | 'PC'
 
 export default function NewAdPage() {
   const router = useRouter()
-  const { client, adComponents, offers, avatars, refreshAdComponents, refreshAds, refreshOffers, refreshAvatars, canEdit } = useAppStore()
+  const {
+    client, copyComponents, offers, avatars,
+    refreshCopyComponents, refreshAds, refreshOffers, refreshAvatars, canEdit,
+  } = useAppStore()
+  const bannerHeadlines = useMemo(
+    () => copyComponents.filter(c => c.type === 'banner_headline'),
+    [copyComponents],
+  )
 
   const [offerId, setOfferId] = useState<string>('')
   const [audienceId, setAudienceId] = useState<string>('')
   const [bhId, setBhId] = useState<string>('')
-  const [bodyType, setBodyType] = useState<BodyType>('SH')
+  const [bodyGroup, setBodyGroup] = useState<BodyGroup>('SH')
   const [bodyId, setBodyId] = useState<string>('')
   const [ctaId, setCtaId] = useState<string>('')
   const [saving, setSaving] = useState(false)
 
-  // Inline create state per type
-  const [inlineCreate, setInlineCreate] = useState<AdComponentType | null>(null)
-  const [newContent, setNewContent] = useState('')
-  const [newAudienceIds, setNewAudienceIds] = useState<string[]>([])
-  const [creating, setCreating] = useState(false)
+  // Inline create — BH only (other types live in /copy/).
+  const [creatingBh, setCreatingBh] = useState(false)
+  const [newBhContent, setNewBhContent] = useState('')
+  const [newBhAudienceIds, setNewBhAudienceIds] = useState<string[]>([])
+  const [bhBusy, setBhBusy] = useState(false)
 
   const offer    = offers.find(o => o.id === offerId)
   const audience = avatars.find(a => a.id === audienceId)
-  const bh       = adComponents.find(c => c.id === bhId)
-  const body     = adComponents.find(c => c.id === bodyId)
-  const cta      = adComponents.find(c => c.id === ctaId)
+  const bh       = bannerHeadlines.find(c => c.id === bhId)
+  const body     = copyComponents.find(c => c.id === bodyId)
+  const cta      = copyComponents.find(c => c.id === ctaId)
 
-  // BH options must include the chosen audience in audience_ids.
   const bhOptions = useMemo(() => (
-    adComponents.filter(c => c.type === 'BH' && (audienceId ? c.audience_ids.includes(audienceId) : true))
-  ), [adComponents, audienceId])
+    bannerHeadlines.filter(c => audienceId ? c.avatar_ids.includes(audienceId) : true)
+  ), [bannerHeadlines, audienceId])
 
-  const bodyOptions = useMemo(() => (
-    adComponents.filter(c => c.type === bodyType)
-  ), [adComponents, bodyType])
+  const bodyOptions = useMemo(() => {
+    const allowed = bodyGroup === 'SH' ? AD_BODY_SH_TYPES : AD_BODY_PC_TYPES
+    if (!client) return []
+    return copyComponents
+      .filter(c => c.client_id === client.id && allowed.includes(c.type) && c.status === 'approved')
+      .sort((a, b) => a.created_at < b.created_at ? -1 : 1)
+  }, [copyComponents, bodyGroup, client])
 
-  const ctaOptions = useMemo(() => (
-    adComponents.filter(c => c.type === 'CTA')
-  ), [adComponents])
+  const ctaOptions = useMemo(() => {
+    if (!client) return []
+    return copyComponents
+      .filter(c => c.client_id === client.id && AD_CTA_TYPES.includes(c.type) && c.status === 'approved')
+      .sort((a, b) => a.created_at < b.created_at ? -1 : 1)
+  }, [copyComponents, client])
 
-  // Live name preview
   const previewName = useMemo(() => {
     if (!offer?.code || !audience?.code || !bh || !body || !cta) return null
-    return `${offer.code}_${audience.code}_BH${bh.per_client_seq}-${body.type}${body.per_client_seq}-CTA${cta.per_client_seq}`
-  }, [offer, audience, bh, body, cta])
+    // Stable per-client per-group seq for body and cta. We compute these
+    // client-side here to match what the trigger would produce.
+    const bodyAllowed = bodyGroup === 'SH' ? AD_BODY_SH_TYPES : AD_BODY_PC_TYPES
+    const bodyPool = copyComponents.filter(c => c.client_id === offer.client_id && bodyAllowed.includes(c.type))
+    const bodyOrdered = [...bodyPool].sort((a, b) => a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : a.id < b.id ? -1 : 1)
+    const bodySeq = bodyOrdered.findIndex(c => c.id === body.id) + 1
 
-  function clearBodyOnTypeChange(t: BodyType) {
-    setBodyType(t)
-    setBodyId('')
-  }
+    const ctaPool = copyComponents.filter(c => c.client_id === offer.client_id && AD_CTA_TYPES.includes(c.type))
+    const ctaOrdered = [...ctaPool].sort((a, b) => a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : a.id < b.id ? -1 : 1)
+    const ctaSeq = ctaOrdered.findIndex(c => c.id === cta.id) + 1
+    const bhSeq = bhSeqFor(bh, copyComponents)
+    return `${offer.code}_${audience.code}_BH${bhSeq}-${bodyGroup}${bodySeq}-CTA${ctaSeq}`
+  }, [offer, audience, bh, body, cta, bodyGroup, copyComponents])
 
-  function clearBhOnAudienceChange(id: string) {
+  function setAudienceAndClearBh(id: string) {
     setAudienceId(id)
-    // If currently selected BH isn't tagged for this audience, clear it.
-    const current = adComponents.find(c => c.id === bhId)
-    if (current && !current.audience_ids.includes(id)) setBhId('')
+    const current = bannerHeadlines.find(c => c.id === bhId)
+    if (current && !current.avatar_ids.includes(id)) setBhId('')
   }
 
-  async function handleCreate(type: AdComponentType) {
+  async function handleCreateBh() {
     if (!client) return
-    setCreating(true)
+    if (!newBhContent.trim()) { showToast('Enter content'); return }
+    if (newBhContent.length > BH_LENGTH_HARD) { showToast(`BH must be ≤${BH_LENGTH_HARD} chars`); return }
+    if (newBhAudienceIds.length === 0) { showToast('BH must be tagged to at least one audience'); return }
+    setBhBusy(true)
     try {
-      if (type === 'BH') {
-        if (newContent.trim().length === 0) { showToast('Enter content'); return }
-        if (newContent.length > BH_LENGTH_HARD) { showToast(`Banner Headline must be ≤${BH_LENGTH_HARD} chars`); return }
-        if (newAudienceIds.length === 0) { showToast('BH must be tagged to at least one audience'); return }
-      }
-      const insert: Partial<AdComponent> & { client_id: string; type: AdComponentType; content: string; audience_ids: string[] } = {
+      // BH rows live in copy_components and need a segment_id (this DB has a
+      // NOT NULL on segment_id; default segment exists per client).
+      const { data: seg } = await supabase
+        .from('segments').select('id').eq('client_id', client.id).eq('is_default', true).single()
+      const { data, error } = await supabase.from('copy_components').insert({
         client_id: client.id,
-        type,
-        content: newContent.trim(),
-        audience_ids: type === 'BH' ? newAudienceIds : [],
-      }
-      const { data, error } = await supabase.from('ad_components').insert(insert).select('*').single()
+        type: 'banner_headline',
+        text: newBhContent.trim(),
+        avatar_ids: newBhAudienceIds,
+        segment_id: seg?.id,
+        status: 'approved',
+      }).select('*').single()
       if (error) throw error
-      await refreshAdComponents(client.id)
-      // Auto-select the newly created component into the appropriate slot.
-      if (type === 'BH')         setBhId(data.id)
-      else if (type === 'CTA')   setCtaId(data.id)
-      else                       { setBodyType(type as BodyType); setBodyId(data.id) }
-      setInlineCreate(null)
-      setNewContent('')
-      setNewAudienceIds([])
-      showToast(`${type} created`)
+      await refreshCopyComponents(client.id)
+      setBhId(data.id)
+      setCreatingBh(false)
+      setNewBhContent('')
+      setNewBhAudienceIds([])
+      showToast('Banner Headline created')
     } catch (err) {
       showToast('Error: ' + (err as Error).message)
     } finally {
-      setCreating(false)
+      setBhBusy(false)
     }
   }
 
@@ -114,11 +135,6 @@ export default function NewAdPage() {
         bh_component_id:   bh.id,
         body_component_id: body.id,
         cta_component_id:  cta.id,
-        // versions are filled by the validate-and-fill trigger; we have to send
-        // *something* because the columns are NOT NULL with no default.
-        bh_component_version:   bh.version,
-        body_component_version: body.version,
-        cta_component_version:  cta.version,
         status: 'approved',
       }).select('*').single()
       if (error) throw error
@@ -135,11 +151,7 @@ export default function NewAdPage() {
   if (!client) {
     return (
       <div>
-        <div className="page-header">
-          <div>
-            <h1 className="page-title">Build New Ad</h1>
-          </div>
-        </div>
+        <div className="page-header"><div><h1 className="page-title">Build New Ad</h1></div></div>
         <div className="empty-state">Select a client first.</div>
       </div>
     )
@@ -148,11 +160,7 @@ export default function NewAdPage() {
   if (!canEdit) {
     return (
       <div>
-        <div className="page-header">
-          <div>
-            <h1 className="page-title">Build New Ad</h1>
-          </div>
-        </div>
+        <div className="page-header"><div><h1 className="page-title">Build New Ad</h1></div></div>
         <div className="empty-state">Read-only role. Switch to an editor account to compose ads.</div>
       </div>
     )
@@ -163,19 +171,16 @@ export default function NewAdPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Build New Ad</h1>
-          <p className="page-subtitle">Compose a banner from BH + body + CTA</p>
+          <p className="page-subtitle">Pick a Banner Headline, body, and CTA for one offer × audience pair.</p>
         </div>
         <Link className="btn btn-secondary" href="/ads/">← Back to ads</Link>
       </div>
 
-      {/* Codes editor — inline for any offer/audience missing a short code */}
       {(offers.some(o => !o.code) || avatars.some(a => !a.code)) && (
         <div className="card" style={{ marginBottom: 16, borderColor: 'var(--warning)' }}>
           <div className="card-title" style={{ color: 'var(--warning)' }}>Set short codes for offers and audiences</div>
           <div className="card-body" style={{ fontSize: 14 }}>
-            <p style={{ marginTop: 0, marginBottom: 12 }}>
-              Ad names depend on a short code (2–6 uppercase letters/digits) on each offer and audience. Set the missing codes below.
-            </p>
+            <p style={{ marginTop: 0, marginBottom: 12 }}>Ad names depend on a short code (2–6 uppercase letters/digits) on each offer and audience.</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }} className="grid-2col-responsive">
               <CodeEditor
                 heading="Offers"
@@ -213,7 +218,7 @@ export default function NewAdPage() {
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-title">2. Audience</div>
         <div className="card-body">
-          <select className="form-input" value={audienceId} onChange={e => clearBhOnAudienceChange(e.target.value)}>
+          <select className="form-input" value={audienceId} onChange={e => setAudienceAndClearBh(e.target.value)}>
             <option value="">— Select an audience —</option>
             {avatars.map(a => (
               <option key={a.id} value={a.id} disabled={!a.code}>
@@ -233,7 +238,7 @@ export default function NewAdPage() {
           <select className="form-input" value={bhId} onChange={e => setBhId(e.target.value)} disabled={!audienceId}>
             <option value="">— Select a Banner Headline —</option>
             {bhOptions.map(c => (
-              <option key={c.id} value={c.id}>BH{c.per_client_seq} · {c.content}</option>
+              <option key={c.id} value={c.id}>BH{bhSeqFor(c, copyComponents)} · {c.text}</option>
             ))}
           </select>
           {audienceId && bhOptions.length === 0 && (
@@ -242,68 +247,56 @@ export default function NewAdPage() {
             </div>
           )}
           <div style={{ marginTop: 8 }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => { setInlineCreate('BH'); setNewAudienceIds(audienceId ? [audienceId] : []) }} disabled={!audienceId}>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => { setCreatingBh(true); setNewBhAudienceIds(audienceId ? [audienceId] : []) }}
+              disabled={!audienceId}
+            >
               + New Banner Headline
             </button>
           </div>
-          {inlineCreate === 'BH' && (
-            <InlineCreate
-              type="BH"
-              creating={creating}
-              content={newContent}
-              setContent={setNewContent}
-              audienceIds={newAudienceIds}
-              setAudienceIds={setNewAudienceIds}
+          {creatingBh && (
+            <BhInlineCreate
+              busy={bhBusy}
+              content={newBhContent}
+              setContent={setNewBhContent}
+              audienceIds={newBhAudienceIds}
+              setAudienceIds={setNewBhAudienceIds}
               avatars={avatars}
-              onCancel={() => { setInlineCreate(null); setNewContent(''); setNewAudienceIds([]) }}
-              onCreate={() => handleCreate('BH')}
+              onCancel={() => { setCreatingBh(false); setNewBhContent(''); setNewBhAudienceIds([]) }}
+              onCreate={handleCreateBh}
             />
           )}
         </div>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-title">4. Body</div>
+        <div className="card-title">4. Body (Subheadline or Proof)</div>
         <div className="card-body">
           <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-            {AD_BODY_TYPES.map(t => (
-              <button
-                key={t}
-                className={`btn btn-sm ${bodyType === t ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => clearBodyOnTypeChange(t as BodyType)}
-              >
-                {t === 'SH' ? 'Subheadline' : t === 'T' ? 'Trust Signal' : 'Proof Copy'}
-              </button>
-            ))}
+            <button
+              className={`btn btn-sm ${bodyGroup === 'SH' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => { setBodyGroup('SH'); setBodyId('') }}
+            >
+              Subheadline
+            </button>
+            <button
+              className={`btn btn-sm ${bodyGroup === 'PC' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => { setBodyGroup('PC'); setBodyId('') }}
+            >
+              Proof Copy
+            </button>
           </div>
           <select className="form-input" value={bodyId} onChange={e => setBodyId(e.target.value)}>
-            <option value="">— Select a {bodyType} —</option>
+            <option value="">— Select a {bodyGroup} component —</option>
             {bodyOptions.map(c => (
-              <option key={c.id} value={c.id}>{c.type}{c.per_client_seq} · {c.content}</option>
+              <option key={c.id} value={c.id}>{c.text.length > 80 ? c.text.slice(0, 80) + '…' : c.text}</option>
             ))}
           </select>
           {bodyOptions.length === 0 && (
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 8 }}>
-              No {bodyType} components yet.
+              No {bodyGroup === 'SH' ? 'subheadline' : 'proof'} copy yet. Add some via <Link href="/copy/" style={{ color: 'var(--accent)' }}>/copy</Link>.
             </div>
-          )}
-          <div style={{ marginTop: 8 }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => setInlineCreate(bodyType)}>
-              + New {bodyType}
-            </button>
-          </div>
-          {inlineCreate === bodyType && (
-            <InlineCreate
-              type={bodyType}
-              creating={creating}
-              content={newContent}
-              setContent={setNewContent}
-              audienceIds={[]}
-              setAudienceIds={() => {}}
-              avatars={[]}
-              onCancel={() => { setInlineCreate(null); setNewContent('') }}
-              onCreate={() => handleCreate(bodyType)}
-            />
           )}
         </div>
       </div>
@@ -314,31 +307,17 @@ export default function NewAdPage() {
           <select className="form-input" value={ctaId} onChange={e => setCtaId(e.target.value)}>
             <option value="">— Select a CTA —</option>
             {ctaOptions.map(c => (
-              <option key={c.id} value={c.id}>CTA{c.per_client_seq} · {c.content}</option>
+              <option key={c.id} value={c.id}>{c.text.length > 80 ? c.text.slice(0, 80) + '…' : c.text}</option>
             ))}
           </select>
-          <div style={{ marginTop: 8 }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => setInlineCreate('CTA')}>
-              + New CTA
-            </button>
-          </div>
-          {inlineCreate === 'CTA' && (
-            <InlineCreate
-              type="CTA"
-              creating={creating}
-              content={newContent}
-              setContent={setNewContent}
-              audienceIds={[]}
-              setAudienceIds={() => {}}
-              avatars={[]}
-              onCancel={() => { setInlineCreate(null); setNewContent('') }}
-              onCreate={() => handleCreate('CTA')}
-            />
+          {ctaOptions.length === 0 && (
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 8 }}>
+              No CTAs yet. Add some via <Link href="/copy/" style={{ color: 'var(--accent)' }}>/copy</Link>.
+            </div>
           )}
         </div>
       </div>
 
-      {/* Live preview */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-title">Preview</div>
         <div className="card-body">
@@ -347,14 +326,12 @@ export default function NewAdPage() {
           </div>
           <div style={{ background: 'var(--bg-secondary, #1a1a1a)', padding: 24, borderRadius: 8, textAlign: 'center', border: '1px solid var(--border, #333)' }}>
             <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 12, minHeight: 28 }}>
-              {bh?.content ?? <span style={{ color: 'var(--text-secondary)' }}>Banner headline goes here</span>}
+              {bh?.text ?? <span style={{ color: 'var(--text-secondary)' }}>Banner headline goes here</span>}
             </div>
             <div style={{ fontSize: 16, marginBottom: 16, color: 'var(--text-secondary)', minHeight: 22 }}>
-              {body?.content ?? 'Body copy goes here'}
+              {body?.text ?? 'Body copy goes here'}
             </div>
-            <button className="btn btn-primary" type="button" disabled>
-              {cta?.content ?? 'CTA'}
-            </button>
+            <button className="btn btn-primary" type="button" disabled>{cta?.text ?? 'CTA'}</button>
           </div>
         </div>
       </div>
@@ -374,11 +351,10 @@ export default function NewAdPage() {
 }
 
 // ---------------------------------------------------------------------------
-// InlineCreate — small editor for adding a component without leaving this page
+// BhInlineCreate — small editor for adding a Banner Headline without leaving
 // ---------------------------------------------------------------------------
-function InlineCreate({
-  type,
-  creating,
+function BhInlineCreate({
+  busy,
   content,
   setContent,
   audienceIds,
@@ -387,72 +363,63 @@ function InlineCreate({
   onCancel,
   onCreate,
 }: {
-  type: AdComponentType
-  creating: boolean
+  busy: boolean
   content: string
   setContent: (v: string) => void
   audienceIds: string[]
   setAudienceIds: (v: string[]) => void
-  avatars: { id: string; name: string; code: string | null }[]
+  avatars: Avatar[]
   onCancel: () => void
   onCreate: () => void
 }) {
-  const isBh = type === 'BH'
   const len = content.length
-  const overHard = isBh && len > BH_LENGTH_HARD
-  const overWarn = isBh && len > BH_LENGTH_WARN
+  const overHard = len > BH_LENGTH_HARD
+  const overWarn = len > BH_LENGTH_WARN
 
   return (
     <div style={{ marginTop: 12, padding: 12, border: '1px solid var(--border, #333)', borderRadius: 8 }}>
-      {isBh && (
-        <div style={{ background: 'var(--bg-secondary, #222)', padding: 10, borderRadius: 6, marginBottom: 10, fontSize: 13 }}>
-          <strong>Banner Headline rules:</strong> short (≤{BH_LENGTH_HARD} chars), calls out the audience by name or trait, opens a loop or asks a question.
-          Generic headlines like &quot;Do you need a lawyer?&quot; aren&apos;t hooks — say who you&apos;re talking to.
-        </div>
-      )}
+      <div style={{ background: 'var(--bg-secondary, #222)', padding: 10, borderRadius: 6, marginBottom: 10, fontSize: 13 }}>
+        <strong>Banner Headline rules:</strong> short (≤{BH_LENGTH_HARD} chars), calls out the audience by name or trait, opens a loop or asks a question.
+      </div>
       <textarea
         className="form-textarea"
-        rows={isBh ? 2 : 3}
+        rows={2}
         value={content}
         onChange={e => setContent(e.target.value)}
-        placeholder={isBh ? 'e.g. Are you undocumented? You have options.' : type === 'CTA' ? 'e.g. Get My Free Consultation' : 'Enter content…'}
+        placeholder="e.g. Are you undocumented? You have options."
       />
-      {isBh && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 4 }}>
-          <span style={{ color: overHard ? 'var(--danger, #ef4444)' : overWarn ? 'var(--warning, #f59e0b)' : 'var(--text-secondary)' }}>
-            {len} / {BH_LENGTH_HARD} chars{overWarn && !overHard ? ' · getting long' : ''}{overHard ? ' · too long' : ''}
-          </span>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: 12, marginTop: 4 }}>
+        <span style={{ color: overHard ? 'var(--danger, #ef4444)' : overWarn ? 'var(--warning, #f59e0b)' : 'var(--text-secondary)' }}>
+          {len} / {BH_LENGTH_HARD} chars{overWarn && !overHard ? ' · getting long' : ''}{overHard ? ' · too long' : ''}
+        </span>
+      </div>
+      <div style={{ marginTop: 10 }}>
+        <label className="form-label" style={{ display: 'block', marginBottom: 4 }}>Audiences this BH targets *</label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {avatars.map(a => {
+            const checked = audienceIds.includes(a.id)
+            return (
+              <label key={a.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', border: '1px solid var(--border, #333)', borderRadius: 999, fontSize: 13, cursor: 'pointer', background: checked ? 'var(--accent, #3b82f6)' : 'transparent', color: checked ? '#fff' : 'inherit' }}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => setAudienceIds(checked ? audienceIds.filter(id => id !== a.id) : [...audienceIds, a.id])}
+                  style={{ display: 'none' }}
+                />
+                {a.code ?? '—'} · {a.name}
+              </label>
+            )
+          })}
         </div>
-      )}
-      {isBh && (
-        <div style={{ marginTop: 10 }}>
-          <label className="form-label" style={{ display: 'block', marginBottom: 4 }}>Audiences this BH targets *</label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {avatars.map(a => {
-              const checked = audienceIds.includes(a.id)
-              return (
-                <label key={a.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', border: '1px solid var(--border, #333)', borderRadius: 999, fontSize: 13, cursor: 'pointer', background: checked ? 'var(--accent, #3b82f6)' : 'transparent', color: checked ? '#fff' : 'inherit' }}>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => setAudienceIds(checked ? audienceIds.filter(id => id !== a.id) : [...audienceIds, a.id])}
-                    style={{ display: 'none' }}
-                  />
-                  {a.code ?? '—'} · {a.name}
-                </label>
-              )
-            })}
-          </div>
-        </div>
-      )}
+      </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
-        <button className="btn btn-secondary btn-sm" onClick={onCancel} disabled={creating}>Cancel</button>
+        <button className="btn btn-secondary btn-sm" onClick={onCancel} disabled={busy}>Cancel</button>
         <button
           className="btn btn-primary btn-sm"
           onClick={onCreate}
-          disabled={creating || content.trim().length === 0 || overHard || (isBh && audienceIds.length === 0)}
+          disabled={busy || content.trim().length === 0 || overHard || audienceIds.length === 0}
         >
-          {creating ? 'Creating…' : `Create ${type}`}
+          {busy ? 'Creating…' : 'Create BH'}
         </button>
       </div>
     </div>
@@ -490,7 +457,7 @@ function CodeEditor({
   async function handleSave(id: string) {
     const code = (drafts[id] ?? '').toUpperCase().trim()
     if (!CODE_REGEX.test(code)) { showToast('Code must be 2–6 uppercase letters/digits'); return }
-    if (existingCodes.includes(code)) { showToast(`Code "${code}" is already in use for another ${table === 'offers' ? 'offer' : 'audience'}`); return }
+    if (existingCodes.includes(code)) { showToast(`Code "${code}" is already in use`); return }
     setSaving(id)
     try {
       const { error } = await supabase.from(table).update({ code }).eq('id', id)

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { supabase } from './supabase'
-import type { Client, Avatar, Offer, IntakeQuestion, CopyComponent, FunnelInstance, CompetitorIntel, LandingPage, MediaAsset, BrandKitRecord, PageTemplate, PublishedPage, PromptTemplate, ClientTemplate, QAReview, Form, FormWebhook, ClientPhoneNumber, UserRole, AdComponent, Ad, BannerAsset } from '@/types/database'
+import type { Client, Avatar, Offer, IntakeQuestion, CopyComponent, FunnelInstance, CompetitorIntel, LandingPage, MediaAsset, BrandKitRecord, PageTemplate, PublishedPage, PromptTemplate, ClientTemplate, QAReview, Form, FormWebhook, ClientPhoneNumber, UserRole, Ad, BannerAsset } from '@/types/database'
 
 interface AppState {
   client: Client | null
@@ -23,7 +23,6 @@ interface AppState {
   forms: Form[]
   formWebhooks: FormWebhook[]
   clientPhoneNumbers: ClientPhoneNumber[]
-  adComponents: AdComponent[]
   ads: Ad[]
   bannerAssets: BannerAsset[]
   loading: boolean
@@ -71,7 +70,6 @@ interface AppStore extends AppState {
   refreshForms: (clientId: string) => Promise<void>
   refreshFormWebhooks: (clientId: string) => Promise<void>
   refreshClientPhoneNumbers: (clientId: string) => Promise<void>
-  refreshAdComponents: (clientId: string) => Promise<void>
   refreshAds: (clientId: string) => Promise<void>
   refreshBannerAssets: (clientId: string) => Promise<void>
   /** Refresh just the client record from DB (e.g. after logo upload or brand kit analysis) */
@@ -101,7 +99,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [forms, setForms] = useState<Form[]>([])
   const [formWebhooks, setFormWebhooks] = useState<FormWebhook[]>([])
   const [clientPhoneNumbers, setClientPhoneNumbers] = useState<ClientPhoneNumber[]>([])
-  const [adComponents, setAdComponents] = useState<AdComponent[]>([])
   const [ads, setAds] = useState<Ad[]>([])
   const [bannerAssets, setBannerAssets] = useState<BannerAsset[]>([])
   const [loading, setLoading] = useState(false)
@@ -159,7 +156,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         { data: formsData },
         { data: formWebhooksData },
         { data: phoneNumberData },
-        { data: adComponentData },
         { data: adData },
       ] = await Promise.all([
         supabase.from('clients').select('*').eq('id', clientId).single(),
@@ -179,7 +175,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         supabase.from('forms').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
         supabase.from('form_webhooks').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
         supabase.from('client_phone_numbers').select('*').eq('client_id', clientId).order('is_default', { ascending: false }),
-        supabase.from('ad_components').select('*').eq('client_id', clientId).order('per_client_seq'),
         supabase.from('ads').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
       ])
       if (clientData) setClient(clientData)
@@ -199,7 +194,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setForms(formsData || [])
       setFormWebhooks(formWebhooksData || [])
       setClientPhoneNumbers(phoneNumberData || [])
-      setAdComponents(adComponentData || [])
       setAds(adData || [])
       setBannerAssets([])
     } catch (err) {
@@ -231,7 +225,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         { data: formsData },
         { data: formWebhooksData },
         { data: phoneNumberData },
-        { data: adComponentData },
         { data: adData },
       ] = await Promise.all([
         supabase.from('clients').select('*').eq('id', clientId).single(),
@@ -251,7 +244,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         supabase.from('forms').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
         supabase.from('form_webhooks').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
         supabase.from('client_phone_numbers').select('*').eq('client_id', clientId).order('is_default', { ascending: false }),
-        supabase.from('ad_components').select('*').eq('client_id', clientId).order('per_client_seq'),
         supabase.from('ads').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
       ])
       if (clientData) {
@@ -274,7 +266,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setForms(formsData || [])
       setFormWebhooks(formWebhooksData || [])
       setClientPhoneNumbers(phoneNumberData || [])
-      setAdComponents(adComponentData || [])
       setAds(adData || [])
       setBannerAssets([])
     } catch (err) {
@@ -312,7 +303,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setQAReviews([])
     setForms([])
     setFormWebhooks([])
-    setAdComponents([])
     setAds([])
     setBannerAssets([])
     return data as Client
@@ -429,11 +419,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const refreshAdComponents = useCallback(async (clientId: string) => {
-    const { data } = await supabase.from('ad_components').select('*').eq('client_id', clientId).order('per_client_seq')
-    setAdComponents(data || [])
-  }, [])
-
   const refreshAds = useCallback(async (clientId: string) => {
     const { data } = await supabase.from('ads').select('*').eq('client_id', clientId).order('created_at', { ascending: false })
     setAds(data || [])
@@ -453,12 +438,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      allClients, client, avatars, offers, intakeQuestions, funnelInstances, copyComponents, competitors, landingPages, publishedPages, mediaAssets, brandKit, pageTemplates, promptTemplates, clientTemplates, qaReviews, forms, formWebhooks, clientPhoneNumbers, adComponents, ads, bannerAssets, loading, error,
+      allClients, client, avatars, offers, intakeQuestions, funnelInstances, copyComponents, competitors, landingPages, publishedPages, mediaAssets, brandKit, pageTemplates, promptTemplates, clientTemplates, qaReviews, forms, formWebhooks, clientPhoneNumbers, ads, bannerAssets, loading, error,
       userRole, canEdit, isClientRole,
       setClient, setAvatars, setOffers, setIntakeQuestions, setCopyComponents, setFunnelInstances, setCompetitors, setLandingPages, setPublishedPages, setMediaAssets, setBrandKit,
       setLoading, setError, loadAllClients, loadClientData, switchClient, createClient: createNewClient,
       updateAvatar, updateOffer, refreshAvatars, refreshOffers, refreshIntake,
-      refreshCopyComponents, refreshFunnelInstances, refreshLandingPages, refreshPublishedPages, refreshMediaAssets, refreshBrandKit, refreshPromptTemplates, refreshClientTemplates, refreshQAReviews, refreshForms, refreshFormWebhooks, refreshClientPhoneNumbers, refreshAdComponents, refreshAds, refreshBannerAssets, refreshClient, setUserRole,
+      refreshCopyComponents, refreshFunnelInstances, refreshLandingPages, refreshPublishedPages, refreshMediaAssets, refreshBrandKit, refreshPromptTemplates, refreshClientTemplates, refreshQAReviews, refreshForms, refreshFormWebhooks, refreshClientPhoneNumbers, refreshAds, refreshBannerAssets, refreshClient, setUserRole,
     }}>
       {children}
     </AppContext.Provider>

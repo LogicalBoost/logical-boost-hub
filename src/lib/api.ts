@@ -83,6 +83,23 @@ export async function recommendAngles(avatarId: string, offerId: string) {
   })
 }
 
+// Generate Banner Headline suggestions for one audience + offer.
+// Returns suggestions only — caller picks which to save into banner_headlines.
+export async function generateBannerHeadlines(
+  clientId: string,
+  audienceId: string,
+  offerId: string,
+  options?: { count?: number; userPrompt?: string },
+): Promise<{ suggestions: { BH: string[] } }> {
+  return callEdgeFunction('generate-banner-headlines', {
+    client_id: clientId,
+    audience_id: audienceId,
+    offer_id: offerId,
+    count: options?.count,
+    user_prompt: options?.userPrompt,
+  })
+}
+
 // Generate avatars via AI prompter
 export async function generateAvatars(
   clientId: string,
