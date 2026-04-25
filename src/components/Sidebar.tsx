@@ -16,6 +16,7 @@ const allNavItems = [
   { href: '/offers/', label: 'Offers', icon: '◭', clientVisible: false },
   { href: '/competitor-intel/', label: 'Competitor Intel', icon: '◮', clientVisible: false },
   { href: '/settings/', label: 'Settings', icon: '◷', clientVisible: true },
+  { href: '/test/', label: 'test', icon: '◷', clientVisible: true },
 ]
 
 export default function Sidebar() {
