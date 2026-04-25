@@ -11,6 +11,7 @@ const allNavItems = [
   { href: '/dashboard/', label: 'Dashboard', icon: '◫', clientVisible: true },
   { href: '/stats/', label: 'Stats', icon: '◩', clientVisible: false },
   { href: '/copy/', label: 'Copy', icon: '◬', clientVisible: false },
+  { href: '/ads/', label: 'Ads', icon: '◐', clientVisible: false },
   { href: '/landing-pages/', label: 'Landing Pages', icon: '◰', clientVisible: true },
   { href: '/avatars/', label: 'Audience Profiles', icon: '◪', clientVisible: false },
   { href: '/offers/', label: 'Offers', icon: '◭', clientVisible: false },
