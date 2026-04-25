@@ -2,78 +2,112 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import { showToast } from '@/lib/demo-toast'
 import { AD_BODY_TYPES } from '@/types/database'
-import type { Ad, AdComponent, Avatar, BannerAsset, Offer } from '@/types/database'
+import type { Ad, AdComponent, BannerAsset } from '@/types/database'
 
 const BANNER_BUCKET = 'client-assets'
 const PAGE_SIZE = 50
 
 type AssetMap = Record<string, BannerAsset[]>
 
-interface Section {
-  key: string
-  offer: Offer
-  audience: Avatar
-  bhs: AdComponent[]
-  bodies: AdComponent[]
-  ctas: AdComponent[]
-  expectedCombos: number
-  ads: Ad[]
+const selectStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '10px 14px',
+  borderRadius: 'var(--radius-sm)',
+  border: '1px solid var(--border)',
+  background: 'var(--bg-input)',
+  color: 'var(--text-primary)',
+  fontSize: 14,
+}
+
+const labelStyle: React.CSSProperties = {
+  fontSize: 13,
+  fontWeight: 600,
+  color: 'var(--text-secondary)',
+  marginBottom: 6,
+  display: 'block',
 }
 
 export default function AdsBulkPage() {
   const { client, ads, adComponents, offers, avatars, refreshAds, canEdit } = useAppStore()
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
+  // ---------------------------------------------------------------------------
+  // Selection state — mirrors /landing-pages/'s Audience + Offer pattern,
+  // but persisted in the URL so refresh / sharing / nav-back keeps the view.
+  // ---------------------------------------------------------------------------
+  const urlOfferId    = searchParams.get('offer')
+  const urlAudienceId = searchParams.get('audience')
+  const [selectedOfferId,    setSelectedOfferId]    = useState<string | null>(urlOfferId)
+  const [selectedAudienceId, setSelectedAudienceId] = useState<string | null>(urlAudienceId)
+
+  // Keep state in sync with URL when the params change (e.g. via back button).
+  useEffect(() => { setSelectedOfferId(urlOfferId) }, [urlOfferId])
+  useEffect(() => { setSelectedAudienceId(urlAudienceId) }, [urlAudienceId])
+
+  function updateSelection(next: { offerId?: string | null; audienceId?: string | null }) {
+    const offerId    = next.offerId    !== undefined ? next.offerId    : selectedOfferId
+    const audienceId = next.audienceId !== undefined ? next.audienceId : selectedAudienceId
+    setSelectedOfferId(offerId)
+    setSelectedAudienceId(audienceId)
+    const params = new URLSearchParams(searchParams.toString())
+    if (offerId)    params.set('offer', offerId);       else params.delete('offer')
+    if (audienceId) params.set('audience', audienceId); else params.delete('audience')
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }
+
+  // ---------------------------------------------------------------------------
+  // Approved-only options, matching /landing-pages/.
+  // ---------------------------------------------------------------------------
+  const approvedAvatars = useMemo(
+    () => [...avatars].filter(a => a.status === 'approved').sort((a, b) => a.priority - b.priority),
+    [avatars],
+  )
+  const approvedOffers = useMemo(
+    () => offers.filter(o => o.status === 'approved'),
+    [offers],
+  )
+
+  const offer    = useMemo(() => offers.find(o => o.id === selectedOfferId)       ?? null, [offers, selectedOfferId])
+  const audience = useMemo(() => avatars.find(a => a.id === selectedAudienceId)   ?? null, [avatars, selectedAudienceId])
+
+  // ---------------------------------------------------------------------------
+  // Component pools + the ads that already exist for this exact pair.
+  // ---------------------------------------------------------------------------
+  const bhs    = useMemo(() => offer && audience ? adComponents.filter(c => c.type === 'BH' && c.audience_ids.includes(audience.id)) : [], [adComponents, offer, audience])
+  const bodies = useMemo(() => adComponents.filter(c => AD_BODY_TYPES.includes(c.type)), [adComponents])
+  const ctas   = useMemo(() => adComponents.filter(c => c.type === 'CTA'), [adComponents])
+  const expectedCombos = bhs.length * bodies.length * ctas.length
+
+  const pairAds = useMemo(() => (
+    offer && audience
+      ? ads.filter(a => a.offer_id === offer.id && a.audience_id === audience.id)
+      : []
+  ), [ads, offer, audience])
+
+  const missingCount = Math.max(0, expectedCombos - pairAds.length)
+
+  // ---------------------------------------------------------------------------
+  // Banner assets — fetch only for the currently visible pair's ads.
+  // ---------------------------------------------------------------------------
   const [assets, setAssets] = useState<AssetMap>({})
   const [loadingAssets, setLoadingAssets] = useState(false)
-  const [generating, setGenerating] = useState<string | null>(null) // 'all' | section.key | null
-  const [uploadingAds, setUploadingAds] = useState<Set<string>>(new Set())
-  const [pageByPair, setPageByPair] = useState<Record<string, number>>({})
-  const [lightbox, setLightbox] = useState<string | null>(null)
 
-  // ---------------------------------------------------------------------------
-  // Sections — one per (offer × audience) pair where both have a code.
-  // ---------------------------------------------------------------------------
-  const sections: Section[] = useMemo(() => {
-    if (!client) return []
-    const bodies = adComponents.filter(c => AD_BODY_TYPES.includes(c.type))
-    const ctas = adComponents.filter(c => c.type === 'CTA')
-    const out: Section[] = []
-    for (const offer of offers) {
-      if (!offer.code) continue
-      for (const audience of avatars) {
-        if (!audience.code) continue
-        const bhs = adComponents.filter(c => c.type === 'BH' && c.audience_ids.includes(audience.id))
-        out.push({
-          key: `${offer.id}|${audience.id}`,
-          offer,
-          audience,
-          bhs,
-          bodies,
-          ctas,
-          expectedCombos: bhs.length * bodies.length * ctas.length,
-          ads: ads.filter(a => a.offer_id === offer.id && a.audience_id === audience.id),
-        })
-      }
-    }
-    return out
-  }, [client, ads, adComponents, offers, avatars])
-
-  // ---------------------------------------------------------------------------
-  // Eagerly fetch banner_assets for every ad belonging to this client.
-  // ---------------------------------------------------------------------------
   const loadAssets = useCallback(async () => {
-    if (!client || ads.length === 0) {
+    if (!client || pairAds.length === 0) {
       setAssets({})
       return
     }
     setLoadingAssets(true)
     try {
-      const adIds = ads.map(a => a.id)
-      // Chunk into batches to avoid hitting URL/payload limits on large clients.
+      const adIds = pairAds.map(a => a.id)
       const CHUNK = 200
       const all: BannerAsset[] = []
       for (let i = 0; i < adIds.length; i += CHUNK) {
@@ -87,16 +121,14 @@ export default function AdsBulkPage() {
         if (data) all.push(...data)
       }
       const byAd: AssetMap = {}
-      for (const a of all) {
-        ;(byAd[a.ad_id] ||= []).push(a)
-      }
+      for (const a of all) (byAd[a.ad_id] ||= []).push(a)
       setAssets(byAd)
     } catch (err) {
       showToast('Failed to load banner assets: ' + (err as Error).message)
     } finally {
       setLoadingAssets(false)
     }
-  }, [client, ads])
+  }, [client, pairAds])
 
   useEffect(() => { loadAssets() }, [loadAssets])
 
@@ -105,82 +137,75 @@ export default function AdsBulkPage() {
   }
 
   // ---------------------------------------------------------------------------
-  // Bulk generation — for each section, build every (BH × body × CTA) tuple
-  // and upsert with ON CONFLICT DO NOTHING (the unique constraint is on the
-  // composition tuple). One round-trip per section keeps the payload bounded.
+  // Bulk generate for THIS pair only.
   // ---------------------------------------------------------------------------
-  const generateForSections = useCallback(async (targets: Section[], label: string) => {
-    if (!client) return
-    setGenerating(label)
+  const [generating, setGenerating] = useState(false)
+  const generate = useCallback(async () => {
+    if (!client || !offer || !audience) return
+    if (!offer.code || !audience.code) {
+      showToast('Both offer and audience need short codes before generating ads.')
+      return
+    }
+    if (expectedCombos === 0) {
+      showToast('No combos available — need ≥1 BH tagged for this audience, ≥1 body component, ≥1 CTA.')
+      return
+    }
+    setGenerating(true)
     let inserted = 0
-    let skippedDueToVoid = 0
     try {
-      for (const s of targets) {
-        if (s.expectedCombos === 0) {
-          skippedDueToVoid++
-          continue
-        }
-        const rows: Array<Partial<Ad> & { client_id: string }> = []
-        for (const bh of s.bhs) {
-          for (const body of s.bodies) {
-            for (const cta of s.ctas) {
-              rows.push({
-                client_id: client.id,
-                offer_id: s.offer.id,
-                audience_id: s.audience.id,
-                bh_component_id: bh.id,
-                body_component_id: body.id,
-                cta_component_id: cta.id,
-                // Trigger overwrites these on insert; columns are NOT NULL so we
-                // still need to send them.
-                bh_component_version: bh.version,
-                body_component_version: body.version,
-                cta_component_version: cta.version,
-                status: 'approved',
-              })
-            }
+      const rows: Array<Partial<Ad> & { client_id: string }> = []
+      for (const bh of bhs) {
+        for (const body of bodies) {
+          for (const cta of ctas) {
+            rows.push({
+              client_id: client.id,
+              offer_id: offer.id,
+              audience_id: audience.id,
+              bh_component_id: bh.id,
+              body_component_id: body.id,
+              cta_component_id: cta.id,
+              bh_component_version: bh.version,
+              body_component_version: body.version,
+              cta_component_version: cta.version,
+              status: 'approved',
+            })
           }
         }
-        if (rows.length === 0) continue
-        // Batch into chunks of 500 to stay well under any payload caps.
-        const CHUNK = 500
-        for (let i = 0; i < rows.length; i += CHUNK) {
-          const slice = rows.slice(i, i + CHUNK)
-          const { data, error } = await supabase
-            .from('ads')
-            .upsert(slice, {
-              onConflict: 'client_id,offer_id,audience_id,bh_component_id,body_component_id,cta_component_id',
-              ignoreDuplicates: true,
-            })
-            .select('id')
-          if (error) throw error
-          inserted += data?.length ?? 0
-        }
+      }
+      // Idempotent: ON CONFLICT DO NOTHING via upsert(ignoreDuplicates).
+      const CHUNK = 500
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const slice = rows.slice(i, i + CHUNK)
+        const { data, error } = await supabase
+          .from('ads')
+          .upsert(slice, {
+            onConflict: 'client_id,offer_id,audience_id,bh_component_id,body_component_id,cta_component_id',
+            ignoreDuplicates: true,
+          })
+          .select('id')
+        if (error) throw error
+        inserted += data?.length ?? 0
       }
       await refreshAds(client.id)
-      const skipNote = skippedDueToVoid > 0 ? ` (${skippedDueToVoid} pair${skippedDueToVoid === 1 ? '' : 's'} skipped — no valid combos)` : ''
-      showToast(`Generated ${inserted} new ad${inserted === 1 ? '' : 's'}${skipNote}`)
+      showToast(`Generated ${inserted} new ad${inserted === 1 ? '' : 's'}`)
     } catch (err) {
       showToast('Generation failed: ' + (err as Error).message)
     } finally {
-      setGenerating(null)
+      setGenerating(false)
     }
-  }, [client, refreshAds])
-
-  const generateAll = useCallback(() => generateForSections(sections, 'all'), [sections, generateForSections])
-  const generateSection = useCallback((s: Section) => generateForSections([s], s.key), [generateForSections])
+  }, [client, offer, audience, bhs, bodies, ctas, expectedCombos, refreshAds])
 
   // ---------------------------------------------------------------------------
   // Banner uploads — rename to {ad.name}_V{n}.{ext}, upload, insert row.
-  // Sequenced per ad so two simultaneous files don't race on the variation seq.
   // ---------------------------------------------------------------------------
+  const [uploadingAds, setUploadingAds] = useState<Set<string>>(new Set())
+
   async function uploadFiles(ad: Ad, files: FileList | File[]) {
     if (!client || !canEdit) return
     const fileList = Array.from(files)
     if (fileList.length === 0) return
     setUploadingAds(prev => new Set(prev).add(ad.id))
     try {
-      // Find the current next variation by re-querying (handles concurrent edits).
       const { data: existing, error: lookupErr } = await supabase
         .from('banner_assets')
         .select('variation')
@@ -193,9 +218,7 @@ export default function AdsBulkPage() {
       const created: BannerAsset[] = []
       for (const file of fileList) {
         const ext = (file.name.split('.').pop() ?? 'png').toLowerCase()
-        // Build the filename per spec: {ad.name}_V{n}.{ext}
         let attempt = 0
-        // Up to 5 retries to handle racing with another tab/session.
         while (attempt < 5) {
           attempt++
           const filename = `${ad.name}_V${nextVariation}.${ext}`
@@ -204,27 +227,15 @@ export default function AdsBulkPage() {
             .from(BANNER_BUCKET)
             .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || undefined })
           if (uploadErr) {
-            // Likely "Duplicate" if the path already exists — bump and retry.
             const msg = uploadErr.message || ''
-            if (/already exists|Duplicate/i.test(msg)) {
-              nextVariation++
-              continue
-            }
+            if (/already exists|Duplicate/i.test(msg)) { nextVariation++; continue }
             throw uploadErr
           }
           const { data: row, error: rowErr } = await supabase
             .from('banner_assets')
-            .insert({
-              ad_id: ad.id,
-              variation: nextVariation,
-              source: 'designer',
-              storage_path: path,
-            })
-            .select('*')
-            .single()
+            .insert({ ad_id: ad.id, variation: nextVariation, source: 'designer', storage_path: path })
+            .select('*').single()
           if (rowErr) {
-            // If the unique (ad_id, variation) constraint fired, clean the file
-            // we just uploaded and retry with a higher variation.
             await supabase.storage.from(BANNER_BUCKET).remove([path])
             if (rowErr.code === '23505') { nextVariation++; continue }
             throw rowErr
@@ -233,9 +244,7 @@ export default function AdsBulkPage() {
           nextVariation++
           break
         }
-        if (attempt >= 5) {
-          throw new Error(`Could not allocate a variation slot for ${file.name} after 5 attempts`)
-        }
+        if (attempt >= 5) throw new Error(`Could not allocate a variation slot for ${file.name} after 5 attempts`)
       }
       setAssets(prev => ({
         ...prev,
@@ -259,10 +268,7 @@ export default function AdsBulkPage() {
       await supabase.storage.from(BANNER_BUCKET).remove([asset.storage_path])
       const { error } = await supabase.from('banner_assets').delete().eq('id', asset.id)
       if (error) throw error
-      setAssets(prev => ({
-        ...prev,
-        [asset.ad_id]: (prev[asset.ad_id] ?? []).filter(a => a.id !== asset.id),
-      }))
+      setAssets(prev => ({ ...prev, [asset.ad_id]: (prev[asset.ad_id] ?? []).filter(a => a.id !== asset.id) }))
       showToast('Deleted')
     } catch (err) {
       showToast('Delete failed: ' + (err as Error).message)
@@ -279,46 +285,51 @@ export default function AdsBulkPage() {
       if (paths.length > 0) await supabase.storage.from(BANNER_BUCKET).remove(paths)
       const { error } = await supabase.from('ads').delete().eq('id', ad.id)
       if (error) throw error
-      setAssets(prev => {
-        const next = { ...prev }
-        delete next[ad.id]
-        return next
-      })
+      setAssets(prev => { const next = { ...prev }; delete next[ad.id]; return next })
       await refreshAds(client.id)
     } catch (err) {
       showToast('Delete failed: ' + (err as Error).message)
     }
   }
 
-  async function handleDeleteSection(s: Section) {
-    if (!client || s.ads.length === 0) return
-    const totalAssets = s.ads.reduce((n, a) => n + (assets[a.id]?.length ?? 0), 0)
+  async function handleDeleteAll() {
+    if (!client || !offer || !audience || pairAds.length === 0) return
+    const totalAssets = pairAds.reduce((n, a) => n + (assets[a.id]?.length ?? 0), 0)
     const assetNote = totalAssets > 0 ? ` and ${totalAssets} banner asset${totalAssets === 1 ? '' : 's'}` : ''
-    if (!confirm(`Delete all ${s.ads.length} ad${s.ads.length === 1 ? '' : 's'}${assetNote} for ${s.offer.name} × ${s.audience.name}? This cannot be undone.`)) return
+    if (!confirm(`Delete all ${pairAds.length} ad${pairAds.length === 1 ? '' : 's'}${assetNote} for ${offer.name} × ${audience.name}? This cannot be undone.`)) return
     try {
-      const allPaths = s.ads.flatMap(a => (assets[a.id] ?? []).map(x => x.storage_path))
+      const allPaths = pairAds.flatMap(a => (assets[a.id] ?? []).map(x => x.storage_path))
       if (allPaths.length > 0) {
-        // remove() can take many paths in one call; chunk to be safe.
         const CHUNK = 100
         for (let i = 0; i < allPaths.length; i += CHUNK) {
           await supabase.storage.from(BANNER_BUCKET).remove(allPaths.slice(i, i + CHUNK))
         }
       }
-      const ids = s.ads.map(a => a.id)
+      const ids = pairAds.map(a => a.id)
       const { error } = await supabase.from('ads').delete().in('id', ids)
       if (error) throw error
-      setAssets(prev => {
-        const next = { ...prev }
-        for (const id of ids) delete next[id]
-        return next
-      })
+      setAssets({})
       await refreshAds(client.id)
       showToast(`Deleted ${ids.length} ad${ids.length === 1 ? '' : 's'}`)
     } catch (err) {
-      showToast('Section delete failed: ' + (err as Error).message)
+      showToast('Delete failed: ' + (err as Error).message)
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Pagination + lightbox
+  // ---------------------------------------------------------------------------
+  const [page, setPage] = useState(0)
+  useEffect(() => { setPage(0) }, [selectedOfferId, selectedAudienceId])
+  const [lightbox, setLightbox] = useState<string | null>(null)
+
+  const totalPages = Math.max(1, Math.ceil(pairAds.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages - 1)
+  const visibleAds = pairAds.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
   if (!client) {
     return (
       <div>
@@ -328,85 +339,177 @@ export default function AdsBulkPage() {
     )
   }
 
-  const totalExpected = sections.reduce((n, s) => n + s.expectedCombos, 0)
-  const totalExisting = sections.reduce((n, s) => n + s.ads.length, 0)
-  const missingPairs = sections.filter(s => s.expectedCombos === 0)
-  const codedSections = sections.length
+  const bothSelected = !!offer && !!audience
+  const codesMissing = bothSelected && (!offer.code || !audience.code)
 
   return (
     <div>
       <div className="page-header">
         <div>
           <h1 className="page-title">Bulk Ad Builder</h1>
-          <p className="page-subtitle">
-            Generate every valid BH × body × CTA combo per offer × audience. {totalExisting} of {totalExpected} possible ad{totalExpected === 1 ? '' : 's'} created across {codedSections} pair{codedSections === 1 ? '' : 's'}.
-          </p>
+          <p className="page-subtitle">Pick an audience and an offer, then generate every valid BH × body × CTA combination.</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Link className="btn btn-secondary" href="/ads/">← Back to ads</Link>
-          {canEdit && (
-            <button
-              className="btn btn-primary"
-              disabled={generating !== null || totalExpected === 0}
-              onClick={generateAll}
+        <Link className="btn btn-secondary" href="/ads/">← Back to ads</Link>
+      </div>
+
+      {/* Selector card — same layout as /landing-pages/ */}
+      <div className="card" style={{ maxWidth: 720, marginBottom: 16 }}>
+        <h3 style={{ fontSize: 18, marginBottom: 16 }}>Select Audience Profile + Offer</h3>
+        <div className="grid-2col-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 4 }}>
+          <div>
+            <label style={labelStyle}>Audience Profile</label>
+            <select
+              style={selectStyle}
+              value={selectedAudienceId || ''}
+              onChange={e => updateSelection({ audienceId: e.target.value || null })}
             >
-              {generating === 'all' ? 'Generating…' : 'Generate all combinations'}
-            </button>
-          )}
+              <option value="">Choose a profile...</option>
+              {approvedAvatars.map(a => (
+                <option key={a.id} value={a.id}>
+                  {a.code ? `${a.code} · ` : ''}{a.name}{a.priority === 1 ? ' (Primary)' : a.priority ? ` (#${a.priority})` : ''}{!a.code ? ' — no code' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Offer</label>
+            <select
+              style={selectStyle}
+              value={selectedOfferId || ''}
+              onChange={e => updateSelection({ offerId: e.target.value || null })}
+            >
+              <option value="">Choose an offer...</option>
+              {approvedOffers.map(o => (
+                <option key={o.id} value={o.id}>
+                  {o.code ? `${o.code} · ` : ''}{o.name}{!o.code ? ' — no code' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
-      {(offers.some(o => !o.code) || avatars.some(a => !a.code)) && (
-        <div className="card" style={{ marginBottom: 16, borderColor: 'var(--warning)' }}>
-          <div className="card-title" style={{ color: 'var(--warning)' }}>Some offers/audiences are missing short codes</div>
-          <div className="card-body" style={{ fontSize: 14 }}>
-            Pairs without codes on both sides aren&apos;t shown. Set codes from <Link href="/ads/new/" style={{ color: 'var(--accent)' }}>/ads/new</Link>.
-          </div>
-        </div>
-      )}
-
-      {missingPairs.length > 0 && (
-        <div className="card" style={{ marginBottom: 16, borderColor: 'var(--warning)' }}>
-          <div className="card-title" style={{ color: 'var(--warning)' }}>{missingPairs.length} pair{missingPairs.length === 1 ? '' : 's'} have no valid combos</div>
-          <div className="card-body" style={{ fontSize: 14 }}>
-            A pair needs at least one BH tagged for that audience, one body component (SH / T / PC), and one CTA. <Link href="/ads/library/" style={{ color: 'var(--accent)' }}>Add components</Link>.
-          </div>
-        </div>
-      )}
-
-      {sections.length === 0 ? (
+      {!bothSelected && (
         <div className="empty-state">
-          No offer × audience pairs available. Both an offer and an audience need short codes before bulk generation can run.
+          Pick an audience and an offer above to see the ads for that pair.
         </div>
-      ) : (
-        sections.map(s => (
-          <SectionCard
-            key={s.key}
-            section={s}
-            assets={assets}
-            loadingAssets={loadingAssets}
-            uploadingAds={uploadingAds}
-            generating={generating}
-            canEdit={canEdit}
-            page={pageByPair[s.key] ?? 0}
-            setPage={(p) => setPageByPair(prev => ({ ...prev, [s.key]: p }))}
-            onGenerate={() => generateSection(s)}
-            onDeleteSection={() => handleDeleteSection(s)}
-            onDeleteAd={handleDeleteAd}
-            onUploadFiles={uploadFiles}
-            onDeleteAsset={handleDeleteAsset}
-            onLightbox={setLightbox}
-            publicUrl={publicUrl}
-          />
-        ))
+      )}
+
+      {bothSelected && codesMissing && (
+        <div className="card" style={{ borderColor: 'var(--warning)' }}>
+          <div className="card-title" style={{ color: 'var(--warning)' }}>Short codes are missing</div>
+          <div className="card-body" style={{ fontSize: 14 }}>
+            {!offer!.code && <div>The offer <strong>{offer!.name}</strong> has no code.</div>}
+            {!audience!.code && <div>The audience <strong>{audience!.name}</strong> has no code.</div>}
+            <div style={{ marginTop: 8 }}>
+              Set codes from <Link href="/ads/new/" style={{ color: 'var(--accent)' }}>/ads/new</Link> (the inline editor at the top), then come back here.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bothSelected && !codesMissing && (
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
+            <div>
+              <div className="card-title" style={{ marginBottom: 4 }}>
+                {offer!.name} <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono, monospace)', fontSize: 13 }}>({offer!.code})</span>
+                {' × '}
+                {audience!.name} <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono, monospace)', fontSize: 13 }}>({audience!.code})</span>
+              </div>
+              <div className="card-meta">
+                {pairAds.length} ad{pairAds.length === 1 ? '' : 's'} · {expectedCombos} possible combo{expectedCombos === 1 ? '' : 's'}
+                {missingCount > 0 ? ` · ${missingCount} missing` : expectedCombos > 0 ? ' · all generated' : ''}
+              </div>
+            </div>
+            {canEdit && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  className="btn btn-primary btn-sm"
+                  disabled={generating || missingCount === 0 || expectedCombos === 0}
+                  onClick={generate}
+                  title={
+                    expectedCombos === 0 ? 'Needs ≥1 BH tagged for this audience, ≥1 body, ≥1 CTA' :
+                    missingCount === 0 ? 'All combos generated' :
+                    `Generate ${missingCount} missing combo${missingCount === 1 ? '' : 's'}`
+                  }
+                >
+                  {generating ? 'Generating…' : missingCount > 0 ? `Generate ${missingCount}` : 'Up to date'}
+                </button>
+                <button
+                  className="btn btn-danger btn-sm"
+                  disabled={pairAds.length === 0 || generating}
+                  onClick={handleDeleteAll}
+                >
+                  Delete all
+                </button>
+              </div>
+            )}
+          </div>
+
+          {expectedCombos === 0 && pairAds.length === 0 ? (
+            <div className="card-body" style={{ marginTop: 12, color: 'var(--text-secondary)' }}>
+              No combos available for this pair. You need at least one Banner Headline tagged for{' '}
+              <strong>{audience!.name}</strong>, plus at least one body component (SH/T/PC) and one CTA in the{' '}
+              <Link href="/ads/library/" style={{ color: 'var(--accent)' }}>component library</Link>.
+            </div>
+          ) : pairAds.length === 0 ? (
+            <div className="card-body" style={{ marginTop: 12, color: 'var(--text-secondary)' }}>
+              No ads yet for this pair. {canEdit && missingCount > 0 && `Click "Generate ${missingCount}" to create them.`}
+            </div>
+          ) : (
+            <>
+              <div style={{ overflowX: 'auto', marginTop: 12 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border, #333)' }}>
+                      <th style={{ padding: '8px 6px', minWidth: 220 }}>Ad name</th>
+                      <th style={{ padding: '8px 6px', minWidth: 200 }}>BH</th>
+                      <th style={{ padding: '8px 6px', minWidth: 200 }}>Body</th>
+                      <th style={{ padding: '8px 6px', minWidth: 150 }}>CTA</th>
+                      <th style={{ padding: '8px 6px', minWidth: 280 }}>Banner assets</th>
+                      <th style={{ padding: '8px 6px', width: 60 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleAds.map(ad => (
+                      <BulkAdRow
+                        key={ad.id}
+                        ad={ad}
+                        bhs={bhs}
+                        bodies={bodies}
+                        ctas={ctas}
+                        assets={assets[ad.id] ?? []}
+                        loadingAssets={loadingAssets}
+                        uploading={uploadingAds.has(ad.id)}
+                        canEdit={canEdit}
+                        onDeleteAd={() => handleDeleteAd(ad)}
+                        onUploadFiles={(files) => uploadFiles(ad, files)}
+                        onDeleteAsset={handleDeleteAsset}
+                        onLightbox={setLightbox}
+                        publicUrl={publicUrl}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 13 }}>
+                  <button className="btn btn-secondary btn-sm" onClick={() => setPage(Math.max(0, safePage - 1))} disabled={safePage === 0}>← Prev</button>
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    {safePage * PAGE_SIZE + 1}–{Math.min((safePage + 1) * PAGE_SIZE, pairAds.length)} of {pairAds.length}
+                  </span>
+                  <button className="btn btn-secondary btn-sm" onClick={() => setPage(Math.min(totalPages - 1, safePage + 1))} disabled={safePage >= totalPages - 1}>Next →</button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       )}
 
       {lightbox && (
-        <div
-          className="modal-overlay"
-          onClick={() => setLightbox(null)}
-          style={{ cursor: 'zoom-out' }}
-        >
+        <div className="modal-overlay" onClick={() => setLightbox(null)} style={{ cursor: 'zoom-out' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={lightbox}
@@ -421,142 +524,13 @@ export default function AdsBulkPage() {
 }
 
 // ---------------------------------------------------------------------------
-// Section card — one per offer × audience pair
-// ---------------------------------------------------------------------------
-function SectionCard({
-  section,
-  assets,
-  loadingAssets,
-  uploadingAds,
-  generating,
-  canEdit,
-  page,
-  setPage,
-  onGenerate,
-  onDeleteSection,
-  onDeleteAd,
-  onUploadFiles,
-  onDeleteAsset,
-  onLightbox,
-  publicUrl,
-}: {
-  section: Section
-  assets: AssetMap
-  loadingAssets: boolean
-  uploadingAds: Set<string>
-  generating: string | null
-  canEdit: boolean
-  page: number
-  setPage: (p: number) => void
-  onGenerate: () => void
-  onDeleteSection: () => void
-  onDeleteAd: (ad: Ad) => void
-  onUploadFiles: (ad: Ad, files: FileList | File[]) => void
-  onDeleteAsset: (asset: BannerAsset) => void
-  onLightbox: (url: string) => void
-  publicUrl: (path: string) => string
-}) {
-  const { offer, audience, ads, expectedCombos } = section
-  const missing = Math.max(0, expectedCombos - ads.length)
-  const totalPages = Math.max(1, Math.ceil(ads.length / PAGE_SIZE))
-  const safePage = Math.min(page, totalPages - 1)
-  const visible = ads.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)
-
-  return (
-    <div className="card" style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
-        <div>
-          <div className="card-title" style={{ marginBottom: 4 }}>
-            {offer.name} <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono, monospace)', fontSize: 13 }}>({offer.code})</span>
-            {' × '}
-            {audience.name} <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono, monospace)', fontSize: 13 }}>({audience.code})</span>
-          </div>
-          <div className="card-meta">
-            {ads.length} ad{ads.length === 1 ? '' : 's'} · {expectedCombos} possible combo{expectedCombos === 1 ? '' : 's'}
-            {missing > 0 ? ` · ${missing} missing` : expectedCombos > 0 ? ' · all generated' : ''}
-          </div>
-        </div>
-        {canEdit && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              className="btn btn-secondary btn-sm"
-              disabled={generating !== null || missing === 0}
-              onClick={onGenerate}
-              title={missing === 0 ? expectedCombos === 0 ? 'No valid combos: needs BH tagged for this audience, ≥1 body component, ≥1 CTA' : 'All combos generated' : `Generate ${missing} missing combo${missing === 1 ? '' : 's'}`}
-            >
-              {generating === section.key ? 'Generating…' : missing > 0 ? `Generate ${missing}` : 'Up to date'}
-            </button>
-            <button
-              className="btn btn-danger btn-sm"
-              disabled={ads.length === 0 || generating !== null}
-              onClick={onDeleteSection}
-            >
-              Delete all
-            </button>
-          </div>
-        )}
-      </div>
-
-      {ads.length === 0 ? (
-        <div className="card-body" style={{ marginTop: 12, color: 'var(--text-secondary)' }}>
-          No ads yet for this pair. {canEdit && missing > 0 && `Click "Generate ${missing}" to create them.`}
-        </div>
-      ) : (
-        <>
-          <div style={{ overflowX: 'auto', marginTop: 12 }}>
-            <table className="bulk-ads-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border, #333)' }}>
-                  <th style={{ padding: '8px 6px', minWidth: 220 }}>Ad name</th>
-                  <th style={{ padding: '8px 6px', minWidth: 200 }}>BH</th>
-                  <th style={{ padding: '8px 6px', minWidth: 200 }}>Body</th>
-                  <th style={{ padding: '8px 6px', minWidth: 150 }}>CTA</th>
-                  <th style={{ padding: '8px 6px', minWidth: 280 }}>Banner assets</th>
-                  <th style={{ padding: '8px 6px', width: 60 }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map(ad => (
-                  <BulkAdRow
-                    key={ad.id}
-                    ad={ad}
-                    section={section}
-                    assets={assets[ad.id] ?? []}
-                    loadingAssets={loadingAssets}
-                    uploading={uploadingAds.has(ad.id)}
-                    canEdit={canEdit}
-                    onDeleteAd={() => onDeleteAd(ad)}
-                    onUploadFiles={(files) => onUploadFiles(ad, files)}
-                    onDeleteAsset={onDeleteAsset}
-                    onLightbox={onLightbox}
-                    publicUrl={publicUrl}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {totalPages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 13 }}>
-              <button className="btn btn-secondary btn-sm" onClick={() => setPage(Math.max(0, safePage - 1))} disabled={safePage === 0}>← Prev</button>
-              <span style={{ color: 'var(--text-secondary)' }}>
-                {safePage * PAGE_SIZE + 1}–{Math.min((safePage + 1) * PAGE_SIZE, ads.length)} of {ads.length}
-              </span>
-              <button className="btn btn-secondary btn-sm" onClick={() => setPage(Math.min(totalPages - 1, safePage + 1))} disabled={safePage >= totalPages - 1}>Next →</button>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Single row in the bulk table
 // ---------------------------------------------------------------------------
 function BulkAdRow({
   ad,
-  section,
+  bhs,
+  bodies,
+  ctas,
   assets,
   loadingAssets,
   uploading,
@@ -568,7 +542,9 @@ function BulkAdRow({
   publicUrl,
 }: {
   ad: Ad
-  section: Section
+  bhs: AdComponent[]
+  bodies: AdComponent[]
+  ctas: AdComponent[]
   assets: BannerAsset[]
   loadingAssets: boolean
   uploading: boolean
@@ -582,9 +558,9 @@ function BulkAdRow({
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const bh   = useMemo(() => section.bhs.find(c => c.id === ad.bh_component_id), [section.bhs, ad.bh_component_id])
-  const body = useMemo(() => section.bodies.find(c => c.id === ad.body_component_id), [section.bodies, ad.body_component_id])
-  const cta  = useMemo(() => section.ctas.find(c => c.id === ad.cta_component_id), [section.ctas, ad.cta_component_id])
+  const bh   = useMemo(() => bhs.find(c => c.id === ad.bh_component_id), [bhs, ad.bh_component_id])
+  const body = useMemo(() => bodies.find(c => c.id === ad.body_component_id), [bodies, ad.body_component_id])
+  const cta  = useMemo(() => ctas.find(c => c.id === ad.cta_component_id), [ctas, ad.cta_component_id])
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault()
