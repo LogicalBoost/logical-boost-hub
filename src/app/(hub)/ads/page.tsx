@@ -69,6 +69,7 @@ export default function AdsListPage() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Link className="btn btn-secondary" href="/ads/library/">Component Library</Link>
+          <Link className="btn btn-secondary" href="/ads/bulk/">Bulk View</Link>
           {canEdit && (
             <Link className="btn btn-primary" href="/ads/new/">+ Build New Ad</Link>
           )}
