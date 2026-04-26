@@ -74,153 +74,247 @@ export interface BatchConfig {
   instructions: string
 }
 
-export const BATCH_1_ADS: BatchConfig = {
-  name: 'Ad Copy (Headlines, Descriptions, Primary Text)',
-  instructions: `Generate the following ad copy components. Read the business context carefully and write copy that could ONLY work for THIS specific business.
+// Batches are split into SMALL focused chunks so Claude's JSON response never
+// truncates. Each batch targets 15-30 components across 1-3 closely related
+// types. All batches run in parallel from generate-funnel, so splitting doesn't
+// slow things down — it just makes generation reliable.
+//
+// Previous behavior: 3 big batches asking for 55-85 components each → BATCH_2
+// truncated routinely, dropping Proof/Urgency/CTAs/Objection Handlers.
 
-GOOGLE HEADLINES (google_headline): Generate 15-20.
-- Hard limit: 30 characters max (including spaces). Count carefully.
-- These appear in search results. They must match SEARCH INTENT — what would someone type into Google before clicking this?
-- Write complete phrases, not fragments. "Get Your Free Roof Quote" not "Free Roof Solutions".
-- Mix structures: benefit-led ("Cut Payroll Time by 60%"), action-led ("Book Your Free Consult"), question-led ("Tired of Manual Invoicing?"), specificity-led ("15-Min Setup, No Contract").
-- Each must make sense WITHOUT any other context — a searcher sees ONLY this headline.
+export const BATCH_GOOGLE_ADS: BatchConfig = {
+  name: 'Google Ads (Headlines + Descriptions)',
+  instructions: `Generate Google search-ad copy.
 
-META HEADLINES (headline): Generate 20-25.
-- Recommended under 40 characters but clarity > brevity.
-- These must STOP THE SCROLL. They compete with friends, family, and cat videos for attention.
-- Be bold, specific, and benefit-forward. "Your Competitors Already Use This" beats "Great Marketing Tool".
-- Questions work exceptionally well on Meta: "Still spending 3 hours on weekly reports?"
-- Include the prospect's identity when possible: "Freelancers: Stop Undercharging"
+GOOGLE HEADLINES (google_headline): Generate exactly 18.
+- Hard limit: 30 characters max (count spaces). Must be COMPLETE phrases, not fragments.
+- Match search intent — what would someone type before clicking?
+- Mix structures: benefit-led ("Cut Payroll Time 60%"), action-led ("Book Your Free Consult"), question-led ("Tired of Manual Invoicing?"), specificity-led ("15-Min Setup, No Contract").
 
-GOOGLE DESCRIPTIONS (google_description): Generate 10-12.
-- Hard limit: 90 characters max.
-- These elaborate on the headline. Include a benefit AND a CTA.
-- Format: "[Benefit/proof]. [CTA]." Example: "Trusted by 500+ local businesses. Get your free quote today."
+GOOGLE DESCRIPTIONS (google_description): Generate exactly 10.
+- Hard limit: 90 characters. Include a BENEFIT and a CTA in each.
+- Format: "[Benefit/proof]. [CTA]." e.g. "Trusted by 500+ local businesses. Get your free quote today."
 
-META PRIMARY TEXT (primary_text): Generate 8-12.
-- Recommended under 125 characters. This is the body text above the image.
-- Write in first or second person. Sound like a trusted friend, not a corporation.
-- Lead with the avatar's pain or desire, then bridge to the offer.
+TOTAL: exactly 28 items.`,
+}
 
-DESCRIPTIONS (description): Generate 5-8.
-- General ad descriptions, 1-2 sentences. Bridge between headline and CTA.
-- Include proof points or benefits specific to this business.
+export const BATCH_META_ADS: BatchConfig = {
+  name: 'Meta Ads (Headlines + Primary Text)',
+  instructions: `Generate Meta/social-ad copy.
 
-SUBHEADLINES (subheadline): Generate 5-8.
-- Supporting text that adds context to a headline. Usually appears below a hero headline on landing pages.
+META HEADLINES (headline): Generate exactly 22.
+- Target under 40 chars but clarity > brevity.
+- Must STOP THE SCROLL — bold, specific, benefit-forward.
+- Questions work exceptionally well: "Still spending 3 hours on weekly reports?"
+- Include the avatar's identity when possible: "Freelancers: Stop Undercharging".
+
+META PRIMARY TEXT (primary_text): Generate exactly 10.
+- Under 125 characters. Sounds like a trusted friend, not a corporation.
+- Lead with the avatar's pain or desire, bridge to the offer.
+
+TOTAL: exactly 32 items.`,
+}
+
+export const BATCH_LANDING_SUPPORT: BatchConfig = {
+  name: 'Landing Support (Descriptions + Subheadlines)',
+  instructions: `Generate supporting copy for landing pages and ad variations.
+
+DESCRIPTIONS (description): Generate exactly 7.
+- General 1-2 sentence descriptions. Bridge between headlines and CTAs.
+- Include a proof point or benefit specific to this business.
+
+SUBHEADLINES (subheadline): Generate exactly 7.
+- Support a hero headline. Below-the-hero supporting text.
 - Include specifics: timeframes, results, process descriptions.
 
-TOTAL: ~65-85 components for this batch.`,
+TOTAL: exactly 14 items.`,
 }
 
-export const BATCH_2_PERSUASION: BatchConfig = {
-  name: 'Persuasion Elements (Benefits, CTAs, Proof, Urgency, Objections, Hero)',
-  instructions: `Generate the following persuasion and landing page components. Every item must be specific to THIS business and avatar.
+export const BATCH_BENEFITS: BatchConfig = {
+  name: 'Benefits + Value Points',
+  instructions: `Generate tangible benefit-driven copy.
 
-BENEFITS (benefit): Generate 10-15.
-- Short, punchy bullet points (5-12 words). These go on landing pages and ad cards.
-- Structure: [Outcome] + [Specific detail]. Example: "Same-Day Response, 365 Days a Year" not "Fast Response Times".
-- Make benefits TANGIBLE. "Save 4+ Hours Every Week on Reporting" not "Save Time".
-- Vary: time-savings, money-savings, quality improvements, emotional benefits, convenience, peace of mind.
+BENEFITS (benefit): Generate exactly 12.
+- Short bullets (5-12 words). Banner-ready.
+- Structure: [Outcome] + [Specific detail]. e.g. "Same-Day Response, 365 Days a Year" not "Fast Response Times".
+- Make them TANGIBLE. Vary: time, money, quality, emotion, convenience, peace of mind.
 
-VALUE POINTS (value_point): Generate 5-8.
-- Similar to benefits but focused on WHAT THEY GET. Feature-benefit hybrid.
-- Example: "Dedicated Account Manager (Not a Call Center)" or "Custom Dashboard with Real-Time Metrics"
+VALUE POINTS (value_point): Generate exactly 6.
+- Feature-benefit hybrids. WHAT THEY GET.
+- e.g. "Dedicated Account Manager (Not a Call Center)" or "Custom Dashboard with Real-Time Metrics"
 
-PROOF ELEMENTS (proof): Generate 6-10.
-- Based ONLY on real data from the business context. Reference actual trust signals.
-- ONLY use numbers/stats that appear in the business data. "Trusted by 500+ businesses" is ONLY acceptable if the business data says so.
-- If limited real data, write qualitative proof: "Backed by years of industry experience" or "Trusted by local businesses across [area]" — never invent specific numbers.
-- Good formats when data exists: social proof with real numbers, real credentials, real awards. When no data: qualitative trust language.
-
-URGENCY ELEMENTS (urgency): Generate 4-6.
-- Create legitimate urgency or scarcity. Avoid fake countdown timers.
-- Good: "Limited spots available this month" or "Price increases [timeframe]" or "Your competitors are already doing this"
-
-FEAR POINTS (fear_point): Generate 4-6.
-- Consequences of NOT acting. What gets worse if they wait?
-- "Every day without [solution] costs you [specific loss]" style.
-
-CTAs (cta): Generate 8-10.
-- Action-oriented buttons and links. Must match the offer's conversion type.
-- If offer is "consultation": "Book Your Free Strategy Call", "Schedule My Consultation", "Claim Your Free Assessment"
-- If offer is "purchase": "Start My Free Trial", "Get Instant Access", "Join [X]+ Members"
-- NEVER use generic "Learn More" or "Click Here". Every CTA should describe the VALUE of clicking.
-
-OBJECTION HANDLERS (objection_handler): Generate 5-8.
-- Address the avatar's specific objections head-on.
-- Format can be FAQ-style, reassurance statements, or reframes.
-- Example: "No long-term contracts. Cancel anytime." or "Most clients see results within the first 30 days."
-
-HERO HEADLINES (hero_headline): Generate 4-6.
-- Landing page above-the-fold headlines. These are the FIRST thing a visitor reads.
-- Longer than ad headlines (up to 60-80 chars OK). Must immediately communicate the core value proposition.
-- Include specificity: who it's for, what result they get, how fast/easy.
-
-HERO SUBHEADLINES (hero_subheadline): Generate 4-6.
-- Support the hero headline with additional proof or context.
-- Often includes a proof point: "Join 2,000+ businesses who switched to [solution]"
-
-HERO CTAs (hero_cta): Generate 4-6.
-- The main action button on a landing page. High-commitment, high-clarity.
-- Include value: "Get My Free Assessment" not "Submit".
-
-URGENCY BARS (urgency_bar): Generate 3-4.
-- Short text for a top-of-page announcement bar.
-- Example: "Limited: Free audit spots for Q1 are almost full" or "New: [Feature] now available for all plans"
-
-TOTAL: ~55-80 components for this batch.`,
+TOTAL: exactly 18 items.`,
 }
 
-export const BATCH_3_VIDEO: BatchConfig = {
-  name: 'Video Scripts (Hooks, Short Scripts, Long Scripts)',
-  instructions: `Generate the following video ad components. These are for social media video ads (YouTube, Meta Reels, TikTok-style). Write conversationally — these will be READ ALOUD or appear as captions.
+export const BATCH_PROOF_URGENCY: BatchConfig = {
+  name: 'Proof + Urgency + Fear Points',
+  instructions: `Generate credibility, scarcity, and stakes copy.
 
-VIDEO HOOKS (video_hook): Generate 12-15.
-- The first 1-3 seconds that stop the scroll. These must create an IMMEDIATE reason to keep watching.
-- Mix these hook types (at least 2-3 of each):
-  * Question hooks: "Have you ever [specific frustrating scenario]?"
-  * Bold claim: "This one change cut our client's [metric] by [amount]"
-  * Pattern interrupt: "Stop. If you're a [avatar identity], you need to hear this."
-  * Story opener: "Last month, a [avatar type] came to us with [specific problem]..."
-  * Stat opener: "Did you know [surprising statistic about their industry]?"
-  * Challenge: "I bet you're still [common mistake]. Here's why that's costing you."
-  * Relatable moment: "You know that feeling when [specific frustration]? Yeah, we fixed that."
-- Each hook must be SPECIFIC to this avatar's world. Reference their actual daily frustrations, goals, or industry.
+PROOF ELEMENTS (proof): Generate exactly 8.
+- Use ONLY real data from the business context. Reference actual trust signals.
+- If the business data doesn't include a specific number, write QUALITATIVE proof: "Backed by years of experience serving local homeowners" — never fabricate specific numbers.
+- Good when real data exists: "4.9 stars from 230 reviews" (only if that's real).
+- Always safe: "Trusted by homeowners across the area", "Licensed and insured", "Family-owned and operated".
 
-SHORT SCRIPTS (short_script): Generate 4-6.
-- The BODY of a 30-second video ad. ~60-75 words each.
-- IMPORTANT: Do NOT include a hook at the start or CTA at the end. Hooks and CTAs are generated separately and will be combined with these scripts to build complete videos. The user picks a hook + script body + CTA.
-- Structure: [PROBLEM or STORY - 10 sec] → [SOLUTION BRIDGE - 10 sec] → [PROOF/BENEFIT - 7 sec]
-- Write in a conversational tone as if talking directly to the avatar.
-- Include [brackets] for visual/stage directions.
-- Each script should use a different angle combination.
-- Start directly with the problem, story, or insight — NOT with a hook line.
+URGENCY ELEMENTS (urgency): Generate exactly 5.
+- Legitimate urgency or scarcity. No fake countdown timers.
+- e.g. "Limited install spots this month", "Spring pricing ends soon", "Your neighbors are booking now".
 
-LONG SCRIPTS (long_script): Generate 3-4.
-- The BODY of a 60-second video ad. ~120-150 words each.
-- IMPORTANT: Do NOT include a hook at the start or CTA at the end. Hooks and CTAs are generated separately. The user picks a hook + script body + CTA to assemble complete videos.
-- Structure: [PROBLEM AGITATION - 15 sec] → [SOLUTION INTRO - 10 sec] → [HOW IT WORKS/PROOF - 20 sec] → [CLOSE/URGENCY SETUP - 10 sec]
-- Build an emotional arc: pain → amplify → hope → solution → urgency setup (but NO final CTA line).
-- Include specific stage directions in [brackets].
-- Start directly with the problem or story — NOT with a hook line.
+FEAR POINTS (fear_point): Generate exactly 5.
+- Consequences of NOT acting. What gets worse?
+- e.g. "Every day you wait, [specific loss compounds]".
 
-FULL VIDEO SCRIPTS (video_script): Generate 2-3.
-- The BODY of extended scripts (90+ seconds). ~200-240 words each.
-- IMPORTANT: Do NOT include a hook at the start or CTA at the end. These are script BODIES that get paired with separate hooks and CTAs.
-- These are mini-stories. Weave 3-4 angles into a compelling narrative.
-- Include timing notes for the body sections only.
-- Perfect for YouTube pre-roll, longer Instagram Reels, or testimonial-style content.
-
-TOTAL: ~20-28 components for this batch.
-
-CRITICAL FOR ALL SCRIPTS:
-- Write the way people TALK, not the way they write. Short sentences. Conversational rhythm.
-- Every script must reference something specific to this avatar's life, industry, or daily experience.
-- Hooks must work WITHOUT sound (think captions). Keep them visually punchy.
-- Include at least one proof point or credibility marker per script.
-- SCRIPTS ARE BODY ONLY: Short scripts, long scripts, and full video scripts must NOT include a hook at the beginning or CTA at the end. These are the MIDDLE section of a video. The user will combine a separate hook + script body + separate CTA to build complete videos. This 3-part structure is intentional.`,
+TOTAL: exactly 18 items.`,
 }
+
+export const BATCH_CTAS_OBJECTIONS: BatchConfig = {
+  name: 'CTAs + Objection Handlers',
+  instructions: `Generate conversion actions and objection reframes.
+
+CTAs (cta): Generate exactly 10.
+- Action-oriented. Must match the offer's conversion type (see OFFER context).
+- If consultation: "Book My Free Strategy Call", "Schedule My Consultation", "Claim My Free Assessment".
+- If purchase: "Start My Free Trial", "Get Instant Access", "Join 500+ Members".
+- NEVER use generic "Learn More" or "Click Here". Every CTA describes the VALUE.
+
+OBJECTION HANDLERS (objection_handler): Generate exactly 8.
+- Address the avatar's REAL objections head-on (see AVATAR context — objections field).
+- FAQ-style, reassurance statements, or reframes.
+- e.g. "No long-term contracts. Cancel anytime." / "Most clients see results in 30 days."
+
+TOTAL: exactly 18 items.`,
+}
+
+export const BATCH_HERO: BatchConfig = {
+  name: 'Hero Copy + Urgency Bar',
+  instructions: `Generate above-the-fold landing page copy.
+
+HERO HEADLINES (hero_headline): Generate exactly 5.
+- FIRST thing a visitor reads. Up to 60-80 chars OK.
+- Immediately communicate: who it's for, what result, how fast/easy.
+
+HERO SUBHEADLINES (hero_subheadline): Generate exactly 5.
+- Support the hero headline with proof or context.
+- Often includes a proof point: "Join 2,000+ homeowners who switched".
+
+HERO CTAs (hero_cta): Generate exactly 5.
+- Main action button on a landing page. High clarity, high value.
+- "Get My Free Assessment" not "Submit".
+
+URGENCY BARS (urgency_bar): Generate exactly 3.
+- Short top-of-page announcement-bar text.
+- e.g. "Limited: Free install quotes for April are almost full".
+
+TOTAL: exactly 18 items.`,
+}
+
+export const BATCH_VIDEO_HOOKS: BatchConfig = {
+  name: 'Video Hooks',
+  instructions: `Generate scroll-stopping video opening hooks. They are called MICRO HOOKS for a reason — keep them tight.
+
+VIDEO HOOKS (video_hook): Generate exactly 14.
+- HARD LENGTH RULE: 3–8 words each. Aim for 4–6. The first 1-3 seconds of a video — anything longer is not a hook, it's a sentence.
+- Soft cap: 50 characters total. Soft floor: 12 characters. Anything outside this is wrong.
+- Hooks must work WITHOUT sound — think captions. Visually punchy.
+- Each hook SPECIFIC to this avatar's daily frustrations or goals — but stripped down to the smallest unit that still lands.
+- GOOD examples (note the brevity):
+  * "Tired of overpaying for security?"
+  * "Suburban parents — listen up."
+  * "Still leaving doors unlocked?"
+  * "Your home isn't actually safe."
+  * "Stop guessing. Start protecting."
+- BAD examples (too long — do NOT produce these):
+  * "Have you ever wondered if your current security setup is actually keeping your family safe at night?"
+  * "Last month, a suburban parent came to us with a story about a break-in attempt..."
+- Mix structures (≥1 of each across the 14):
+  * Question:    "Tired of [specific pain]?"
+  * Callout:     "[Identity], pay attention."
+  * Stop hook:   "Stop [common mistake]."
+  * Curiosity:   "Here's what nobody tells you."
+  * Stat:        "1 in 4 [avatar] does this wrong."
+  * Provocation: "[Common belief] is a lie."
+  * Story tease: "She thought she was safe."
+
+TOTAL: exactly 14 items.`,
+}
+
+export const BATCH_BANNER_HEADLINES: BatchConfig = {
+  name: 'Banner Headlines',
+  instructions: `Generate top-slot Banner Headlines (BH) for the Ad Builder. These are the hook copy on banner ads.
+
+BANNER HEADLINES (banner_headline): Generate exactly 12.
+- HARD LENGTH RULE: ≤ 60 characters total (including spaces). Aim for 25–40.
+- MUST call out the audience by name or by a defining trait. The reader should immediately recognize "this is about me".
+- MUST hook: open a loop, ask a question, or trigger recognition. Generic claims are FAILURES.
+- GOOD examples:
+  * "Suburban parents: is your home really secure?"
+  * "Tech-savvy homeowners, this changes everything."
+  * "Empty nesters — the safest move you'll make."
+  * "Still relying on a 1990s security system?"
+- BAD examples (do NOT produce these):
+  * "Best security in the state"          (no audience callout, no hook)
+  * "Get a free quote today"              (generic — no identity)
+  * "Smart home solutions for everyone"   (audience-blind)
+- Mix structures (≥1 of each):
+  * Direct callout:   "[Audience name], [hook]"
+  * Question:         "Is your [thing] [problem]?"
+  * Recognition:      "You've felt it. [Pain]."
+  * Provocation:      "[Common assumption] is wrong."
+  * Curiosity:        "What [audience] don't realize about [topic]"
+
+TOTAL: exactly 12 items.`,
+}
+
+export const BATCH_VIDEO_SCRIPTS: BatchConfig = {
+  name: 'Video Script Bodies (Short + Long + Full)',
+  instructions: `Generate the BODY of video ads — NOT the hook or CTA. Hooks and CTAs are produced in separate batches. The user assembles [hook] + [script body] + [CTA] to build complete videos.
+
+SHORT SCRIPTS (short_script): Generate exactly 5.
+- 30-second ad body. ~60-75 words.
+- Structure: [PROBLEM/STORY - 10s] → [SOLUTION BRIDGE - 10s] → [PROOF/BENEFIT - 7s].
+- Conversational. Direct to the avatar. Start with the problem, NOT a hook line.
+- Use [brackets] for visual/stage directions.
+
+LONG SCRIPTS (long_script): Generate exactly 4.
+- 60-second ad body. ~120-150 words.
+- Structure: [PROBLEM AGITATION - 15s] → [SOLUTION INTRO - 10s] → [HOW IT WORKS/PROOF - 20s] → [URGENCY SETUP - 10s].
+- Emotional arc: pain → amplify → hope → solution → urgency. NO final CTA line.
+- Start with the problem or story, NOT a hook line.
+
+FULL VIDEO SCRIPTS (video_script): Generate exactly 3.
+- 90+ second body. ~200-240 words.
+- Mini-stories weaving 3-4 angles. Include timing notes for body sections.
+
+TOTAL: exactly 12 items.
+
+RULES FOR ALL SCRIPTS:
+- Write how people TALK. Short sentences. Conversational rhythm.
+- Each script references something SPECIFIC to this avatar (industry, daily life, a real frustration).
+- At least one credibility marker per script.
+- NO hook line at the start. NO CTA line at the end. Body only.`,
+}
+
+// All batches run in parallel from generate-funnel. Order only matters for
+// logging — results are collapsed into one component list.
+export const ALL_BATCHES: BatchConfig[] = [
+  BATCH_GOOGLE_ADS,
+  BATCH_META_ADS,
+  BATCH_LANDING_SUPPORT,
+  BATCH_BENEFITS,
+  BATCH_PROOF_URGENCY,
+  BATCH_CTAS_OBJECTIONS,
+  BATCH_HERO,
+  BATCH_BANNER_HEADLINES,
+  BATCH_VIDEO_HOOKS,
+  BATCH_VIDEO_SCRIPTS,
+]
+
+// Legacy aliases so existing imports keep compiling. The old 3-batch split
+// mapped ~ads / ~persuasion / ~video; the new names are more precise but
+// we keep references to avoid breaking callers that might still import them.
+export const BATCH_1_ADS = BATCH_GOOGLE_ADS
+export const BATCH_2_PERSUASION = BATCH_PROOF_URGENCY
+export const BATCH_3_VIDEO = BATCH_VIDEO_HOOKS
 
 // ── Build the system prompt for a batch ───────────────────────────────────
 
@@ -454,10 +548,17 @@ function getSectionGuidance(sectionType: string): string {
 - Top-of-page announcement strip. Short, punchy, creates FOMO or excitement.
 - "Limited: Free audit spots for Q1 are filling up" or "New: [Feature] now available."`,
 
-    video_hook: `SECTION GUIDANCE — Video Hooks:
-- First 1-3 seconds of a video ad. Must create IMMEDIATE reason to keep watching.
-- Mix: questions, bold claims, pattern interrupts, story openers, stat hooks, challenges.
-- Must work as captions (no sound). Keep visually punchy.`,
+    banner_headline: `SECTION GUIDANCE — Banner Headlines (BH):
+- HARD: ≤ 60 characters. Aim for 25–40.
+- MUST call out the audience by name or trait — reader recognizes "this is about me".
+- MUST hook: question, open loop, or recognition trigger.
+- "Suburban parents: is your home really secure?" YES. "Best security in the state" NO.`,
+
+    video_hook: `SECTION GUIDANCE — Video Hooks (Micro Hooks):
+- HARD: 3–8 words each, ≤ 50 chars. They are MICRO hooks — first 1-3 seconds only.
+- Must work as captions (no sound). Visually punchy.
+- Mix: question, callout, stop-hook, curiosity, stat, provocation, story tease.
+- "Tired of overpaying for security?" YES. Anything resembling a sentence is wrong.`,
 
     short_script: `SECTION GUIDANCE — Short Video Script BODY (~30 sec):
 - Write ONLY the body/middle of the video. Do NOT include a hook at the start or CTA at the end.

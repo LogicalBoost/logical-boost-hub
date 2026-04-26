@@ -713,7 +713,7 @@ export default function FunnelPage() {
             onClick={handleGenerate}
             disabled={loading || !avatarId || !offerId}
           >
-            &#9889; Generate Campaign
+            &#9889; Generate Sales Copy
           </button>
         ) : currentInstance ? (
           <div className="funnel-selector-status">
@@ -1016,7 +1016,7 @@ export default function FunnelPage() {
           <div className="empty-state-text">No campaign generated for this Audience Profile + Offer</div>
           <div className="empty-state-sub" style={{ maxWidth: 500 }}>
             {canEdit
-              ? 'Select your target audience profile and offer above, then click "Generate Campaign" to create ~130-180 copy components across multiple marketing angles.'
+              ? 'Select your target audience profile and offer above, then click "Generate Sales Copy" to create ~130-180 copy components across multiple marketing angles.'
               : 'No campaign has been generated for this combination yet.'}
           </div>
         </div>

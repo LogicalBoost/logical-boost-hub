@@ -7,14 +7,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { callClaude, parseJsonResponse, corsHeaders, jsonResponse, errorResponse } from '../_shared/ai-client.ts'
 import {
-  BATCH_1_ADS,
-  BATCH_2_PERSUASION,
-  BATCH_3_VIDEO,
+  ALL_BATCHES,
+  BATCH_VIDEO_HOOKS,
+  BATCH_VIDEO_SCRIPTS,
   ANGLE_DEFINITIONS,
   buildBatchSystemPrompt,
   buildUserMessage,
   type BatchConfig,
 } from '../_shared/copywriter-prompts.ts'
+import { getSegment, resolveSegmentId } from '../_shared/segments.ts'
+import { buildAiRulesContext } from '../_shared/ai-rules.ts'
 
 // Parse AI response into component array (handles various response structures)
 function extractComponents(response: string, recommendedAngles: string[]): Array<Record<string, unknown>> {
@@ -33,6 +35,7 @@ function extractComponents(response: string, recommendedAngles: string[]): Array
   if (!Array.isArray(components) || components.length === 0) {
     components = []
     const typeKeys = [
+      'banner_headline', 'banner_headlines',
       'headline', 'headlines', 'subheadline', 'subheadlines',
       'primary_text', 'primary_texts',
       'google_headline', 'google_headlines',
@@ -127,6 +130,18 @@ Deno.serve(async (req: Request) => {
     const { data: client } = await supabase.from('clients').select('*').eq('id', avatar.client_id).single()
     if (!client) return errorResponse('Client not found')
 
+    // Segment is derived from the avatar. Both avatar and offer must share it.
+    // Fall back to default segment if missing (older rows that pre-date migration 028).
+    const segment_id: string = avatar.segment_id || await resolveSegmentId(supabase, avatar.client_id, null)
+    if (offer.segment_id && avatar.segment_id && avatar.segment_id !== offer.segment_id) {
+      return errorResponse('Avatar and offer belong to different segments and cannot be combined.')
+    }
+    const segment = await getSegment(supabase, segment_id)
+    const { data: proof } = await supabase.from('proof_items').select('*').eq('segment_id', segment_id)
+    const { data: segAvatars } = await supabase.from('avatars').select('*').eq('segment_id', segment_id).eq('status', 'approved')
+    const { data: segOffers } = await supabase.from('offers').select('*').eq('segment_id', segment_id).eq('status', 'approved')
+    const aiRules = buildAiRulesContext({ segment, avatars: segAvatars, offers: segOffers, proof })
+
     // Get recommended angles
     let recommendedAngles = avatar.recommended_angles as string[] || []
     if (recommendedAngles.length === 0) {
@@ -151,6 +166,7 @@ Deno.serve(async (req: Request) => {
         .from('funnel_instances')
         .insert({
           client_id: client.id,
+          segment_id,
           avatar_id,
           offer_id,
           generated_at: new Date().toISOString(),
@@ -165,21 +181,35 @@ Deno.serve(async (req: Request) => {
       funnelInstance = newInstance as Record<string, unknown>
     }
 
-    // Build user message (shared across all batches)
+    // Build user message (shared across all batches). Append the segment's
+    // AI Rules block so every batch respects voice/guardrails/approved-proof,
+    // plus a hard-enforced service-area block so copy never mixes markets.
+    const serviceArea = (avatar as Record<string, unknown>).service_area as string | null
+    const serviceAreaBlock = serviceArea
+      ? `\n\n## SERVICE AREA
+This campaign targets the **${serviceArea}** market. Guidance, not a straitjacket:
+- Weave the locale in where it adds specificity — local trust cues, local urgency, local proof. Aim for roughly 20-30% of items to reference it naturally.
+- Most items should focus on the service value, pain points, and outcome — no need to force location into every headline or hook.
+- The one hard rule: do NOT reference OTHER markets the business also serves (if they also operate elsewhere, ignore those markets for this run).`
+      : ''
+
     const userMessage = buildUserMessage(
       avatar as unknown as Record<string, unknown>,
       offer as unknown as Record<string, unknown>,
       client as unknown as Record<string, unknown>,
       recommendedAngles,
-    )
+    ) + `\n\n${aiRules}${serviceAreaBlock}`
 
     // ── Select which batches to run based on mode ──────────────────────
+    // Nine small focused batches run in parallel. Each asks for 12-32 items
+    // across 1-3 related types, well under the JSON-truncation threshold.
+    // Old behavior was 3 big batches — BATCH_2 routinely truncated and
+    // dropped Proof/Urgency/CTAs/Objection Handlers.
     let batches: BatchConfig[]
     if (mode === 'video_only') {
-      batches = [BATCH_3_VIDEO]
+      batches = [BATCH_VIDEO_HOOKS, BATCH_VIDEO_SCRIPTS]
     } else {
-      // full or fill_all: run all 3 batches
-      batches = [BATCH_1_ADS, BATCH_2_PERSUASION, BATCH_3_VIDEO]
+      batches = ALL_BATCHES
     }
 
     console.log(`Starting ${batches.length} parallel generation batches (mode=${mode}) for funnel ${funnelInstance.id}`)
@@ -187,11 +217,15 @@ Deno.serve(async (req: Request) => {
     const batchResults = await Promise.allSettled(
       batches.map(async (batch) => {
         const systemPrompt = buildBatchSystemPrompt(batch, recommendedAngles, client.ad_copy_rules, client.ad_copy_notes)
-        console.log(`[${batch.name}] Calling Claude...`)
+        // Video script bodies can be 240-word scripts x 3 + 150-word scripts
+        // x 4 + 75-word scripts x 5 — still large enough to benefit from
+        // extra headroom. All other batches are tight enough for 8K.
+        const maxTokens = batch === BATCH_VIDEO_SCRIPTS ? 12288 : 8192
+        console.log(`[${batch.name}] Calling Claude (maxTokens=${maxTokens})...`)
 
         const response = await callClaude(systemPrompt, userMessage, {
           model: 'claude-sonnet-4-20250514',
-          maxTokens: 8192,
+          maxTokens,
         })
 
         const components = extractComponents(response, recommendedAngles)
@@ -224,6 +258,7 @@ Deno.serve(async (req: Request) => {
         const text = String(c.text || '')
         return {
           client_id: client.id,
+          segment_id,
           type: String(c.type || 'headline'),
           text,
           character_count: typeof c.character_count === 'number' ? c.character_count : text.length,
