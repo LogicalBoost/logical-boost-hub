@@ -145,10 +145,6 @@ export default function AdsBulkPage() {
   const [generating, setGenerating] = useState(false)
   const generate = useCallback(async () => {
     if (!client || !offer || !audience) return
-    if (!offer.code || !audience.code) {
-      showToast('Both offer and audience need short codes before generating ads.')
-      return
-    }
     if (expectedCombos === 0) {
       showToast('Need ≥1 BH for this audience, ≥1 body component, ≥1 CTA before generating.')
       return
@@ -339,7 +335,7 @@ export default function AdsBulkPage() {
   }
 
   const bothSelected = !!offer && !!audience
-  const codesMissing = bothSelected && (!offer.code || !audience.code)
+  // display_id is auto-assigned on insert, so codes-missing is impossible.
 
   return (
     <div>
@@ -364,7 +360,7 @@ export default function AdsBulkPage() {
               <option value="">Choose a profile...</option>
               {approvedAvatars.map(a => (
                 <option key={a.id} value={a.id}>
-                  {a.code ? `${a.code} · ` : ''}{a.name}{a.priority === 1 ? ' (Primary)' : a.priority ? ` (#${a.priority})` : ''}{!a.code ? ' — no code' : ''}
+                  AU{a.display_id} · {a.name}{a.priority === 1 ? ' (Primary)' : a.priority ? ` (#${a.priority})` : ''}
                 </option>
               ))}
             </select>
@@ -379,7 +375,7 @@ export default function AdsBulkPage() {
               <option value="">Choose an offer...</option>
               {approvedOffers.map(o => (
                 <option key={o.id} value={o.id}>
-                  {o.code ? `${o.code} · ` : ''}{o.name}{!o.code ? ' — no code' : ''}
+                  OF{o.display_id} · {o.name}
                 </option>
               ))}
             </select>
@@ -391,19 +387,8 @@ export default function AdsBulkPage() {
         <div className="empty-state">Pick an audience and an offer above to see the ads for that pair.</div>
       )}
 
-      {bothSelected && codesMissing && (
-        <div className="card" style={{ borderColor: 'var(--warning)' }}>
-          <div className="card-title" style={{ color: 'var(--warning)' }}>Short codes are missing</div>
-          <div className="card-body" style={{ fontSize: 14 }}>
-            {!offer!.code && <div>The offer <strong>{offer!.name}</strong> has no code.</div>}
-            {!audience!.code && <div>The audience <strong>{audience!.name}</strong> has no code.</div>}
-            <div style={{ marginTop: 8 }}>Set codes from <Link href="/ads/new/" style={{ color: 'var(--accent)' }}>/ads/new</Link>.</div>
-          </div>
-        </div>
-      )}
-
       {/* Pool summary — what's available for this audience right now */}
-      {bothSelected && !codesMissing && (bhs.length === 0 || bodies.length === 0 || ctas.length === 0) && (
+      {bothSelected && (bhs.length === 0 || bodies.length === 0 || ctas.length === 0) && (
         <div className="card" style={{ marginBottom: 16, borderColor: 'var(--warning)' }}>
           <div className="card-title" style={{ color: 'var(--warning)' }}>Missing copy for this pair</div>
           <div className="card-body" style={{ fontSize: 14 }}>
@@ -415,14 +400,14 @@ export default function AdsBulkPage() {
       )}
 
       {/* Ads section for the pair */}
-      {bothSelected && !codesMissing && (
+      {bothSelected && (
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
             <div>
               <div className="card-title" style={{ marginBottom: 4 }}>
-                {offer!.name} <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono, monospace)', fontSize: 13 }}>({offer!.code})</span>
+                {offer!.name} <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono, monospace)', fontSize: 13 }}>(OF{offer!.display_id})</span>
                 {' × '}
-                {audience!.name} <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono, monospace)', fontSize: 13 }}>({audience!.code})</span>
+                {audience!.name} <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono, monospace)', fontSize: 13 }}>(AU{audience!.display_id})</span>
               </div>
               <div className="card-meta">
                 {pairAds.length} ad{pairAds.length === 1 ? '' : 's'} · {expectedCombos} possible combo{expectedCombos === 1 ? '' : 's'}

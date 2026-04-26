@@ -110,7 +110,9 @@ export interface Avatar {
   preferred_platforms: string[] | null
   recommended_angles: string[] | null
   priority: number
+  /** @deprecated user-typed code; ad naming uses display_id now. */
   code: string | null
+  display_id: number  // per-client never-reused integer used in ad names (AU{n})
   status: 'approved' | 'denied'
   created_at: string
   updated_at: string
@@ -131,7 +133,9 @@ export interface Offer {
   urgency_elements: string[] | null
   faq: FaqItem[] | null
   landing_page_type: 'lead_capture' | 'call_only' | 'booking' | 'product_page'
+  /** @deprecated user-typed code; ad naming uses display_id now. */
   code: string | null
+  display_id: number  // per-client never-reused integer used in ad names (OF{n})
   status: 'approved' | 'denied'
   created_at: string
   updated_at: string

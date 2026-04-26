@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase'
 import { showToast } from '@/lib/demo-toast'
 import {
   AD_BODY_SH_TYPES, AD_BODY_PC_TYPES, AD_CTA_TYPES,
-  BH_LENGTH_HARD, BH_LENGTH_WARN, CODE_REGEX,
+  BH_LENGTH_HARD, BH_LENGTH_WARN,
 } from '@/types/database'
 import type { Avatar, CopyComponent } from '@/types/database'
 import { bhSeqFor } from '@/types/database'
@@ -19,7 +19,7 @@ export default function NewAdPage() {
   const router = useRouter()
   const {
     client, copyComponents, offers, avatars,
-    refreshCopyComponents, refreshAds, refreshOffers, refreshAvatars, canEdit,
+    refreshCopyComponents, refreshAds, canEdit,
   } = useAppStore()
   const bannerHeadlines = useMemo(
     () => copyComponents.filter(c => c.type === 'banner_headline'),
@@ -66,7 +66,7 @@ export default function NewAdPage() {
   }, [copyComponents, client])
 
   const previewName = useMemo(() => {
-    if (!offer?.code || !audience?.code || !bh || !body || !cta) return null
+    if (!offer || !audience || !bh || !body || !cta) return null
     // Stable per-client per-group seq for body and cta. We compute these
     // client-side here to match what the trigger would produce.
     const bodyAllowed = bodyGroup === 'SH' ? AD_BODY_SH_TYPES : AD_BODY_PC_TYPES
@@ -78,7 +78,7 @@ export default function NewAdPage() {
     const ctaOrdered = [...ctaPool].sort((a, b) => a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : a.id < b.id ? -1 : 1)
     const ctaSeq = ctaOrdered.findIndex(c => c.id === cta.id) + 1
     const bhSeq = bhSeqFor(bh, copyComponents)
-    return `${offer.code}_${audience.code}_BH${bhSeq}-${bodyGroup}${bodySeq}-CTA${ctaSeq}`
+    return `AU${audience.display_id}_OF${offer.display_id}_BH${bhSeq}-${bodyGroup}${bodySeq}-CTA${ctaSeq}`
   }, [offer, audience, bh, body, cta, bodyGroup, copyComponents])
 
   function setAudienceAndClearBh(id: string) {
@@ -122,10 +122,6 @@ export default function NewAdPage() {
 
   async function handleSave() {
     if (!client || !offer || !audience || !bh || !body || !cta) return
-    if (!offer.code || !audience.code) {
-      showToast('Offer and Audience must each have a short code before they can be used in an ad.')
-      return
-    }
     setSaving(true)
     try {
       const { data, error } = await supabase.from('ads').insert({
@@ -176,40 +172,13 @@ export default function NewAdPage() {
         <Link className="btn btn-secondary" href="/ads/">← Back to ads</Link>
       </div>
 
-      {(offers.some(o => !o.code) || avatars.some(a => !a.code)) && (
-        <div className="card" style={{ marginBottom: 16, borderColor: 'var(--warning)' }}>
-          <div className="card-title" style={{ color: 'var(--warning)' }}>Set short codes for offers and audiences</div>
-          <div className="card-body" style={{ fontSize: 14 }}>
-            <p style={{ marginTop: 0, marginBottom: 12 }}>Ad names depend on a short code (2–6 uppercase letters/digits) on each offer and audience.</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }} className="grid-2col-responsive">
-              <CodeEditor
-                heading="Offers"
-                rows={offers.filter(o => !o.code).map(o => ({ id: o.id, name: o.name }))}
-                table="offers"
-                existingCodes={offers.map(o => o.code).filter(Boolean) as string[]}
-                onSaved={() => client && refreshOffers(client.id)}
-              />
-              <CodeEditor
-                heading="Audiences"
-                rows={avatars.filter(a => !a.code).map(a => ({ id: a.id, name: a.name }))}
-                table="avatars"
-                existingCodes={avatars.map(a => a.code).filter(Boolean) as string[]}
-                onSaved={() => client && refreshAvatars(client.id)}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-title">1. Offer</div>
         <div className="card-body">
           <select className="form-input" value={offerId} onChange={e => setOfferId(e.target.value)}>
             <option value="">— Select an offer —</option>
             {offers.map(o => (
-              <option key={o.id} value={o.id} disabled={!o.code}>
-                {o.code ?? 'NO_CODE'} · {o.name}{!o.code ? ' (set a code)' : ''}
-              </option>
+              <option key={o.id} value={o.id}>OF{o.display_id} · {o.name}</option>
             ))}
           </select>
         </div>
@@ -221,9 +190,7 @@ export default function NewAdPage() {
           <select className="form-input" value={audienceId} onChange={e => setAudienceAndClearBh(e.target.value)}>
             <option value="">— Select an audience —</option>
             {avatars.map(a => (
-              <option key={a.id} value={a.id} disabled={!a.code}>
-                {a.code ?? 'NO_CODE'} · {a.name}{!a.code ? ' (set a code)' : ''}
-              </option>
+              <option key={a.id} value={a.id}>AU{a.display_id} · {a.name}</option>
             ))}
           </select>
         </div>
@@ -341,7 +308,7 @@ export default function NewAdPage() {
         <button
           className="btn btn-primary"
           onClick={handleSave}
-          disabled={saving || !offer?.code || !audience?.code || !bh || !body || !cta}
+          disabled={saving || !offer || !audience || !bh || !body || !cta}
         >
           {saving ? 'Saving…' : 'Save Ad'}
         </button>
@@ -406,7 +373,7 @@ function BhInlineCreate({
                   onChange={() => setAudienceIds(checked ? audienceIds.filter(id => id !== a.id) : [...audienceIds, a.id])}
                   style={{ display: 'none' }}
                 />
-                {a.code ?? '—'} · {a.name}
+                AU{a.display_id} · {a.name}
               </label>
             )
           })}
@@ -426,74 +393,3 @@ function BhInlineCreate({
   )
 }
 
-// ---------------------------------------------------------------------------
-// CodeEditor — inline panel for assigning short codes to offers / audiences
-// ---------------------------------------------------------------------------
-function CodeEditor({
-  heading,
-  rows,
-  table,
-  existingCodes,
-  onSaved,
-}: {
-  heading: string
-  rows: { id: string; name: string }[]
-  table: 'offers' | 'avatars'
-  existingCodes: string[]
-  onSaved: () => void
-}) {
-  const [drafts, setDrafts] = useState<Record<string, string>>({})
-  const [saving, setSaving] = useState<string | null>(null)
-
-  if (rows.length === 0) {
-    return (
-      <div>
-        <div style={{ fontWeight: 600, marginBottom: 4 }}>{heading}</div>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>All have codes ✓</div>
-      </div>
-    )
-  }
-
-  async function handleSave(id: string) {
-    const code = (drafts[id] ?? '').toUpperCase().trim()
-    if (!CODE_REGEX.test(code)) { showToast('Code must be 2–6 uppercase letters/digits'); return }
-    if (existingCodes.includes(code)) { showToast(`Code "${code}" is already in use`); return }
-    setSaving(id)
-    try {
-      const { error } = await supabase.from(table).update({ code }).eq('id', id)
-      if (error) throw error
-      onSaved()
-      showToast(`Code ${code} saved`)
-    } catch (err) {
-      showToast('Error: ' + (err as Error).message)
-    } finally {
-      setSaving(null)
-    }
-  }
-
-  return (
-    <div>
-      <div style={{ fontWeight: 600, marginBottom: 8 }}>{heading}</div>
-      {rows.map(r => (
-        <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <input
-            className="form-input"
-            value={drafts[r.id] ?? ''}
-            placeholder="CODE"
-            maxLength={6}
-            onChange={e => setDrafts({ ...drafts, [r.id]: e.target.value.toUpperCase() })}
-            style={{ width: 90, textTransform: 'uppercase', fontFamily: 'var(--font-mono, monospace)' }}
-          />
-          <span style={{ flex: 1, fontSize: 14 }}>{r.name}</span>
-          <button
-            className="btn btn-primary btn-sm"
-            disabled={saving === r.id || !drafts[r.id]}
-            onClick={() => handleSave(r.id)}
-          >
-            {saving === r.id ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-      ))}
-    </div>
-  )
-}

@@ -378,7 +378,7 @@ export default function BannerHeadlinesTab({
                       <div className="tag-list" style={{ marginTop: 8 }}>
                         {taggedAudiences.map(aid => {
                           const a = avatars.find(av => av.id === aid)
-                          return <span key={aid} className="tag">{a?.code ?? '—'} · {a?.name ?? aid}</span>
+                          return <span key={aid} className="tag">{a ? `AU${a.display_id}` : '—'} · {a?.name ?? aid}</span>
                         })}
                       </div>
                     )}
@@ -434,7 +434,7 @@ function AudienceTagger({
                 onChange={() => setAudienceIds(checked ? audienceIds.filter(id => id !== a.id) : [...audienceIds, a.id])}
                 style={{ display: 'none' }}
               />
-              {a.code ?? '—'} · {a.name}
+              AU{a.display_id} · {a.name}
             </label>
           )
         })}

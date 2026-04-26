@@ -84,13 +84,13 @@ export default function AdsListPage() {
         <select className="form-input" value={offerFilter} onChange={e => setOfferFilter(e.target.value)} style={{ maxWidth: 200 }}>
           <option value="all">All offers</option>
           {offers.map(o => (
-            <option key={o.id} value={o.id}>{o.code ?? '—'} · {o.name}</option>
+            <option key={o.id} value={o.id}>OF{o.display_id} · {o.name}</option>
           ))}
         </select>
         <select className="form-input" value={audienceFilter} onChange={e => setAudienceFilter(e.target.value)} style={{ maxWidth: 220 }}>
           <option value="all">All audiences</option>
           {avatars.map(a => (
-            <option key={a.id} value={a.id}>{a.code ?? '—'} · {a.name}</option>
+            <option key={a.id} value={a.id}>AU{a.display_id} · {a.name}</option>
           ))}
         </select>
         <select className="form-input" value={bodyFilter} onChange={e => setBodyFilter(e.target.value as BodyFilter)} style={{ maxWidth: 160 }}>
