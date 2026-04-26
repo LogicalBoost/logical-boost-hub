@@ -243,24 +243,57 @@ export const BATCH_BANNER_HEADLINES: BatchConfig = {
   instructions: `Generate top-slot Banner Headlines (BH) for the Ad Builder. These are the hook copy on banner ads.
 
 BANNER HEADLINES (banner_headline): Generate exactly 12.
-- HARD LENGTH RULE: ≤ 60 characters total (including spaces). Aim for 25–40.
-- MUST call out the audience by name or by a defining trait. The reader should immediately recognize "this is about me".
-- MUST hook: open a loop, ask a question, or trigger recognition. Generic claims are FAILURES.
-- GOOD examples:
-  * "Suburban parents: is your home really secure?"
-  * "Tech-savvy homeowners, this changes everything."
-  * "Empty nesters — the safest move you'll make."
-  * "Still relying on a 1990s security system?"
-- BAD examples (do NOT produce these):
-  * "Best security in the state"          (no audience callout, no hook)
-  * "Get a free quote today"              (generic — no identity)
-  * "Smart home solutions for everyone"   (audience-blind)
-- Mix structures (≥1 of each):
-  * Direct callout:   "[Audience name], [hook]"
-  * Question:         "Is your [thing] [problem]?"
-  * Recognition:      "You've felt it. [Pain]."
-  * Provocation:      "[Common assumption] is wrong."
-  * Curiosity:        "What [audience] don't realize about [topic]"
+
+THE TWO-PART RULE — every BH must clearly communicate AT LEAST ONE of these,
+ideally BOTH:
+  (a) WHO IT'S FOR — the audience identified by a SPECIFIC trait. Generic
+      labels like "homeowners", "people", "everyone" fail. Use the audience's
+      actual descriptor: "cost-conscious homeowners", "suburban parents",
+      "empty nesters", "first-time security buyers".
+  (b) WHAT'S BEING OFFERED — the product or service category, named explicitly.
+      For this client that means words like: "security system", "home security",
+      "alarm", "monitoring", "smart locks", "cameras". Whatever product/service
+      the BUSINESS CONTEXT below describes — use those words.
+
+THE SWAP TEST: read the BH out loud. If you could swap in a totally unrelated
+business (a car dealership, a vacation rental, a dentist) and the BH still
+makes sense, it FAILS. Rewrite it.
+
+GOOD examples (assume the business sells home security):
+  ✓ Audience-trait + product (best):
+    "Cost-conscious homeowners: home security without the upsell."
+    "Empty nesters — security that's actually simple."
+    "Suburban parents: is your alarm system really protecting them?"
+  ✓ Product clearly named, audience implied:
+    "Tired of overpriced security systems?"
+    "Done with overengineered home security?"
+    "Want security that doesn't waste your money?"
+  ✓ Specific-audience trait (when the surrounding offer makes product obvious):
+    "Smart shoppers: skip the security sales pitch."
+    "Hate pushy security salespeople?"
+
+BAD examples (do NOT produce these — they fail the swap test):
+  ✗ "Research every purchase? Start here."        (could sell a car, a vacation, ANYTHING)
+  ✗ "Smart homeowners: skip the sales pitch."     ("homeowners" too generic + no product named)
+  ✗ "Established homeowners: real value exists."  (could sell anything to homeowners)
+  ✗ "Hate pushy salespeople?"                     (any product — needs the category named)
+  ✗ "Stop guessing. Start protecting."            (protecting WHAT? from WHAT?)
+  ✗ "Get honest advice."                          (no audience trait, no product)
+  ✗ "Done with the runaround?"                    (passes neither rule)
+
+OTHER RULES:
+- HARD: ≤ 60 characters total (including spaces). Aim for 25–45.
+- MUST hook: question, open loop, or recognition trigger.
+- Mix structures (≥1 of each across the 12):
+  * Direct callout:    "[Specific audience trait]: [hook about product]"
+  * Question:          "Tired of [specific product problem]?"
+  * Recognition:       "You've felt it. [Specific pain about product]."
+  * Provocation:       "[Common product assumption] is wrong."
+  * Curiosity:         "What [specific audience] don't know about [product]"
+
+REMEMBER: read the BUSINESS CONTEXT above. Use the actual product/service
+words from the business — don't write generic banners that could run for any
+client.
 
 TOTAL: exactly 12 items.`,
 }
@@ -549,10 +582,16 @@ function getSectionGuidance(sectionType: string): string {
 - "Limited: Free audit spots for Q1 are filling up" or "New: [Feature] now available."`,
 
     banner_headline: `SECTION GUIDANCE — Banner Headlines (BH):
-- HARD: ≤ 60 characters. Aim for 25–40.
-- MUST call out the audience by name or trait — reader recognizes "this is about me".
+- HARD: ≤ 60 characters. Aim for 25–45.
+- TWO-PART RULE — every BH must communicate AT LEAST ONE, ideally BOTH:
+  (a) WHO IT'S FOR — specific audience trait, NOT generic labels like "homeowners" or "everyone".
+  (b) WHAT'S BEING OFFERED — name the product/service category from the business context (e.g. "home security", "alarm", "monitoring").
+- SWAP TEST: if you could swap in a different business (car, vacation, dentist) and the BH still works, it FAILS.
 - MUST hook: question, open loop, or recognition trigger.
-- "Suburban parents: is your home really secure?" YES. "Best security in the state" NO.`,
+- GOOD: "Cost-conscious homeowners: home security without the upsell."
+- GOOD: "Tired of overpriced security systems?"
+- BAD:  "Research every purchase? Start here." (could sell anything)
+- BAD:  "Smart homeowners: skip the sales pitch." (no product named)`,
 
     video_hook: `SECTION GUIDANCE — Video Hooks (Micro Hooks):
 - HARD: 3–8 words each, ≤ 50 chars. They are MICRO hooks — first 1-3 seconds only.
