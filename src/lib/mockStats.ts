@@ -414,8 +414,14 @@ export function generateMockStats(input: GenerateInput): MockStats {
       // subset of leads, Purchase is a subset of qualified.
       // Phone Call and Add to Cart are independent micro-events.
       const leads = Math.max(0, Math.round(clicks * cvr))
-      const qualified = Math.round(leads * (0.30 + dayRng() * 0.20))     // 30-50% of leads
-      const purchases = Math.round(qualified * (0.10 + dayRng() * 0.15)) // 10-25% of qualified
+      // Funnel invariant: leads >= qualified >= purchases for every row.
+      // The math here can't break it given the percentage bounds, but the
+      // explicit min() clamps protect the invariant if those bounds ever
+      // change — the heatmap and Cost/Conv math depend on it.
+      const qualifiedRaw = Math.round(leads * (0.30 + dayRng() * 0.20))     // 30-50% of leads
+      const qualified    = Math.min(qualifiedRaw, leads)
+      const purchasesRaw = Math.round(qualified * (0.10 + dayRng() * 0.15)) // 10-25% of qualified
+      const purchases    = Math.min(purchasesRaw, qualified)
       const phoneCalls = Math.round(clicks * (0.005 + dayRng() * 0.015))
       const addToCart  = Math.round(clicks * (0.02  + dayRng() * 0.04))
 
@@ -516,11 +522,14 @@ export function dailyByPlatform(stats: MockStats, range: DateRange): DailyPlatfo
 // Daily heatmap row: spend + funnel counts for one day, after filtering.
 // Drives the daily breakdown table on /stats/.
 //
-//   leads / qualified                 — top + middle of the funnel
-//   conversions                       — sum across ALL event types for the day,
-//                                        matching what an ad platform reports
-//                                        as "Conversions" in its own column
-//   costPerConversion                 — spend / conversions, null when conv = 0
+//   leads / qualified / conversions   — strict funnel: Lead -> Qualified Lead
+//                                        -> Purchase. Invariant for every
+//                                        row: leads >= qualified >= conversions.
+//                                        Phone Call and Add to Cart are
+//                                        deliberately excluded — they're
+//                                        independent micro-events, not part
+//                                        of the same funnel.
+//   costPerConversion                 — spend / conversions, null when 0.
 export interface HeatmapRow {
   date: string
   spend: number
@@ -559,12 +568,13 @@ export function dailyHeatmap(
     if (adId       !== 'all' && m.ad_id       !== adId)       continue
     const row = map.get(m.date)
     if (!row) continue
-    row.spend     += m.spend
-    row.leads     += m.conversions['Lead']
-    row.qualified += m.conversions['Qualified Lead']
-    // Total of all conversion events — what an ad platform reports as
-    // "Conversions". Sums every named event for the day.
-    for (const ev of CONVERSION_EVENTS) row.conversions += m.conversions[ev]
+    row.spend       += m.spend
+    row.leads       += m.conversions['Lead']
+    row.qualified   += m.conversions['Qualified Lead']
+    // Conversions = bottom of the funnel only (Purchase). NOT the platform's
+    // "all events" rollup — the user's funnel is strict, so this column
+    // must remain >= 0 and <= qualified for every row.
+    row.conversions += m.conversions['Purchase']
   }
   // Compute cost-per-conversion per row now that totals are settled.
   for (const row of map.values()) {
