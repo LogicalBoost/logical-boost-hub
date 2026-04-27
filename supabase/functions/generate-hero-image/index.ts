@@ -8,6 +8,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders, jsonResponse, errorResponse } from '../_shared/ai-client.ts'
+import { verifyCaller, requireClientAccess } from '../_shared/auth.ts'
 
 // Google AI Studio API key (free tier — works with Gemini Flash image generation)
 const GOOGLE_AI_API_KEY = Deno.env.get('GOOGLE_AI_API_KEY')
@@ -402,6 +403,12 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    // ── Auth: caller must have access to client_id ───────────────────
+    const caller = await verifyCaller(req)
+    if (caller instanceof Response) return caller
+    const denied = await requireClientAccess(caller, client_id, supabase)
+    if (denied) return denied
 
     // Fetch avatar for description
     const { data: avatar, error: avatarError } = await supabase

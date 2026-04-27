@@ -6,11 +6,11 @@ import { supabase } from '@/lib/supabase'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [mode, setMode] = useState<'login' | 'signup' | 'forgot' | 'reset'>('login')
-  const [signupSuccess, setSignupSuccess] = useState(false)
+  // Self-serve sign-up has been removed. New users land in the system via
+  // an admin-issued invite flow (invite-user edge function -> password set).
+  const [mode, setMode] = useState<'login' | 'forgot' | 'reset'>('login')
   const [resetEmailSent, setResetEmailSent] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -82,60 +82,43 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    setSignupSuccess(false)
 
     try {
-      if (mode === 'login') {
-        const { error: authError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
-        if (authError) {
-          // If email not confirmed, auto-confirm via edge function and retry
-          if (authError.message.toLowerCase().includes('email not confirmed')) {
-            try {
-              const res = await fetch(
-                `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/confirm-user`,
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ email, password }),
-                }
-              )
-              const result = await res.json()
-              if (result.session) {
-                // Set the session from the edge function response
-                await supabase.auth.setSession({
-                  access_token: result.session.access_token,
-                  refresh_token: result.session.refresh_token,
-                })
-                // AuthProvider will handle redirect
-                return
-              } else {
-                setError(result.error || 'Login failed')
+      // Sign-in is the only direct-form action left. Sign-up is invite-only.
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      if (authError) {
+        // If email not confirmed, auto-confirm via edge function and retry.
+        if (authError.message.toLowerCase().includes('email not confirmed')) {
+          try {
+            const res = await fetch(
+              `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/confirm-user`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password }),
               }
-            } catch {
-              setError('Login failed. Please try again.')
+            )
+            const result = await res.json()
+            if (result.session) {
+              await supabase.auth.setSession({
+                access_token: result.session.access_token,
+                refresh_token: result.session.refresh_token,
+              })
+              return
+            } else {
+              setError(result.error || 'Login failed')
             }
-          } else {
-            setError(authError.message)
+          } catch {
+            setError('Login failed. Please try again.')
           }
-        }
-        // AuthProvider will handle the redirect on success
-      } else {
-        const { error: authError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { name: name || email.split('@')[0] },
-          },
-        })
-        if (authError) {
-          setError(authError.message)
         } else {
-          setSignupSuccess(true)
+          setError(authError.message)
         }
       }
+      // AuthProvider will handle the redirect on success.
     } catch {
       setError('An unexpected error occurred')
     } finally {
@@ -238,30 +221,13 @@ export default function LoginPage() {
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
             {mode === 'login' && 'Sign in to your account'}
-            {mode === 'signup' && 'Create your account'}
             {mode === 'forgot' && 'Reset your password'}
             {mode === 'reset' && 'Set a new password'}
           </p>
         </div>
 
         <div className="card" style={{ padding: 24 }}>
-          {/* Signup success */}
-          {signupSuccess ? (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 32, marginBottom: 12 }}>&#9989;</div>
-              <div style={{ fontWeight: 600, marginBottom: 8 }}>Account Created!</div>
-              <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.5 }}>
-                Check your email for a confirmation link, then sign in.
-              </div>
-              <button
-                className="btn btn-primary"
-                style={{ width: '100%', justifyContent: 'center' }}
-                onClick={() => { setMode('login'); setSignupSuccess(false) }}
-              >
-                Go to Sign In
-              </button>
-            </div>
-          ) : resetEmailSent ? (
+          {resetEmailSent ? (
             /* Forgot password email sent */
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 32, marginBottom: 12 }}>&#9993;</div>
@@ -415,7 +381,7 @@ export default function LoginPage() {
               </button>
             </form>
           ) : (
-            /* Login / Signup form */
+            /* Sign-in form */
             <form onSubmit={handleSubmit}>
               {error && (
                 <div style={{
@@ -428,19 +394,6 @@ export default function LoginPage() {
                   border: '1px solid rgba(239, 68, 68, 0.2)',
                 }}>
                   {error}
-                </div>
-              )}
-
-              {mode === 'signup' && (
-                <div className="form-group">
-                  <label className="form-label">Full Name</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Your name"
-                  />
                 </div>
               )}
 
@@ -463,9 +416,8 @@ export default function LoginPage() {
                   className="form-input"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={mode === 'signup' ? 'At least 6 characters' : 'Enter your password'}
+                  placeholder="Enter your password"
                   required
-                  minLength={mode === 'signup' ? 6 : undefined}
                 />
               </div>
 
@@ -494,43 +446,14 @@ export default function LoginPage() {
                 style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}
                 disabled={loading}
               >
-                {loading
-                  ? (mode === 'login' ? 'Signing in...' : 'Creating account...')
-                  : (mode === 'login' ? 'Sign In' : 'Create Account')
-                }
+                {loading ? 'Signing in...' : 'Sign In'}
               </button>
             </form>
           )}
         </div>
 
         <p style={{ textAlign: 'center', marginTop: 16, fontSize: 13, color: 'var(--text-muted)' }}>
-          {mode === 'login' ? (
-            <>
-              Don&apos;t have an account?{' '}
-              <button
-                onClick={() => { setMode('signup'); setError('') }}
-                style={{
-                  background: 'none', border: 'none', color: 'var(--accent)',
-                  cursor: 'pointer', fontSize: 13, textDecoration: 'underline',
-                }}
-              >
-                Sign up
-              </button>
-            </>
-          ) : mode === 'signup' ? (
-            <>
-              Already have an account?{' '}
-              <button
-                onClick={() => { setMode('login'); setError('') }}
-                style={{
-                  background: 'none', border: 'none', color: 'var(--accent)',
-                  cursor: 'pointer', fontSize: 13, textDecoration: 'underline',
-                }}
-              >
-                Sign in
-              </button>
-            </>
-          ) : null}
+          Need an account? Contact your account manager.
         </p>
       </div>
     </div>

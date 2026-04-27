@@ -4,6 +4,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { callClaude, parseJsonResponse, corsHeaders, jsonResponse, errorResponse, getCustomPrompt } from '../_shared/ai-client.ts'
+import { verifyCaller, requireClientAccess } from '../_shared/auth.ts'
 
 const ANGLE_DEFINITIONS = `Available angles (use slug values):
 - problem: Pain Point. Focus on a pain the audience is currently experiencing.
@@ -41,6 +42,12 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    // ── Auth: caller must have access to client_id ───────────────────
+    const caller = await verifyCaller(req)
+    if (caller instanceof Response) return caller
+    const denied = await requireClientAccess(caller, client_id, supabase)
+    if (denied) return denied
 
     // Fetch client data for context
     const { data: client } = await supabase.from('clients').select('*').eq('id', client_id).single()

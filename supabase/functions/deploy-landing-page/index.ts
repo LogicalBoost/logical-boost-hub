@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { verifyCaller, requireClientAccess } from '../_shared/auth.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -321,6 +322,12 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    // ── Auth: caller must have access to client_id ───────────────────
+    const caller = await verifyCaller(req)
+    if (caller instanceof Response) return caller
+    const denied = await requireClientAccess(caller, client_id, supabase)
+    if (denied) return denied
 
     // ─── Step 1: Save to published_pages table ───
     const insertPayload: Record<string, unknown> = {

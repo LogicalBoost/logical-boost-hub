@@ -3,6 +3,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { callClaude, parseJsonResponse, corsHeaders, jsonResponse, errorResponse } from '../_shared/ai-client.ts'
+import { verifyCaller, requireAccessViaEntity } from '../_shared/auth.ts'
 import { COPYWRITER_IDENTITY, QUALITY_RULES, FORMATTING_RULES } from '../_shared/copywriter-prompts.ts'
 import { renderLandingPage } from '../_shared/template-renderer.ts'
 
@@ -79,6 +80,12 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    // ── Auth: caller must have access to the landing page's client ───
+    const caller = await verifyCaller(req)
+    if (caller instanceof Response) return caller
+    const denied = await requireAccessViaEntity(caller, 'landing_pages', landing_page_id, supabase)
+    if (denied) return denied
 
     // Fetch the landing page
     const { data: landingPage, error: lpError } = await supabase

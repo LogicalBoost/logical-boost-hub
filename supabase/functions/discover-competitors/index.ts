@@ -4,6 +4,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { callClaude, parseJsonResponse, corsHeaders, jsonResponse, errorResponse } from '../_shared/ai-client.ts'
+import { verifyCaller, requireClientAccess } from '../_shared/auth.ts'
 
 const SYSTEM_PROMPT = `You are a competitive intelligence analyst at a performance marketing agency. Your job is to identify real competitors for a client's business and analyze their competitive positioning.
 
@@ -59,6 +60,12 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    // ── Auth: caller must have access to client_id ───────────────────
+    const caller = await verifyCaller(req)
+    if (caller instanceof Response) return caller
+    const denied = await requireClientAccess(caller, client_id, supabase)
+    if (denied) return denied
 
     // Fetch client data
     const { data: clientData, error: clientError } = await supabase

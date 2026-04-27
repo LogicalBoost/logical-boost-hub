@@ -4,6 +4,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { callClaude, parseJsonResponse, corsHeaders, jsonResponse, errorResponse, getCustomPrompt } from '../_shared/ai-client.ts'
+import { verifyCaller, requireAccessViaEntity } from '../_shared/auth.ts'
 
 const HARDCODED_SYSTEM_PROMPT = `You are an elite creative director reviewing ad copy components. Score each component 1-100 on strength, audience fit, emotional resonance, specificity, and variety. Return JSON with overall_score, overall_assessment, top_performers, weakest_items, variety_issues, and component_reviews array.`
 
@@ -19,6 +20,12 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const sb = createClient(supabaseUrl, serviceKey)
+
+    // ── Auth: caller must have access to the funnel's client ─────────
+    const caller = await verifyCaller(req)
+    if (caller instanceof Response) return caller
+    const denied = await requireAccessViaEntity(caller, 'funnel_instances', funnel_instance_id, sb)
+    if (denied) return denied
 
     // 1. Fetch funnel instance
     const { data: instance, error: instErr } = await sb

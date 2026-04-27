@@ -4,6 +4,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { callClaude, parseJsonResponse, corsHeaders, jsonResponse, errorResponse } from '../_shared/ai-client.ts'
+import { verifyCaller, requireAccessViaEntity } from '../_shared/auth.ts'
 
 const SYSTEM_PROMPT = `You are a senior direct-response strategist working inside a marketing agency. Your job is to recommend the best messaging angles for a specific audience + offer combination.
 
@@ -54,6 +55,12 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    // ── Auth: caller must have access to the avatar's client ─────────
+    const caller = await verifyCaller(req)
+    if (caller instanceof Response) return caller
+    const denied = await requireAccessViaEntity(caller, 'avatars', avatar_id, supabase)
+    if (denied) return denied
 
     // Fetch avatar, offer, and client data
     const { data: avatar } = await supabase.from('avatars').select('*').eq('id', avatar_id).single()

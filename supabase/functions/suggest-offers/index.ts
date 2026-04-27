@@ -4,6 +4,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { callClaude, parseJsonResponse, corsHeaders, jsonResponse, errorResponse, getCustomPrompt } from '../_shared/ai-client.ts'
+import { verifyCaller, requireClientAccess } from '../_shared/auth.ts'
 
 const DEFAULT_SYSTEM_PROMPT = `You are a senior marketing strategist specializing in offer creation for local service businesses and lead generation campaigns. Your job is to suggest high-converting offers based on the client's business, audience, and competitive landscape.
 
@@ -34,6 +35,12 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    // ── Auth: caller must have access to client_id ───────────────────
+    const caller = await verifyCaller(req)
+    if (caller instanceof Response) return caller
+    const denied = await requireClientAccess(caller, client_id, supabase)
+    if (denied) return denied
 
     const { data: client } = await supabase.from('clients').select('*').eq('id', client_id).single()
     const { data: offers } = await supabase.from('offers').select('*').eq('client_id', client_id).eq('status', 'approved')

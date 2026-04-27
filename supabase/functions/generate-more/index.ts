@@ -4,6 +4,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { callClaude, parseJsonResponse, corsHeaders, jsonResponse, errorResponse } from '../_shared/ai-client.ts'
+import { verifyCaller, requireAccessViaEntity } from '../_shared/auth.ts'
 import { buildGenerateMoreSystemPrompt } from '../_shared/copywriter-prompts.ts'
 import { getSegment, resolveSegmentId } from '../_shared/segments.ts'
 import { buildAiRulesContext } from '../_shared/ai-rules.ts'
@@ -26,6 +27,12 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    // ── Auth: caller must have access to the funnel's client ─────────
+    const caller = await verifyCaller(req)
+    if (caller instanceof Response) return caller
+    const denied = await requireAccessViaEntity(caller, 'funnel_instances', funnel_instance_id, supabase)
+    if (denied) return denied
 
     // Fetch funnel instance and related data
     const { data: fi } = await supabase.from('funnel_instances').select('*').eq('id', funnel_instance_id).single()

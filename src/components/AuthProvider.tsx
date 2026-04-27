@@ -54,29 +54,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data) {
       setProfile(data as AuthUser)
       return data as AuthUser
-    } else {
-      // User exists in auth but not in users table yet.
-      // This happens on first signup. We'll auto-create a profile.
-      const { data: userCount } = await supabase.rpc('get_user_count')
-      const role: UserRole = (userCount === 0) ? 'admin' : 'team_editor'
+    }
+
+    // User authenticated but has no profile row.
+    //
+    // Bootstrap path: if the `users` table is genuinely empty, allow this
+    // user to claim admin (this is how the very first agency owner sets
+    // themselves up on a fresh install). This branch is dead on a populated
+    // prod DB and is intentionally guarded by a real count check that runs
+    // SECURITY DEFINER so it bypasses the user's own RLS view.
+    const { data: userCount } = await supabase.rpc('get_user_count')
+    if (userCount === 0) {
       const authUser = (await supabase.auth.getUser()).data.user
       const { data: newProfile } = await supabase
         .from('users')
         .insert({
           id: userId,
           email: authUser?.email || '',
-          name: authUser?.user_metadata?.name || authUser?.email?.split('@')[0] || 'User',
-          role,
+          name: authUser?.user_metadata?.name || authUser?.email?.split('@')[0] || 'Owner',
+          role: 'admin',
           status: 'active',
         })
         .select()
         .single()
-
       if (newProfile) {
         setProfile(newProfile as AuthUser)
         return newProfile as AuthUser
       }
     }
+
+    // No bootstrap, no profile. The user wasn't invited via /invite-user
+    // and there is no path for them to gain a role automatically. Sign
+    // them out so they can't loiter in an authenticated-but-roleless state.
+    await supabase.auth.signOut()
+    setProfile(null)
     return null
   }, [])
 

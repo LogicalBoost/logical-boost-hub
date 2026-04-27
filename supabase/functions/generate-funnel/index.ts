@@ -6,6 +6,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { callClaude, parseJsonResponse, corsHeaders, jsonResponse, errorResponse } from '../_shared/ai-client.ts'
+import { verifyCaller, requireAccessViaEntity } from '../_shared/auth.ts'
 import {
   ALL_BATCHES,
   BATCH_VIDEO_HOOKS,
@@ -93,6 +94,12 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
+
+    // ── Auth: caller must have access to the avatar's client ──────────
+    const caller = await verifyCaller(req)
+    if (caller instanceof Response) return caller
+    const denied = await requireAccessViaEntity(caller, 'avatars', avatar_id, supabase)
+    if (denied) return denied
 
     // Check if funnel instance already exists for this Avatar + Offer
     const { data: existing } = await supabase
