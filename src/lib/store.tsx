@@ -10,7 +10,14 @@ interface AppState {
   offers: Offer[]
   intakeQuestions: IntakeQuestion[]
   funnelInstances: FunnelInstance[]
+  // copyComponents in the store is a slim snapshot of the 50 most recent
+  // rows (id, type, avatar_ids, created_at) — fast to fetch + cheap to ship.
+  // Pages that need full rows MUST call refreshCopyComponents on mount;
+  // see /copy/, /ads/* — that swaps the store to full select('*').
   copyComponents: CopyComponent[]
+  // True total count for the current client (from the slim query's
+  // count: 'exact'). Use this for dashboard tallies, not .length.
+  copyComponentsCount: number
   competitors: CompetitorIntel[]
   landingPages: LandingPage[]
   publishedPages: PublishedPage[]
@@ -25,7 +32,15 @@ interface AppState {
   clientPhoneNumbers: ClientPhoneNumber[]
   ads: Ad[]
   bannerAssets: BannerAsset[]
+  // True while a client-data load is in flight. Flips false once CORE has
+  // resolved (clients, avatars, offers, intake, funnel, copyComponents
+  // slim, competitors). The remaining 11 tables continue loading in the
+  // background — pages reading those slices may briefly see empty arrays.
   loading: boolean
+  // True once core has resolved at least once for the current client.
+  // Useful for "are we still booting?" decisions independent of `loading`,
+  // which flips on every refresh.
+  isCoreLoaded: boolean
   error: string | null
   userRole: UserRole
 }
@@ -87,6 +102,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [intakeQuestions, setIntakeQuestions] = useState<IntakeQuestion[]>([])
   const [funnelInstances, setFunnelInstances] = useState<FunnelInstance[]>([])
   const [copyComponents, setCopyComponents] = useState<CopyComponent[]>([])
+  const [copyComponentsCount, setCopyComponentsCount] = useState(0)
   const [competitors, setCompetitors] = useState<CompetitorIntel[]>([])
   const [landingPages, setLandingPages] = useState<LandingPage[]>([])
   const [publishedPages, setPublishedPages] = useState<PublishedPage[]>([])
@@ -102,6 +118,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [ads, setAds] = useState<Ad[]>([])
   const [bannerAssets, setBannerAssets] = useState<BannerAsset[]>([])
   const [loading, setLoading] = useState(false)
+  const [isCoreLoaded, setIsCoreLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<UserRole>('admin')
   const canEdit = userRole === 'admin' || userRole === 'team_editor'
@@ -134,146 +151,132 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return data || []
   }, [])
 
-  const loadClientData = useCallback(async (clientId: string) => {
+  // Shared loader. Two phases:
+  //
+  //   CORE (awaited)  — what the dashboard / most pages need to render.
+  //                     7 parallel queries. Resolves first; flips
+  //                     `loading` false and `isCoreLoaded` true.
+  //
+  //   FULL (deferred) — the 11 remaining tables (landing pages, media,
+  //                     ads, etc.). Fired AFTER core resolves, never
+  //                     awaited by the caller. Pages reading these
+  //                     slices may briefly see empty arrays; they
+  //                     re-render naturally when the writes land.
+  //
+  // copy_components is fetched slim — top-50 by created_at, with
+  // count: 'exact' so we still know the true total. Pages that need
+  // full rows (e.g. /copy/, /ads/*) call refreshCopyComponents on mount
+  // to swap the store to a full select('*').
+  const fetchClientData = useCallback(async (
+    clientId: string,
+    opts: { persist?: boolean } = {},
+  ) => {
     setLoading(true)
     setError(null)
     try {
+      // ── CORE: 7 queries, awaited ────────────────────────────────────
       const [
         { data: clientData },
         { data: avatarData },
         { data: offerData },
         { data: intakeData },
         { data: funnelData },
-        { data: copyData },
+        copyResp,
         { data: competitorData },
-        { data: landingPageData },
-        { data: publishedPageData },
-        { data: assetData },
-        { data: brandKitData },
-        { data: templateData },
-        { data: clientTemplateData },
-        { data: qaReviewData },
-        { data: formsData },
-        { data: formWebhooksData },
-        { data: phoneNumberData },
-        { data: adData },
       ] = await Promise.all([
         supabase.from('clients').select('*').eq('id', clientId).single(),
         supabase.from('avatars').select('*').eq('client_id', clientId).order('created_at'),
         supabase.from('offers').select('*').eq('client_id', clientId).order('created_at'),
         supabase.from('intake_questions').select('*').eq('client_id', clientId).order('sort_order'),
         supabase.from('funnel_instances').select('*').eq('client_id', clientId).order('generated_at'),
-        supabase.from('copy_components').select('*').eq('client_id', clientId).order('created_at'),
+        supabase
+          .from('copy_components')
+          .select('id, type, avatar_ids, created_at', { count: 'exact' })
+          .eq('client_id', clientId)
+          .order('created_at', { ascending: false })
+          .limit(50),
         supabase.from('competitor_intel').select('*').eq('client_id', clientId).order('captured_at'),
-        supabase.from('landing_pages').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
-        supabase.from('published_pages').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
-        supabase.from('media_assets').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
-        supabase.from('brand_kits').select('*').eq('client_id', clientId).single(),
-        supabase.from('page_templates').select('*').eq('is_active', true).order('created_at'),
-        supabase.from('client_templates').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
-        supabase.from('qa_reviews').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
-        supabase.from('forms').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
-        supabase.from('form_webhooks').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
-        supabase.from('client_phone_numbers').select('*').eq('client_id', clientId).order('is_default', { ascending: false }),
-        supabase.from('ads').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
       ])
-      if (clientData) setClient(clientData)
-      setAvatars(avatarData || [])
-      setOffers(offerData || [])
-      setIntakeQuestions(intakeData || [])
-      setFunnelInstances(funnelData || [])
-      setCopyComponents(copyData || [])
-      setCompetitors(competitorData || [])
-      setLandingPages(landingPageData || [])
-      setPublishedPages(publishedPageData || [])
-      setMediaAssets(assetData || [])
-      setBrandKit(brandKitData || null)
-      setPageTemplates(templateData || [])
-      setClientTemplates(clientTemplateData || [])
-      setQAReviews(qaReviewData || [])
-      setForms(formsData || [])
-      setFormWebhooks(formWebhooksData || [])
-      setClientPhoneNumbers(phoneNumberData || [])
-      setAds(adData || [])
-      setBannerAssets([])
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
 
-  const switchClient = useCallback(async (clientId: string) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const [
-        { data: clientData },
-        { data: avatarData },
-        { data: offerData },
-        { data: intakeData },
-        { data: funnelData },
-        { data: copyData },
-        { data: competitorData },
-        { data: landingPageData },
-        { data: publishedPageData },
-        { data: assetData },
-        { data: brandKitData },
-        { data: templateData },
-        { data: clientTemplateData },
-        { data: qaReviewData },
-        { data: formsData },
-        { data: formWebhooksData },
-        { data: phoneNumberData },
-        { data: adData },
-      ] = await Promise.all([
-        supabase.from('clients').select('*').eq('id', clientId).single(),
-        supabase.from('avatars').select('*').eq('client_id', clientId).order('created_at'),
-        supabase.from('offers').select('*').eq('client_id', clientId).order('created_at'),
-        supabase.from('intake_questions').select('*').eq('client_id', clientId).order('sort_order'),
-        supabase.from('funnel_instances').select('*').eq('client_id', clientId).order('generated_at'),
-        supabase.from('copy_components').select('*').eq('client_id', clientId).order('created_at'),
-        supabase.from('competitor_intel').select('*').eq('client_id', clientId).order('captured_at'),
-        supabase.from('landing_pages').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
-        supabase.from('published_pages').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
-        supabase.from('media_assets').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
-        supabase.from('brand_kits').select('*').eq('client_id', clientId).single(),
-        supabase.from('page_templates').select('*').eq('is_active', true).order('created_at'),
-        supabase.from('client_templates').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
-        supabase.from('qa_reviews').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
-        supabase.from('forms').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
-        supabase.from('form_webhooks').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
-        supabase.from('client_phone_numbers').select('*').eq('client_id', clientId).order('is_default', { ascending: false }),
-        supabase.from('ads').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
-      ])
       if (clientData) {
         setClient(clientData)
-        saveClientId(clientData.id)
+        if (opts.persist) saveClientId(clientData.id)
       }
       setAvatars(avatarData || [])
       setOffers(offerData || [])
       setIntakeQuestions(intakeData || [])
       setFunnelInstances(funnelData || [])
-      setCopyComponents(copyData || [])
+      setCopyComponents((copyResp.data as unknown as CopyComponent[]) || [])
+      setCopyComponentsCount(copyResp.count ?? (copyResp.data?.length || 0))
       setCompetitors(competitorData || [])
-      setLandingPages(landingPageData || [])
-      setPublishedPages(publishedPageData || [])
-      setMediaAssets(assetData || [])
-      setBrandKit(brandKitData || null)
-      setPageTemplates(templateData || [])
-      setClientTemplates(clientTemplateData || [])
-      setQAReviews(qaReviewData || [])
-      setForms(formsData || [])
-      setFormWebhooks(formWebhooksData || [])
-      setClientPhoneNumbers(phoneNumberData || [])
-      setAds(adData || [])
-      setBannerAssets([])
+      setIsCoreLoaded(true)
+      setLoading(false)
+
+      // ── FULL: 11 queries, fire-and-forget ──────────────────────────
+      void (async () => {
+        try {
+          const [
+            { data: landingPageData },
+            { data: publishedPageData },
+            { data: assetData },
+            { data: brandKitData },
+            { data: templateData },
+            { data: clientTemplateData },
+            { data: qaReviewData },
+            { data: formsData },
+            { data: formWebhooksData },
+            { data: phoneNumberData },
+            { data: adData },
+          ] = await Promise.all([
+            supabase.from('landing_pages').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+            supabase.from('published_pages').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+            supabase.from('media_assets').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+            supabase.from('brand_kits').select('*').eq('client_id', clientId).single(),
+            supabase.from('page_templates').select('*').eq('is_active', true).order('created_at'),
+            supabase.from('client_templates').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+            supabase.from('qa_reviews').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+            supabase.from('forms').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+            supabase.from('form_webhooks').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+            supabase.from('client_phone_numbers').select('*').eq('client_id', clientId).order('is_default', { ascending: false }),
+            supabase.from('ads').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+          ])
+          setLandingPages(landingPageData || [])
+          setPublishedPages(publishedPageData || [])
+          setMediaAssets(assetData || [])
+          setBrandKit(brandKitData || null)
+          setPageTemplates(templateData || [])
+          setClientTemplates(clientTemplateData || [])
+          setQAReviews(qaReviewData || [])
+          setForms(formsData || [])
+          setFormWebhooks(formWebhooksData || [])
+          setClientPhoneNumbers(phoneNumberData || [])
+          setAds(adData || [])
+          setBannerAssets([])
+        } catch {
+          // Deferred-phase failures are non-blocking — pages that need
+          // these slices have their own refresh handlers and will retry
+          // on demand.
+        }
+      })()
     } catch (err) {
       setError((err as Error).message)
-    } finally {
       setLoading(false)
     }
   }, [saveClientId])
+
+  // Public wrappers. Behavioural difference: switchClient persists the
+  // selected client_id to localStorage (so it survives reloads); plain
+  // loadClientData does not (typically called as a re-fetch for the
+  // already-selected client).
+  const loadClientData = useCallback(
+    (clientId: string) => fetchClientData(clientId),
+    [fetchClientData],
+  )
+
+  const switchClient = useCallback(
+    (clientId: string) => fetchClientData(clientId, { persist: true }),
+    [fetchClientData],
+  )
 
   const createNewClient = useCallback(async (name: string, website: string) => {
     const { data, error: err } = await supabase
@@ -334,8 +337,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const refreshCopyComponents = useCallback(async (clientId: string) => {
-    const { data } = await supabase.from('copy_components').select('*').eq('client_id', clientId).order('created_at')
+    // Pages that need full rows (text, status, client_id, etc.) call this
+    // on mount. Replaces the slim core snapshot with a full select('*').
+    const { data, count } = await supabase
+      .from('copy_components')
+      .select('*', { count: 'exact' })
+      .eq('client_id', clientId)
+      .order('created_at')
     setCopyComponents(data || [])
+    setCopyComponentsCount(count ?? (data?.length || 0))
   }, [])
 
   const refreshFunnelInstances = useCallback(async (clientId: string) => {
@@ -438,7 +448,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      allClients, client, avatars, offers, intakeQuestions, funnelInstances, copyComponents, competitors, landingPages, publishedPages, mediaAssets, brandKit, pageTemplates, promptTemplates, clientTemplates, qaReviews, forms, formWebhooks, clientPhoneNumbers, ads, bannerAssets, loading, error,
+      allClients, client, avatars, offers, intakeQuestions, funnelInstances, copyComponents, copyComponentsCount, competitors, landingPages, publishedPages, mediaAssets, brandKit, pageTemplates, promptTemplates, clientTemplates, qaReviews, forms, formWebhooks, clientPhoneNumbers, ads, bannerAssets, loading, isCoreLoaded, error,
       userRole, canEdit, isClientRole,
       setClient, setAvatars, setOffers, setIntakeQuestions, setCopyComponents, setFunnelInstances, setCompetitors, setLandingPages, setPublishedPages, setMediaAssets, setBrandKit,
       setLoading, setError, loadAllClients, loadClientData, switchClient, createClient: createNewClient,

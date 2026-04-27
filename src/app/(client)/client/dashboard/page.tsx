@@ -5,7 +5,7 @@ import { useAppStore } from '@/lib/store'
 import { useAuth } from '@/components/AuthProvider'
 
 export default function ClientDashboardPage() {
-  const { client, avatars, offers, copyComponents, publishedPages } = useAppStore()
+  const { client, avatars, offers, copyComponentsCount, publishedPages } = useAppStore()
   const { profile } = useAuth()
 
   const approvedAvatars = avatars.filter(a => a.status === 'approved').length
@@ -34,7 +34,7 @@ export default function ClientDashboardPage() {
           <div className="funnel-stat-label">Offers</div>
         </div>
         <div className="funnel-stat">
-          <div className="funnel-stat-value">{copyComponents.length}</div>
+          <div className="funnel-stat-value">{copyComponentsCount}</div>
           <div className="funnel-stat-label">Copy Components</div>
         </div>
         <div className="funnel-stat">

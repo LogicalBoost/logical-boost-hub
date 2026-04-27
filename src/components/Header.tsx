@@ -6,7 +6,7 @@ import { useAppStore } from '@/lib/store'
 import { useAuth } from './AuthProvider'
 
 export default function Header() {
-  const { client, allClients, loadAllClients, switchClient, setUserRole, isClientRole } = useAppStore()
+  const { client, allClients, switchClient, setUserRole, isClientRole } = useAppStore()
   const { profile, signOut } = useAuth()
   const router = useRouter()
   const restoredRef = useRef(false)
@@ -23,44 +23,46 @@ export default function Header() {
   const clientRef = useRef(client)
   clientRef.current = client
 
+  // Restore the selected client once both profile and allClients have
+  // landed. AuthProvider gates render on both being resolved (it fires
+  // them in parallel on session resolve), so by the time this Header
+  // mounts, allClients is already populated. No fetch happens here —
+  // we just decide which client to select.
   useEffect(() => {
-    if (!profile) return // Wait for profile to load
-    loadAllClients().then((clients) => {
-      if (!restoredRef.current) {
-        restoredRef.current = true
-        if (clientRef.current) return // A client was already set (e.g., just created)
+    if (!profile) return
+    if (restoredRef.current) return
+    restoredRef.current = true
+    if (clientRef.current) return // A client was already set (e.g., just created)
 
-        // Client-role users: auto-select their assigned client
-        if (profile.role === 'client') {
-          if (profile.client_id) {
-            const assigned = clients.find(c => c.id === profile.client_id)
-            if (assigned) {
-              switchClient(assigned.id)
-              return
-            }
-          }
-          // Fallback: if only one client visible, select it
-          if (clients.length === 1) {
-            switchClient(clients[0].id)
-            return
-          }
-        }
-
-        // Agency roles: restore from localStorage or auto-select
-        if (clients.length > 0) {
-          try {
-            const savedId = localStorage.getItem('lbh_selected_client_id')
-            if (savedId && clients.some(c => c.id === savedId)) {
-              switchClient(savedId)
-            } else if (clients.length === 1) {
-              switchClient(clients[0].id)
-            }
-          } catch { /* storage unavailable */ }
+    // Client-role users: auto-select their assigned client
+    if (profile.role === 'client') {
+      if (profile.client_id) {
+        const assigned = allClients.find(c => c.id === profile.client_id)
+        if (assigned) {
+          switchClient(assigned.id)
+          return
         }
       }
-    })
+      // Fallback: if only one client visible, select it
+      if (allClients.length === 1) {
+        switchClient(allClients[0].id)
+        return
+      }
+    }
+
+    // Agency roles: restore from localStorage or auto-select
+    if (allClients.length > 0) {
+      try {
+        const savedId = localStorage.getItem('lbh_selected_client_id')
+        if (savedId && allClients.some(c => c.id === savedId)) {
+          switchClient(savedId)
+        } else if (allClients.length === 1) {
+          switchClient(allClients[0].id)
+        }
+      } catch { /* storage unavailable */ }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadAllClients, switchClient, profile])
+  }, [profile, allClients, switchClient])
 
   async function handleClientChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const value = e.target.value

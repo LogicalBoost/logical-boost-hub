@@ -15,7 +15,9 @@ interface SetupStep {
 }
 
 export default function DashboardPage() {
-  const { client, avatars, offers, funnelInstances, copyComponents, intakeQuestions, competitors, isClientRole } = useAppStore()
+  // copyComponents in the store is a slim 50-row snapshot (see store.tsx);
+  // copyComponentsCount is the accurate total for tally displays.
+  const { client, avatars, offers, funnelInstances, copyComponents, copyComponentsCount, intakeQuestions, competitors, isClientRole } = useAppStore()
   const { profile } = useAuth()
 
   const activeFunnels = funnelInstances.filter((fi) => fi.status === 'active').length
@@ -185,7 +187,7 @@ export default function DashboardPage() {
             <div className="funnel-stat-label">Offers</div>
           </div>
           <div className="funnel-stat">
-            <div className="funnel-stat-value">{copyComponents.length}</div>
+            <div className="funnel-stat-value">{copyComponentsCount}</div>
             <div className="funnel-stat-label">Copy Components</div>
           </div>
         </div>
@@ -381,7 +383,7 @@ export default function DashboardPage() {
           <Link href="/funnel/" className="funnel-section-card" style={{ textDecoration: 'none', color: 'inherit', padding: '20px', display: 'block' }}>
             <h3 style={{ fontSize: 15, marginBottom: 4, color: 'var(--accent)' }}>&#9889; Funnel Builder</h3>
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
-              {activeFunnels > 0 ? `${activeFunnels} active funnels with ${copyComponents.length} copy components` : 'Generate your first campaign'}
+              {activeFunnels > 0 ? `${activeFunnels} active funnels with ${copyComponentsCount} copy components` : 'Generate your first campaign'}
             </p>
           </Link>
           <Link href="/avatars/" className="funnel-section-card" style={{ textDecoration: 'none', color: 'inherit', padding: '20px', display: 'block' }}>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useAppStore } from '@/lib/store'
 import {
   generateHeroImage,
@@ -168,8 +168,15 @@ const labelStyle: React.CSSProperties = {
 // ============================================================
 export default function LandingPagesPage() {
   const store = useAppStore()
-  const { client, avatars, offers, copyComponents, landingPages, publishedPages, mediaAssets, clientTemplates, forms, formWebhooks, clientPhoneNumbers, canEdit, isClientRole, refreshLandingPages, refreshPublishedPages, refreshMediaAssets, refreshClientTemplates, refreshForms, refreshFormWebhooks, refreshClientPhoneNumbers } = store
+  const { client, avatars, offers, copyComponents, landingPages, publishedPages, mediaAssets, clientTemplates, forms, formWebhooks, clientPhoneNumbers, canEdit, isClientRole, refreshLandingPages, refreshPublishedPages, refreshMediaAssets, refreshClientTemplates, refreshForms, refreshFormWebhooks, refreshClientPhoneNumbers, refreshCopyComponents } = store
   const HUB_URL = 'https://hub.logicalboost.com'
+
+  // copy_components ships slim from the core load — but this page filters
+  // by status/avatar_ids/client_id to pick approved copy for slot fill.
+  // Re-fetch full rows on mount.
+  useEffect(() => {
+    if (client?.id) refreshCopyComponents(client.id)
+  }, [client?.id, refreshCopyComponents])
 
   // Pipeline state
   const [step, setStep] = useState(1)

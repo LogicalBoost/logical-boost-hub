@@ -15,8 +15,17 @@ export default function AdDetailPage() {
   const params = useParams<{ adId: string }>()
   const adId = params?.adId
   const router = useRouter()
-  const { client, ads, copyComponents, offers, avatars, refreshAds, canEdit } = useAppStore()
+  const { client, ads, copyComponents, offers, avatars, refreshAds, refreshCopyComponents, canEdit } = useAppStore()
   const [bannerAssets, setBannerAssets] = useState<BannerAsset[]>([])
+
+  // ads is in the deferred phase and copy_components ships slim — both
+  // can be empty/incomplete when this detail page mounts. Re-fetch.
+  useEffect(() => {
+    if (client?.id) {
+      refreshCopyComponents(client.id)
+      refreshAds(client.id)
+    }
+  }, [client?.id, refreshCopyComponents, refreshAds])
   const [loadingAssets, setLoadingAssets] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)

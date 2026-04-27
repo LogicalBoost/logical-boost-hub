@@ -345,6 +345,12 @@ export default function FunnelPage() {
     .sort((a, b) => (a.priority || 99) - (b.priority || 99))
   const approvedOffers = offers.filter((o) => o.status === 'approved')
 
+  // copy_components ships slim from the core load; this page filters by
+  // funnel_instance_id + status, so re-fetch full rows on mount.
+  useEffect(() => {
+    if (client?.id) refreshCopyComponents(client.id)
+  }, [client?.id, refreshCopyComponents])
+
   // Set defaults — pick highest-priority avatar
   useEffect(() => {
     if (approvedAvatars.length > 0 && !avatarId) setAvatarId(approvedAvatars[0].id)

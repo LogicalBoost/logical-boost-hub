@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
@@ -10,8 +10,18 @@ import { adBodyGroupCode } from '@/types/database'
 type BodyFilter = 'all' | 'SH' | 'PC'
 
 export default function AdsListPage() {
-  const { client, ads, copyComponents, offers, avatars, refreshAds, canEdit } = useAppStore()
+  const { client, ads, copyComponents, offers, avatars, refreshAds, refreshCopyComponents, canEdit } = useAppStore()
   const [search, setSearch] = useState('')
+
+  // The store's `ads` is loaded in the deferred phase and
+  // `copyComponents` is a slim 50-row snapshot — both insufficient for
+  // this page. Re-fetch full rows on mount so filters/lookups work.
+  useEffect(() => {
+    if (client?.id) {
+      refreshCopyComponents(client.id)
+      refreshAds(client.id)
+    }
+  }, [client?.id, refreshCopyComponents, refreshAds])
   const [offerFilter, setOfferFilter] = useState<string>('all')
   const [audienceFilter, setAudienceFilter] = useState<string>('all')
   const [bodyFilter, setBodyFilter] = useState<BodyFilter>('all')

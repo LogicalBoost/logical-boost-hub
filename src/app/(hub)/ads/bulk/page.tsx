@@ -38,9 +38,19 @@ const labelStyle: React.CSSProperties = {
 export default function AdsBulkPage() {
   const {
     client, ads, copyComponents, offers, avatars,
-    refreshAds, canEdit,
+    refreshAds, refreshCopyComponents, canEdit,
   } = useAppStore()
   const router = useRouter()
+
+  // The store ships a slim 50-row snapshot of copy_components and loads
+  // `ads` in the deferred phase — neither is sufficient here. Re-fetch
+  // full rows on mount.
+  useEffect(() => {
+    if (client?.id) {
+      refreshCopyComponents(client.id)
+      refreshAds(client.id)
+    }
+  }, [client?.id, refreshCopyComponents, refreshAds])
   const pathname = usePathname()
   const searchParams = useSearchParams()
 

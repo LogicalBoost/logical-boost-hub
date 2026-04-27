@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useAppStore } from '@/lib/store'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import type { UserRole } from '@/types/database'
 
@@ -43,6 +44,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const pathname = usePathname()
   const router = useRouter()
+  // Pull loadAllClients from the store so we can prefetch clients in
+  // parallel with the profile fetch on session resolve. AuthProvider is
+  // nested inside AppProvider (see src/app/(hub)/layout.tsx), so the
+  // store is available here.
+  const { loadAllClients } = useAppStore()
 
   const loadProfile = useCallback(async (userId: string): Promise<AuthUser | null> => {
     const { data } = await supabase
@@ -100,11 +106,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router])
 
   useEffect(() => {
-    // Check existing session — don't stop loading until profile is fully resolved
+    // Check existing session — don't stop loading until profile + the
+    // initial clients list are both resolved. Both queries depend only
+    // on the session, so we fire them in parallel; total latency is the
+    // slower of the two instead of profile-then-clients sequentially.
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user)
-        await loadProfile(session.user.id)
+        await Promise.all([
+          loadProfile(session.user.id),
+          loadAllClients(),
+        ])
       }
       // Only now is it safe to render the app
       setLoading(false)
@@ -114,7 +126,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setUser(session.user)
-        loadProfile(session.user.id)
+        // Same parallel fetch on fresh login (e.g. after password reset).
+        Promise.all([loadProfile(session.user.id), loadAllClients()])
       } else {
         setUser(null)
         setProfile(null)
@@ -122,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     return () => subscription.unsubscribe()
-  }, [loadProfile])
+  }, [loadProfile, loadAllClients])
 
   // Redirect logic
   useEffect(() => {

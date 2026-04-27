@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAppStore } from '@/lib/store'
@@ -21,6 +21,17 @@ export default function NewAdPage() {
     client, copyComponents, offers, avatars,
     refreshCopyComponents, refreshAds, canEdit,
   } = useAppStore()
+
+  // Slim core snapshot only has 50 rows; this page filters by type and
+  // text, so re-fetch full copy_components on mount. Same for ads
+  // (deferred phase) since /ads/new can also reference existing rows.
+  useEffect(() => {
+    if (client?.id) {
+      refreshCopyComponents(client.id)
+      refreshAds(client.id)
+    }
+  }, [client?.id, refreshCopyComponents, refreshAds])
+
   const bannerHeadlines = useMemo(
     () => copyComponents.filter(c => c.type === 'banner_headline'),
     [copyComponents],
