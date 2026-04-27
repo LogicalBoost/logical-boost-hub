@@ -27,12 +27,12 @@ export const PLATFORM_COLOR: Record<AdPlatform, string> = {
 // per named conversion event.
 //
 // The first three form a funnel: every Qualified Lead is also a Lead; every
-// Purchase is also a Qualified Lead. Phone Call and Add to Cart are
+// Conversion is also a Qualified Lead. Phone Call and Add to Cart are
 // independent tracks that don't strictly nest.
 export const CONVERSION_EVENTS = [
   'Lead',
   'Qualified Lead',
-  'Purchase',
+  'Conversion',
   'Phone Call',
   'Add to Cart',
 ] as const
@@ -312,7 +312,7 @@ export function generateMockStats(input: GenerateInput): MockStats {
     const channel = platform === 'google'
       ? pick(rng, ['Search', 'Display', 'YouTube', 'Performance Max'])
       : pick(rng, ['Feed', 'Reels', 'Stories', 'Audience Network'])
-    const event: ConversionEvent = pick(rng, ['Lead', 'Qualified Lead', 'Purchase'])
+    const event: ConversionEvent = pick(rng, ['Lead', 'Qualified Lead', 'Conversion'])
     const status: MockCampaign['status'] = rng() > 0.18 ? 'active' : 'paused'
     campaigns.push({
       id: `c_${i + 1}`,
@@ -383,10 +383,10 @@ export function generateMockStats(input: GenerateInput): MockStats {
     // Each ad gets a stable scale factor so some ads are big spenders and
     // others are barely getting impressions — matches reality.
     const adRng = mulberry32(hash(ad.id))
-    const baseSpend = 5 + adRng() * 50      // $5-$55 average daily spend
+    const baseSpend = 25 + adRng() * 150     // $25-$175 average daily spend
     const ctr       = 0.005 + adRng() * 0.025
-    const cvr       = 0.02 + adRng() * 0.10
-    const cpc       = 0.4 + adRng() * 2.6   // $0.40-$3.00 cost-per-click
+    const cvr       = 0.03 + adRng() * 0.10  // 3-13% click-to-lead
+    const cpc       = 0.4 + adRng() * 2.6    // $0.40-$3.00 cost-per-click
 
     for (let d = 0; d < days; d++) {
       const dt = daysAgo(days - 1 - d)
@@ -397,7 +397,7 @@ export function generateMockStats(input: GenerateInput): MockStats {
         daily.push({
           ad_id: ad.id, campaign_id: camp.id, platform: ad.platform, date: isoDay(dt),
           spend: 0, impressions: 0, clicks: 0,
-          conversions: { 'Lead': 0, 'Qualified Lead': 0, 'Purchase': 0, 'Phone Call': 0, 'Add to Cart': 0 },
+          conversions: { 'Lead': 0, 'Qualified Lead': 0, 'Conversion': 0, 'Phone Call': 0, 'Add to Cart': 0 },
         })
         continue
       }
@@ -411,24 +411,24 @@ export function generateMockStats(input: GenerateInput): MockStats {
       const impressions = Math.round(clicks / Math.max(ctr, 0.001))
 
       // True funnel: Lead is the broad top of funnel, Qualified Lead is a
-      // subset of leads, Purchase is a subset of qualified.
+      // subset of leads, Conversion is a subset of qualified.
       // Phone Call and Add to Cart are independent micro-events.
       const leads = Math.max(0, Math.round(clicks * cvr))
-      // Funnel invariant: leads >= qualified >= purchases for every row.
+      // Funnel invariant: leads >= qualified >= conversions for every row.
       // The math here can't break it given the percentage bounds, but the
       // explicit min() clamps protect the invariant if those bounds ever
       // change — the heatmap and Cost/Conv math depend on it.
-      const qualifiedRaw = Math.round(leads * (0.30 + dayRng() * 0.20))     // 30-50% of leads
+      const qualifiedRaw = Math.round(leads * (0.35 + dayRng() * 0.20))     // 35-55% of leads
       const qualified    = Math.min(qualifiedRaw, leads)
-      const purchasesRaw = Math.round(qualified * (0.10 + dayRng() * 0.15)) // 10-25% of qualified
-      const purchases    = Math.min(purchasesRaw, qualified)
+      const convRaw      = Math.round(qualified * (0.15 + dayRng() * 0.15)) // 15-30% of qualified
+      const convCount    = Math.min(convRaw, qualified)
       const phoneCalls = Math.round(clicks * (0.005 + dayRng() * 0.015))
       const addToCart  = Math.round(clicks * (0.02  + dayRng() * 0.04))
 
       const conversions: Record<ConversionEvent, number> = {
         'Lead':           leads,
         'Qualified Lead': qualified,
-        'Purchase':       purchases,
+        'Conversion':     convCount,
         'Phone Call':     phoneCalls,
         'Add to Cart':    addToCart,
       }
@@ -479,7 +479,7 @@ export function rollupRange(stats: MockStats, range: DateRange): RangeTotals {
   const totals: RangeTotals = {
     spend: 0,
     conversionsByEvent: {
-      'Lead': 0, 'Qualified Lead': 0, 'Purchase': 0, 'Phone Call': 0, 'Add to Cart': 0,
+      'Lead': 0, 'Qualified Lead': 0, 'Conversion': 0, 'Phone Call': 0, 'Add to Cart': 0,
     },
     totalConversions: 0,
   }
@@ -523,7 +523,7 @@ export function dailyByPlatform(stats: MockStats, range: DateRange): DailyPlatfo
 // Drives the daily breakdown table on /stats/.
 //
 //   leads / qualified / conversions   — strict funnel: Lead -> Qualified Lead
-//                                        -> Purchase. Invariant for every
+//                                        -> Conversion. Invariant for every
 //                                        row: leads >= qualified >= conversions.
 //                                        Phone Call and Add to Cart are
 //                                        deliberately excluded — they're
@@ -571,10 +571,10 @@ export function dailyHeatmap(
     row.spend       += m.spend
     row.leads       += m.conversions['Lead']
     row.qualified   += m.conversions['Qualified Lead']
-    // Conversions = bottom of the funnel only (Purchase). NOT the platform's
-    // "all events" rollup — the user's funnel is strict, so this column
-    // must remain >= 0 and <= qualified for every row.
-    row.conversions += m.conversions['Purchase']
+    // Conversions = bottom of the funnel only (the 'Conversion' event).
+    // NOT the platform's "all events" rollup — the user's funnel is strict,
+    // so this column must remain >= 0 and <= qualified for every row.
+    row.conversions += m.conversions['Conversion']
   }
   // Compute cost-per-conversion per row now that totals are settled.
   for (const row of map.values()) {
@@ -584,14 +584,14 @@ export function dailyHeatmap(
   return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date))
 }
 
-// Daily funnel counts: Lead -> Qualified Lead -> Purchase. These three nest;
+// Daily funnel counts: Lead -> Qualified Lead -> Conversion. These three nest;
 // Phone Call and Add to Cart are deliberately not included (they're separate
 // tracks, not part of the same funnel).
 export interface DailyFunnel {
   date: string
   lead: number
   qualified: number
-  purchase: number
+  conversion: number
 }
 
 export function dailyFunnel(stats: MockStats, range: DateRange): DailyFunnel[] {
@@ -600,15 +600,15 @@ export function dailyFunnel(stats: MockStats, range: DateRange): DailyFunnel[] {
   const to   = new Date(range.to   + 'T00:00:00Z')
   for (let t = from.getTime(); t <= to.getTime(); t += 86400000) {
     const d = isoDay(new Date(t))
-    map.set(d, { date: d, lead: 0, qualified: 0, purchase: 0 })
+    map.set(d, { date: d, lead: 0, qualified: 0, conversion: 0 })
   }
   for (const m of stats.daily) {
     if (!inRange(m.date, range)) continue
     const row = map.get(m.date)
     if (!row) continue
-    row.lead      += m.conversions['Lead']
-    row.qualified += m.conversions['Qualified Lead']
-    row.purchase  += m.conversions['Purchase']
+    row.lead       += m.conversions['Lead']
+    row.qualified  += m.conversions['Qualified Lead']
+    row.conversion += m.conversions['Conversion']
   }
   return Array.from(map.values()).sort((a, b) => a.date < b.date ? -1 : 1)
 }
@@ -744,7 +744,7 @@ export interface AdPerformanceRow {
   campaign: MockCampaign | null
   spend: number
   qualified: number  // Qualified Lead count
-  conversions: number  // Purchase count (matches the heatmap)
+  conversions: number  // Conversion count (matches the heatmap)
   costPerQualified: number | null
   costPerConversion: number | null
   parsed: ParsedAdName | null
@@ -758,8 +758,8 @@ export function adsPerformance(
   const platform = filters.platform ?? 'all'
   const adType   = filters.adType   ?? 'all'
 
-  const acc = new Map<string, { spend: number; qualified: number; purchases: number }>()
-  for (const a of stats.ads) acc.set(a.id, { spend: 0, qualified: 0, purchases: 0 })
+  const acc = new Map<string, { spend: number; qualified: number; conversions: number }>()
+  for (const a of stats.ads) acc.set(a.id, { spend: 0, qualified: 0, conversions: 0 })
   for (const m of stats.daily) {
     if (!inRange(m.date, range)) continue
     if (platform !== 'all' && m.platform !== platform) continue
@@ -768,9 +768,9 @@ export function adsPerformance(
     if (adType !== 'all' && ad.ad_type !== adType) continue
     const row = acc.get(m.ad_id)
     if (!row) continue
-    row.spend     += m.spend
-    row.qualified += m.conversions['Qualified Lead']
-    row.purchases += m.conversions['Purchase']
+    row.spend       += m.spend
+    row.qualified   += m.conversions['Qualified Lead']
+    row.conversions += m.conversions['Conversion']
   }
   const campById = new Map(stats.campaigns.map(c => [c.id, c]))
   return stats.ads
@@ -783,9 +783,9 @@ export function adsPerformance(
         campaign: campById.get(a.campaign_id) ?? null,
         spend: r.spend,
         qualified: r.qualified,
-        conversions: r.purchases,
-        costPerQualified:  r.qualified  > 0 ? r.spend / r.qualified  : null,
-        costPerConversion: r.purchases > 0 ? r.spend / r.purchases : null,
+        conversions: r.conversions,
+        costPerQualified:  r.qualified   > 0 ? r.spend / r.qualified   : null,
+        costPerConversion: r.conversions > 0 ? r.spend / r.conversions : null,
         parsed: parseAdName(a.name),
       }
     })

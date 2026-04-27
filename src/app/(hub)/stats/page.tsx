@@ -576,7 +576,7 @@ export default function StatsPage() {
 //   Cost              amber-500 (#f59e0b)  — money out
 //   Leads             cyan-500  (#06b6d4)  — top of funnel
 //   Qualified         emerald-400 (#34d399) — middle of funnel
-//   Conversions       violet-500 (#a855f7)  — bottom of funnel (Purchase)
+//   Conversions       violet-500 (#a855f7)  — bottom of funnel
 //   Cost / Conv       rose-500  (#f43f5e)  — distinct from amber but in the
 //                                            same "warm = costs" family,
 //                                            since both are "more is worse"
