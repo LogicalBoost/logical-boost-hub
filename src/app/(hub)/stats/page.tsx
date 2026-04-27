@@ -5,8 +5,6 @@ import { useAppStore } from '@/lib/store'
 import {
   generateMockStats,
   rollupRange,
-  dailyByPlatform,
-  dailyFunnel,
   dailyHeatmap,
   previousPeriod,
   fmtMoney,
@@ -14,7 +12,6 @@ import {
   fmtPercentDelta,
   CONVERSION_EVENTS,
   PLATFORM_LABEL,
-  PLATFORM_COLOR,
 } from '@/lib/mockStats'
 import type { ConversionEvent, AdPlatform, HeatmapRow } from '@/lib/mockStats'
 
@@ -78,9 +75,6 @@ export default function StatsPage() {
 
   const totals = useMemo(() => stats ? rollupRange(stats, range) : null, [stats, range])
   const prevTotals = useMemo(() => stats ? rollupRange(stats, previousPeriod(range)) : null, [stats, range])
-  const dailySpend = useMemo(() => stats ? dailyByPlatform(stats, range) : [], [stats, range])
-  const funnelDaily = useMemo(() => stats ? dailyFunnel(stats, range) : [], [stats, range])
-
   // Cascading table-filter option lists.
   const tableCampaigns = useMemo(() => {
     if (!stats) return []
@@ -284,36 +278,6 @@ export default function StatsPage() {
         </div>
       </div>
 
-      {/* ── Spend over time chart ───────────────────────────────────── */}
-      <div className="card" style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-          <div className="card-title" style={{ marginBottom: 0 }}>Spend over time</div>
-          <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--text-muted)' }}>
-            <PlatformDot platform="google" /> {PLATFORM_LABEL.google}
-            <PlatformDot platform="meta"   /> {PLATFORM_LABEL.meta}
-          </div>
-        </div>
-        <SpendChart data={dailySpend} />
-      </div>
-
-      {/* ── Conversions by day chart (funnel) ───────────────────────── */}
-      <div className="card" style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-          <div>
-            <div className="card-title" style={{ marginBottom: 0 }}>Conversions by day</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-              Funnel: every Qualified Lead is also a Lead, every Purchase is also a Qualified Lead.
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--text-muted)' }}>
-            <SeriesDot color={FUNNEL_COLORS.lead} />      Lead
-            <SeriesDot color={FUNNEL_COLORS.qualified} /> Qualified Lead
-            <SeriesDot color={FUNNEL_COLORS.purchase} />  Purchase
-          </div>
-        </div>
-        <ConversionsChart data={funnelDaily} />
-      </div>
-
       {/* ── Daily heatmap table ─────────────────────────────────────── */}
       <div className="card" style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
@@ -414,30 +378,6 @@ export default function StatsPage() {
 }
 
 // ─── Small UI helpers ──────────────────────────────────────────────────
-
-// Funnel chart palette: cool → warm progression matches the funnel narrative
-// (top-of-funnel cyan, qualified emerald, purchase amber/gold = the "win").
-const FUNNEL_COLORS = {
-  lead:      '#06b6d4',  // cyan-500
-  qualified: '#34d399',  // emerald-400
-  purchase:  '#fbbf24',  // amber-400
-} as const
-
-function SeriesDot({ color }: { color: string }) {
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-      <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: color }} />
-    </span>
-  )
-}
-
-function PlatformDot({ platform }: { platform: AdPlatform }) {
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-      <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: PLATFORM_COLOR[platform] }} />
-    </span>
-  )
-}
 
 // Heatmap palette — single hue per column. Picked so each column reads as a
 // visually distinct band and the dark-cell text stays legible.
@@ -543,224 +483,3 @@ function SortableTh({
   )
 }
 
-// ─── SVG stacked-bar chart ─────────────────────────────────────────────
-// Each day = one bar; google stacks under meta. ViewBox-scaled so it
-// responds to container width without a chart library.
-
-function SpendChart({ data }: { data: { date: string; google: number; meta: number }[] }) {
-  const W = 1000
-  const H = 220
-  const PAD_LEFT = 56
-  const PAD_RIGHT = 12
-  const PAD_TOP = 12
-  const PAD_BOTTOM = 32
-  const innerW = W - PAD_LEFT - PAD_RIGHT
-  const innerH = H - PAD_TOP - PAD_BOTTOM
-
-  const max = Math.max(1, ...data.map(d => d.google + d.meta))
-  // Round max up to a nice tick
-  const niceMax = niceCeil(max)
-  const barW = innerW / Math.max(data.length, 1)
-
-  // Y-axis ticks: 4 evenly-spaced values incl. 0.
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map(t => Math.round(niceMax * t))
-
-  // X-axis labels: show ~6 evenly-spaced dates.
-  const labelEvery = Math.max(1, Math.floor(data.length / 6))
-
-  function y(value: number) {
-    return PAD_TOP + innerH - (value / niceMax) * innerH
-  }
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 240, display: 'block' }} preserveAspectRatio="none">
-      {/* Gridlines + Y-axis labels */}
-      {ticks.map((t, i) => (
-        <g key={i}>
-          <line
-            x1={PAD_LEFT} x2={W - PAD_RIGHT}
-            y1={y(t)} y2={y(t)}
-            stroke="var(--border, #2a2a2a)"
-            strokeDasharray={i === 0 ? '' : '2 3'}
-          />
-          <text
-            x={PAD_LEFT - 6} y={y(t) + 3}
-            textAnchor="end" fontSize="10" fill="var(--text-muted)"
-            style={{ fontVariantNumeric: 'tabular-nums' }}
-          >
-            ${t.toLocaleString()}
-          </text>
-        </g>
-      ))}
-
-      {/* Bars (google bottom, meta on top) */}
-      {data.map((d, i) => {
-        const x = PAD_LEFT + i * barW
-        const gH = (d.google / niceMax) * innerH
-        const mH = (d.meta   / niceMax) * innerH
-        const gY = PAD_TOP + innerH - gH
-        const mY = gY - mH
-        const gap = barW > 6 ? 1 : 0
-        const w = Math.max(1, barW - gap)
-        return (
-          <g key={d.date}>
-            {gH > 0 && (
-              <rect
-                x={x} y={gY} width={w} height={gH}
-                fill={PLATFORM_COLOR.google}
-              >
-                <title>{`${d.date} · Google: $${d.google.toFixed(0)} · Meta: $${d.meta.toFixed(0)}`}</title>
-              </rect>
-            )}
-            {mH > 0 && (
-              <rect
-                x={x} y={mY} width={w} height={mH}
-                fill={PLATFORM_COLOR.meta}
-              >
-                <title>{`${d.date} · Google: $${d.google.toFixed(0)} · Meta: $${d.meta.toFixed(0)}`}</title>
-              </rect>
-            )}
-          </g>
-        )
-      })}
-
-      {/* X-axis labels */}
-      {data.map((d, i) => {
-        if (i % labelEvery !== 0 && i !== data.length - 1) return null
-        const x = PAD_LEFT + i * barW + barW / 2
-        const label = d.date.slice(5)  // MM-DD
-        return (
-          <text
-            key={`x-${i}`} x={x} y={H - 12}
-            textAnchor="middle" fontSize="10" fill="var(--text-muted)"
-          >
-            {label}
-          </text>
-        )
-      })}
-    </svg>
-  )
-}
-
-// ─── SVG grouped-bar chart for the conversion funnel ───────────────────
-// Three series side-by-side per day. NOT stacked because Lead, Qualified
-// Lead, and Purchase nest — stacking would visually double-count.
-
-function ConversionsChart({ data }: { data: { date: string; lead: number; qualified: number; purchase: number }[] }) {
-  const W = 1000
-  const H = 220
-  const PAD_LEFT = 56
-  const PAD_RIGHT = 12
-  const PAD_TOP = 12
-  const PAD_BOTTOM = 32
-  const innerW = W - PAD_LEFT - PAD_RIGHT
-  const innerH = H - PAD_TOP - PAD_BOTTOM
-
-  // Lead is always the largest of the three (it's the parent in the funnel),
-  // so axis scaling off lead is enough.
-  const max = Math.max(1, ...data.map(d => Math.max(d.lead, d.qualified, d.purchase)))
-  const niceMax = niceCeil(max)
-
-  const dayWidth = innerW / Math.max(data.length, 1)
-  // Three series. Tiny gap between bars within a day, larger gap between days.
-  const innerGap = dayWidth > 12 ? 1 : 0
-  const seriesW = Math.max(1, (dayWidth - innerGap * 2 - 2) / 3)
-
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map(t => Math.round(niceMax * t))
-  const labelEvery = Math.max(1, Math.floor(data.length / 6))
-
-  function y(value: number) {
-    return PAD_TOP + innerH - (value / niceMax) * innerH
-  }
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 240, display: 'block' }} preserveAspectRatio="none">
-      {/* Gridlines + Y-axis labels */}
-      {ticks.map((t, i) => (
-        <g key={i}>
-          <line
-            x1={PAD_LEFT} x2={W - PAD_RIGHT}
-            y1={y(t)} y2={y(t)}
-            stroke="var(--border, #2a2a2a)"
-            strokeDasharray={i === 0 ? '' : '2 3'}
-          />
-          <text
-            x={PAD_LEFT - 6} y={y(t) + 3}
-            textAnchor="end" fontSize="10" fill="var(--text-muted)"
-            style={{ fontVariantNumeric: 'tabular-nums' }}
-          >
-            {t.toLocaleString()}
-          </text>
-        </g>
-      ))}
-
-      {/* Grouped bars */}
-      {data.map((d, i) => {
-        const dayX = PAD_LEFT + i * dayWidth + 1  // 1px left margin within slot
-        const tip = `${d.date} · Leads: ${d.lead} · Qualified: ${d.qualified} · Purchases: ${d.purchase}`
-        return (
-          <g key={d.date}>
-            {/* Lead */}
-            {d.lead > 0 && (() => {
-              const barH = (d.lead / niceMax) * innerH
-              return (
-                <rect
-                  x={dayX} y={PAD_TOP + innerH - barH}
-                  width={seriesW} height={barH}
-                  fill={FUNNEL_COLORS.lead}
-                ><title>{tip}</title></rect>
-              )
-            })()}
-            {/* Qualified */}
-            {d.qualified > 0 && (() => {
-              const barH = (d.qualified / niceMax) * innerH
-              return (
-                <rect
-                  x={dayX + seriesW + innerGap} y={PAD_TOP + innerH - barH}
-                  width={seriesW} height={barH}
-                  fill={FUNNEL_COLORS.qualified}
-                ><title>{tip}</title></rect>
-              )
-            })()}
-            {/* Purchase */}
-            {d.purchase > 0 && (() => {
-              const barH = (d.purchase / niceMax) * innerH
-              return (
-                <rect
-                  x={dayX + (seriesW + innerGap) * 2} y={PAD_TOP + innerH - barH}
-                  width={seriesW} height={barH}
-                  fill={FUNNEL_COLORS.purchase}
-                ><title>{tip}</title></rect>
-              )
-            })()}
-          </g>
-        )
-      })}
-
-      {/* X-axis labels */}
-      {data.map((d, i) => {
-        if (i % labelEvery !== 0 && i !== data.length - 1) return null
-        const x = PAD_LEFT + i * dayWidth + dayWidth / 2
-        const label = d.date.slice(5)  // MM-DD
-        return (
-          <text
-            key={`x-${i}`} x={x} y={H - 12}
-            textAnchor="middle" fontSize="10" fill="var(--text-muted)"
-          >
-            {label}
-          </text>
-        )
-      })}
-    </svg>
-  )
-}
-
-function niceCeil(n: number): number {
-  if (n <= 0) return 1
-  const exp = Math.floor(Math.log10(n))
-  const base = Math.pow(10, exp)
-  for (const m of [1, 2, 2.5, 5, 10]) {
-    if (m * base >= n) return m * base
-  }
-  return Math.ceil(n / base) * base
-}
