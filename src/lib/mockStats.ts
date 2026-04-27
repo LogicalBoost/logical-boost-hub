@@ -9,6 +9,8 @@
 // Delete or replace this file when real integrations come online.
 // ─────────────────────────────────────────────────────────────────────────
 
+import type { SampleDataSettings } from '@/types/database'
+export type { SampleDataSettings } from '@/types/database'
 
 export type AdPlatform = 'google' | 'meta'
 
@@ -161,6 +163,13 @@ interface GenerateInput {
   offers:    { id: string; name: string; display_id?: number | null }[]
   /** how many days of history to generate (default 90) */
   days?: number
+  /**
+   * Per-client tuning for the goal-driven generator. When omitted, the
+   * generator uses sensible defaults (target CPC $50, 10–30 daily
+   * conversions, 0.40/0.20 funnel rates). See `SampleDataSettings` in
+   * src/types/database.ts for the shape.
+   */
+  settings?: SampleDataSettings
 }
 
 const FORMATS_BY_PLATFORM: Record<AdPlatform, MockAd['format'][]> = {
@@ -376,72 +385,142 @@ export function generateMockStats(input: GenerateInput): MockStats {
     }
   }
 
-  // Per-(ad, day) metrics.
+  // ── Per-ad scale factors ────────────────────────────────────────────
+  // Every ad gets a stable mix of weights — so some ads consistently
+  // spend more than others, mirroring real campaigns. These are *weights*
+  // for distributing daily totals; they don't determine absolute volume.
+  // baseWeight: relative spend share. ctr/cpc: visual variation.
+  const adFactors = new Map<string, { baseWeight: number; ctr: number; cpc: number }>()
+  for (const a of ads) {
+    const adRng = mulberry32(hash(a.id))
+    adFactors.set(a.id, {
+      baseWeight: 0.5 + adRng() * 1.5,            // 0.5x..2x relative weight
+      ctr:        0.005 + adRng() * 0.025,
+      cpc:        0.4 + adRng() * 2.6,            // $0.40-$3.00 cost-per-click
+    })
+  }
+
+  // ── Settings: goal-driven generator knobs ──────────────────────────
+  // The mock generator is goal-driven: pick daily totals (conversions,
+  // cost, funnel counts) from configured targets first, then distribute
+  // across active ads via weighted split. Inverts the previous bottom-up
+  // approach so demos can be tuned to match a client's real targets.
+  const s = input.settings ?? {}
+  const targetCpc       = s.target_cost_per_conversion ?? 50
+  const [convMin, convMax] = s.target_daily_conversions ?? [10, 30]
+  const qualToConvRate  = s.qualified_to_conversion_rate ?? 0.20
+  const leadToQualRate  = s.lead_to_qualified_rate       ?? 0.40
+
+  // Per-(ad, day) metrics, distributed from daily totals.
   const daily: DailyMetric[] = []
-  for (const ad of ads) {
-    const camp = campaigns.find(c => c.id === ad.campaign_id)!
-    // Each ad gets a stable scale factor so some ads are big spenders and
-    // others are barely getting impressions — matches reality.
-    const adRng = mulberry32(hash(ad.id))
-    const baseSpend = 25 + adRng() * 150     // $25-$175 average daily spend
-    const ctr       = 0.005 + adRng() * 0.025
-    const cvr       = 0.03 + adRng() * 0.10  // 3-13% click-to-lead
-    const cpc       = 0.4 + adRng() * 2.6    // $0.40-$3.00 cost-per-click
+  for (let d = 0; d < days; d++) {
+    const dt = daysAgo(days - 1 - d)
+    const isoDate = isoDay(dt)
+    const dow = dt.getUTCDay()
+    // Day-of-week dampening + a smooth seasonal arc.
+    const dowMult = dow === 0 || dow === 6 ? 0.70 : 1
+    const trend   = 1 + Math.sin((d / days) * Math.PI * 2) * 0.18
 
-    for (let d = 0; d < days; d++) {
-      const dt = daysAgo(days - 1 - d)
-      const dayRng = mulberry32(hash(`${ad.id}|${isoDay(dt)}`))
-      // Paused campaigns spend 0 (still keep the row so the chart axis is steady).
-      if (camp.status === 'paused' && d < days - 14) {
-        // paused for the older portion of the window; resumes recently. Skip spend.
-        daily.push({
-          ad_id: ad.id, campaign_id: camp.id, platform: ad.platform, date: isoDay(dt),
-          spend: 0, impressions: 0, clicks: 0,
-          conversions: { 'Lead': 0, 'Qualified Lead': 0, 'Conversion': 0, 'Phone Call': 0, 'Add to Cart': 0 },
-        })
-        continue
-      }
-      // Weekday vs weekend variance + seasonal drift.
-      const dow = dt.getUTCDay()
-      const dowMult = dow === 0 || dow === 6 ? 0.65 : 1
-      const trend = 1 + Math.sin((d / days) * Math.PI * 2) * 0.18
-      const noise = bell(dayRng, 0.7, 1.3)
-      const spend = Math.max(0, baseSpend * dowMult * trend * noise)
-      const clicks = Math.max(0, Math.round(spend / cpc))
-      const impressions = Math.round(clicks / Math.max(ctr, 0.001))
+    // Seed per-day randomness off the client + date so the demo is
+    // deterministic but every day still differs.
+    const dayRng = mulberry32(hash(`${input.clientId}|${isoDate}`))
 
-      // True funnel: Lead is the broad top of funnel, Qualified Lead is a
-      // subset of leads, Conversion is a subset of qualified.
-      // Phone Call and Add to Cart are independent micro-events.
-      const leads = Math.max(0, Math.round(clicks * cvr))
-      // Funnel invariant: leads >= qualified >= conversions for every row.
-      // The math here can't break it given the percentage bounds, but the
-      // explicit min() clamps protect the invariant if those bounds ever
-      // change — the heatmap and Cost/Conv math depend on it.
-      const qualifiedRaw = Math.round(leads * (0.35 + dayRng() * 0.20))     // 35-55% of leads
-      const qualified    = Math.min(qualifiedRaw, leads)
-      const convRaw      = Math.round(qualified * (0.15 + dayRng() * 0.15)) // 15-30% of qualified
-      const convCount    = Math.min(convRaw, qualified)
-      const phoneCalls = Math.round(clicks * (0.005 + dayRng() * 0.015))
-      const addToCart  = Math.round(clicks * (0.02  + dayRng() * 0.04))
+    // Daily target conversions: pick from [min, max], then bend by the
+    // weekday/seasonal factors.
+    const convMid = (convMin + convMax) / 2
+    const convSpan = (convMax - convMin) / 2
+    const dayConvFloat = Math.max(0,
+      (convMid + (dayRng() * 2 - 1) * convSpan) * dowMult * trend
+    )
+    const dayConv = Math.round(dayConvFloat)
 
-      const conversions: Record<ConversionEvent, number> = {
-        'Lead':           leads,
-        'Qualified Lead': qualified,
-        'Conversion':     convCount,
-        'Phone Call':     phoneCalls,
-        'Add to Cart':    addToCart,
-      }
+    // Daily target cost: conversions × target CPC × bell-shaped noise.
+    // Bell over [0.82, 1.18] keeps daily CPC visibly varied while pulling
+    // the tails in: ~93% of days land under target × 1.0909 (e.g. under
+    // $60 when target is $55). Uniform ±15% only hit ~80% under-budget.
+    const cpcNoise = bell(dayRng, 0.82, 1.18)
+    const dayCost = dayConvFloat * targetCpc * cpcNoise
+
+    // Walk the funnel up: more qualified than conversions, more leads
+    // than qualified. Rates configurable per client; defaults are
+    // conservative paid-traffic norms (40%/20%).
+    const dayQualified = Math.round(dayConv / Math.max(qualToConvRate, 0.05))
+    const dayLeads     = Math.round(dayQualified / Math.max(leadToQualRate, 0.05))
+    // Phone Call / Add to Cart: small independent tracks proportional to
+    // leads. Not part of the funnel invariant.
+    const dayPhone   = Math.round(dayLeads * (0.04 + dayRng() * 0.06))
+    const dayAddCart = Math.round(dayLeads * (0.10 + dayRng() * 0.10))
+
+    // Identify active ads on this day. Paused campaigns contribute zero
+    // for the older portion of the window; we still emit zero-rows so
+    // chart axes stay steady.
+    const activeAds: typeof ads = []
+    const zeroAds:   typeof ads = []
+    for (const ad of ads) {
+      const camp = campaigns.find(c => c.id === ad.campaign_id)!
+      const isPausedToday = camp.status === 'paused' && d < days - 14
+      if (isPausedToday) zeroAds.push(ad)
+      else activeAds.push(ad)
+    }
+
+    // Compute per-ad weight for today: stable baseWeight × dow × trend
+    // × per-ad-day noise so daily share ranking varies a bit.
+    const weights: number[] = []
+    let weightSum = 0
+    for (const ad of activeAds) {
+      const f = adFactors.get(ad.id)!
+      const adDayRng = mulberry32(hash(`${ad.id}|${isoDate}`))
+      const noise = bell(adDayRng, 0.7, 1.3)
+      const w = f.baseWeight * dowMult * trend * noise
+      weights.push(w)
+      weightSum += w
+    }
+
+    // Distribute daily totals across active ads.
+    for (let i = 0; i < activeAds.length; i++) {
+      const ad = activeAds[i]
+      const camp = campaigns.find(c => c.id === ad.campaign_id)!
+      const f = adFactors.get(ad.id)!
+      const share = weightSum > 0 ? weights[i] / weightSum : 1 / Math.max(activeAds.length, 1)
+
+      const spend       = dayCost * share
+      const conv        = Math.round(dayConv * share)
+      const qualifiedR  = Math.round(dayQualified * share)
+      const leadsR      = Math.round(dayLeads * share)
+      // Invariant clamp per row: leads >= qualified >= conversions.
+      const leads     = Math.max(leadsR, qualifiedR, conv)
+      const qualified = Math.max(Math.min(qualifiedR, leads), conv)
+      const convCount = Math.min(conv, qualified)
+      const phoneCalls = Math.round(dayPhone   * share)
+      const addToCart  = Math.round(dayAddCart * share)
+
+      const clicks      = Math.max(0, Math.round(spend / f.cpc))
+      const impressions = Math.round(clicks / Math.max(f.ctr, 0.001))
 
       daily.push({
         ad_id: ad.id,
         campaign_id: camp.id,
         platform: ad.platform,
-        date: isoDay(dt),
+        date: isoDate,
         spend: Math.round(spend * 100) / 100,
         impressions,
         clicks,
-        conversions,
+        conversions: {
+          'Lead':           leads,
+          'Qualified Lead': qualified,
+          'Conversion':     convCount,
+          'Phone Call':     phoneCalls,
+          'Add to Cart':    addToCart,
+        },
+      })
+    }
+
+    // Emit zero-rows for paused ads so the heatmap still has every day.
+    for (const ad of zeroAds) {
+      daily.push({
+        ad_id: ad.id, campaign_id: ad.campaign_id, platform: ad.platform, date: isoDate,
+        spend: 0, impressions: 0, clicks: 0,
+        conversions: { 'Lead': 0, 'Qualified Lead': 0, 'Conversion': 0, 'Phone Call': 0, 'Add to Cart': 0 },
       })
     }
   }

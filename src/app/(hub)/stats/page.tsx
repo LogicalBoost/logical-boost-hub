@@ -72,18 +72,26 @@ export default function StatsPage() {
 
   const range = rangeFromPreset(preset, custom)
 
-  // Generate (or re-use) the mock stats — deterministic per client. Memoized
-  // so swapping the conversion-event picker doesn't regenerate.
+  // Per-client sample-data settings live on the clients row (admin-only;
+  // see migration 039). When `use_sample_data === false` we render an
+  // empty "connect your ad accounts" state instead of generating data.
+  const sampleSettings = client?.sample_data_settings ?? null
+  const useSampleData = sampleSettings?.use_sample_data !== false  // default true
+
+  // Generate (or re-use) the mock stats — deterministic per client and
+  // per settings-snapshot. Memoized so swapping the conversion-event
+  // picker doesn't regenerate.
   const stats = useMemo(() => {
-    if (!client) return null
+    if (!client || !useSampleData) return null
     return generateMockStats({
       clientId: client.id,
       clientName: client.name,
       audiences: avatars.map(a => ({ id: a.id, name: a.name, display_id: a.display_id })),
       offers: offers.map(o => ({ id: o.id, name: o.name, display_id: o.display_id })),
       days: 90,
+      settings: sampleSettings ?? undefined,
     })
-  }, [client, avatars, offers])
+  }, [client, avatars, offers, useSampleData, sampleSettings])
 
   const totals = useMemo(() => stats ? rollupRange(stats, range) : null, [stats, range])
   const prevTotals = useMemo(() => stats ? rollupRange(stats, previousPeriod(range)) : null, [stats, range])
@@ -263,6 +271,47 @@ export default function StatsPage() {
     )
   }
 
+  // Sample-data toggle is off → real-data placeholder. Stub button until
+  // an ad-account connection flow exists.
+  if (!useSampleData) {
+    return (
+      <div>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Stats</h1>
+            <p className="page-subtitle">Ad performance across Google Ads + Meta for {client.name}</p>
+          </div>
+        </div>
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          textAlign: 'center', padding: '80px 20px', borderRadius: 12,
+          background: 'var(--bg-elevated, #1a1a1a)', border: '1px dashed var(--border, #333)',
+          color: 'var(--text-secondary)',
+        }}>
+          <div style={{ fontSize: 48, lineHeight: 1, marginBottom: 16, opacity: 0.4 }}>
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M3 3v18h18" /><path d="M7 14l4-4 4 4 5-5" />
+            </svg>
+          </div>
+          <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary)' }}>
+            Connect your ad accounts to see real data
+          </h2>
+          <p style={{ maxWidth: 460, marginBottom: 24, lineHeight: 1.5 }}>
+            Sample data is turned off for {client.name}. Connect Google Ads and Meta to start
+            pulling real campaign performance.
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => alert('Ad-account connection is coming soon.')}
+          >
+            Connect ad accounts
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // Top-line numbers — selected event is the lever for cost-per-conversion.
   const totalSpend = totals?.spend ?? 0
   const eventConversions = totals?.conversionsByEvent[event] ?? 0
@@ -283,7 +332,7 @@ export default function StatsPage() {
           <p className="page-subtitle">
             Ad performance across Google Ads + Meta for {client.name}{' '}
             <span style={{ marginLeft: 8, padding: '2px 8px', fontSize: 11, fontWeight: 600, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', borderRadius: 4, verticalAlign: 'middle' }}>
-              MOCK DATA
+              SAMPLE DATA
             </span>
           </p>
         </div>

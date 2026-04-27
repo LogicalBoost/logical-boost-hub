@@ -6,7 +6,7 @@ import { useAppStore } from '@/lib/store'
 import { supabase } from '@/lib/supabase'
 import { showToast } from '@/lib/demo-toast'
 import { analyzeBusiness, analyzeBrandKit, generateIntake, refineSystem, inviteUser } from '@/lib/api'
-import type { UserRole, Competitor, PromptTemplate, ClientPhoneNumber } from '@/types/database'
+import type { UserRole, Competitor, PromptTemplate, ClientPhoneNumber, SampleDataSettings } from '@/types/database'
 import TagInput from '@/components/TagInput'
 import LogoUpload from '@/components/LogoUpload'
 
@@ -26,7 +26,7 @@ interface ClientAssignment {
   client_id: string
 }
 
-type SettingsTab = 'business' | 'intake' | 'profile' | 'team' | 'clients' | 'prompts' | 'phones'
+type SettingsTab = 'business' | 'intake' | 'profile' | 'team' | 'clients' | 'prompts' | 'phones' | 'sample-data'
 
 export default function SettingsPage() {
   const { profile, user } = useAuth()
@@ -124,6 +124,19 @@ export default function SettingsPage() {
   const [editPhoneIsDefault, setEditPhoneIsDefault] = useState(false)
   const [deletingPhoneId, setDeletingPhoneId] = useState<string | null>(null)
 
+  // ─── Sample Data state ───
+  // Form state for the per-client sample-data tab. Initialized from
+  // `client.sample_data_settings` whenever the selected client changes.
+  // Strings (not numbers) so empty inputs display as blank — they're
+  // parsed at save time.
+  const [sdUseSample, setSdUseSample]     = useState(true)
+  const [sdTargetCpc, setSdTargetCpc]     = useState('')
+  const [sdConvMin,   setSdConvMin]       = useState('')
+  const [sdConvMax,   setSdConvMax]       = useState('')
+  const [sdLeadRate,  setSdLeadRate]      = useState('')
+  const [sdQualRate,  setSdQualRate]      = useState('')
+  const [sdSaving,    setSdSaving]        = useState(false)
+
   // ─── Company Assets state ───
   interface ClientContentItem {
     id: string
@@ -204,6 +217,18 @@ export default function SettingsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, client?.id])
+
+  // Hydrate Sample Data form whenever the selected client (or its
+  // settings JSON) changes.
+  useEffect(() => {
+    const s = client?.sample_data_settings ?? null
+    setSdUseSample(s?.use_sample_data !== false)  // default true when missing
+    setSdTargetCpc(s?.target_cost_per_conversion?.toString() ?? '')
+    setSdConvMin(s?.target_daily_conversions?.[0]?.toString() ?? '')
+    setSdConvMax(s?.target_daily_conversions?.[1]?.toString() ?? '')
+    setSdLeadRate(s?.lead_to_qualified_rate?.toString() ?? '')
+    setSdQualRate(s?.qualified_to_conversion_rate?.toString() ?? '')
+  }, [client?.id, client?.sample_data_settings])
 
   async function loadClientContent() {
     if (!client?.id) return
@@ -3114,6 +3139,189 @@ export default function SettingsPage() {
   }
 
   // ═══════════════════════════════════════
+  // Sample Data tab render
+  // ═══════════════════════════════════════
+  //
+  // Admin / team_editor only. Tunes the Stats page mock generator for
+  // the selected client. Writes to clients.sample_data_settings — RLS
+  // blocks `client` role from updating, so this UI is also hidden from
+  // them via the !isClientRole tab gate.
+
+  async function saveSampleDataSettings() {
+    if (!client?.id) return
+    // Build the settings object, omitting empty inputs so the generator
+    // falls back to defaults rather than treating "" as 0.
+    const next: SampleDataSettings = { use_sample_data: sdUseSample }
+    const cpc = parseFloat(sdTargetCpc)
+    if (!Number.isNaN(cpc) && cpc > 0) next.target_cost_per_conversion = cpc
+    const cmin = parseFloat(sdConvMin)
+    const cmax = parseFloat(sdConvMax)
+    if (!Number.isNaN(cmin) && !Number.isNaN(cmax) && cmin >= 0 && cmax >= cmin) {
+      next.target_daily_conversions = [cmin, cmax]
+    }
+    const lr = parseFloat(sdLeadRate)
+    if (!Number.isNaN(lr) && lr > 0 && lr <= 1) next.lead_to_qualified_rate = lr
+    const qr = parseFloat(sdQualRate)
+    if (!Number.isNaN(qr) && qr > 0 && qr <= 1) next.qualified_to_conversion_rate = qr
+
+    setSdSaving(true)
+    const { error } = await supabase
+      .from('clients')
+      .update({ sample_data_settings: next })
+      .eq('id', client.id)
+    setSdSaving(false)
+    if (error) {
+      showToast('Save failed: ' + error.message)
+      return
+    }
+    showToast('Sample data settings saved')
+    await refreshClient(client.id)
+  }
+
+  function renderSampleDataTab() {
+    if (!client) {
+      return <div className="empty-state">Select a client to edit sample-data settings.</div>
+    }
+    return (
+      <div className="settings-section">
+        <div style={{ marginBottom: 24 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>Sample Data</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.5 }}>
+            Tune the Stats page&apos;s sample data so demos for {client.name} reflect their
+            target metrics. These settings are admin-only and never visible to the client.
+            Switch off to render a &quot;connect your ad accounts&quot; placeholder instead.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 560 }}>
+          {/* Master toggle */}
+          <label style={{ display: 'flex', gap: 12, alignItems: 'flex-start', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={sdUseSample}
+              onChange={e => setSdUseSample(e.target.checked)}
+              style={{ marginTop: 4 }}
+            />
+            <span>
+              <span style={{ fontWeight: 600 }}>Use sample data on Stats page</span>
+              <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 13, marginTop: 2 }}>
+                When off, the Stats page shows a placeholder asking the client to connect
+                their ad accounts.
+              </span>
+            </span>
+          </label>
+
+          <div>
+            <label style={{ display: 'block', fontWeight: 600, marginBottom: 4 }}>
+              Target cost per conversion ($)
+            </label>
+            <input
+              type="number"
+              min={1}
+              step="any"
+              placeholder="50"
+              value={sdTargetCpc}
+              onChange={e => setSdTargetCpc(e.target.value)}
+              className="form-input"
+              style={{ width: 160 }}
+            />
+            <p style={{ color: 'var(--text-secondary)', fontSize: 12, marginTop: 4 }}>
+              Daily CPC averages around this with realistic variance. Default $50 if blank.
+            </p>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontWeight: 600, marginBottom: 4 }}>
+              Target daily conversions (range)
+            </label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                type="number"
+                min={0}
+                placeholder="10"
+                value={sdConvMin}
+                onChange={e => setSdConvMin(e.target.value)}
+                className="form-input"
+                style={{ width: 120 }}
+              />
+              <span style={{ color: 'var(--text-secondary)' }}>to</span>
+              <input
+                type="number"
+                min={0}
+                placeholder="30"
+                value={sdConvMax}
+                onChange={e => setSdConvMax(e.target.value)}
+                className="form-input"
+                style={{ width: 120 }}
+              />
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 12, marginTop: 4 }}>
+              Total conversions per day across all campaigns. Default 10–30.
+            </p>
+          </div>
+
+          <details style={{ marginTop: 4 }}>
+            <summary style={{ cursor: 'pointer', fontWeight: 600, marginBottom: 8 }}>
+              Advanced funnel rates
+            </summary>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingLeft: 16, marginTop: 8 }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: 4 }}>
+                  Lead → Qualified rate
+                </label>
+                <input
+                  type="number"
+                  min={0.01}
+                  max={1}
+                  step="0.01"
+                  placeholder="0.40"
+                  value={sdLeadRate}
+                  onChange={e => setSdLeadRate(e.target.value)}
+                  className="form-input"
+                  style={{ width: 120 }}
+                />
+                <p style={{ color: 'var(--text-secondary)', fontSize: 12, marginTop: 4 }}>
+                  Fraction of leads that become qualified. Default 0.40.
+                </p>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: 4 }}>
+                  Qualified → Conversion rate
+                </label>
+                <input
+                  type="number"
+                  min={0.01}
+                  max={1}
+                  step="0.01"
+                  placeholder="0.20"
+                  value={sdQualRate}
+                  onChange={e => setSdQualRate(e.target.value)}
+                  className="form-input"
+                  style={{ width: 120 }}
+                />
+                <p style={{ color: 'var(--text-secondary)', fontSize: 12, marginTop: 4 }}>
+                  Fraction of qualified that convert. Default 0.20.
+                </p>
+              </div>
+            </div>
+          </details>
+
+          <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={saveSampleDataSettings}
+              disabled={sdSaving}
+            >
+              {sdSaving ? 'Saving…' : 'Save sample-data settings'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ═══════════════════════════════════════
   // Main render
   // ═══════════════════════════════════════
 
@@ -3139,6 +3347,12 @@ export default function SettingsPage() {
               onClick={() => setActiveTab('intake')}
             >
               Intake
+            </button>
+            <button
+              className={`funnel-tab ${activeTab === 'sample-data' ? 'funnel-tab-active' : ''}`}
+              onClick={() => setActiveTab('sample-data')}
+            >
+              Sample Data
             </button>
           </>
         )}
@@ -3186,6 +3400,7 @@ export default function SettingsPage() {
       {activeTab === 'clients' && isAdmin && renderClientAccessTab()}
       {activeTab === 'prompts' && isAdmin && renderPromptsTab()}
       {activeTab === 'phones' && (isClientRole ? renderPhoneNumbersReadOnly() : renderPhoneNumbersTab())}
+      {activeTab === 'sample-data' && !isClientRole && renderSampleDataTab()}
     </div>
   )
 }

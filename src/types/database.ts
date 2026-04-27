@@ -31,8 +31,30 @@ export interface Client {
   github_repo: string | null
   custom_domain: string | null
   metadata: Record<string, unknown> | null
+  sample_data_settings: SampleDataSettings | null
   created_at: string
   updated_at: string
+}
+
+// Per-client tuning for the Stats page mock generator. All keys are
+// optional — missing keys fall back to generator defaults. Editable by
+// admin / team_editor only (RLS); see migration 039.
+export interface SampleDataSettings {
+  // Master toggle. When false, the Stats page renders a "Connect your ad
+  // accounts" empty state instead of generating sample data. Defaults to
+  // true if the whole settings object is missing.
+  use_sample_data?: boolean
+  // Primary tuning knob. Daily cost-per-conversion averages around this
+  // with ~±15% variance. Default ~$55.
+  target_cost_per_conversion?: number
+  // [min, max] total conversions per day across all campaigns combined.
+  // Defaults to a range scaled off the avatar/offer count.
+  target_daily_conversions?: [number, number]
+  // Funnel rates: defaults are 0.40 lead→qualified, 0.20 qualified→conv.
+  // 1 / qualified_to_conversion_rate gives "qualified per conversion";
+  // 1 / lead_to_qualified_rate gives "leads per qualified".
+  qualified_to_conversion_rate?: number
+  lead_to_qualified_rate?: number
 }
 
 export interface AdCopyRules {
