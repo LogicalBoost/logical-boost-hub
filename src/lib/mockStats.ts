@@ -515,12 +515,19 @@ export function dailyByPlatform(stats: MockStats, range: DateRange): DailyPlatfo
 
 // Daily heatmap row: spend + funnel counts for one day, after filtering.
 // Drives the daily breakdown table on /stats/.
+//
+//   leads / qualified                 — top + middle of the funnel
+//   conversions                       — sum across ALL event types for the day,
+//                                        matching what an ad platform reports
+//                                        as "Conversions" in its own column
+//   costPerConversion                 — spend / conversions, null when conv = 0
 export interface HeatmapRow {
   date: string
   spend: number
   leads: number
   qualified: number
-  purchases: number
+  conversions: number
+  costPerConversion: number | null
 }
 
 export interface HeatmapFilters {
@@ -543,7 +550,7 @@ export function dailyHeatmap(
   const to   = new Date(range.to   + 'T00:00:00Z')
   for (let t = from.getTime(); t <= to.getTime(); t += 86400000) {
     const d = isoDay(new Date(t))
-    map.set(d, { date: d, spend: 0, leads: 0, qualified: 0, purchases: 0 })
+    map.set(d, { date: d, spend: 0, leads: 0, qualified: 0, conversions: 0, costPerConversion: null })
   }
   for (const m of stats.daily) {
     if (!inRange(m.date, range)) continue
@@ -555,7 +562,13 @@ export function dailyHeatmap(
     row.spend     += m.spend
     row.leads     += m.conversions['Lead']
     row.qualified += m.conversions['Qualified Lead']
-    row.purchases += m.conversions['Purchase']
+    // Total of all conversion events — what an ad platform reports as
+    // "Conversions". Sums every named event for the day.
+    for (const ev of CONVERSION_EVENTS) row.conversions += m.conversions[ev]
+  }
+  // Compute cost-per-conversion per row now that totals are settled.
+  for (const row of map.values()) {
+    row.costPerConversion = row.conversions > 0 ? row.spend / row.conversions : null
   }
   // Default: newest first.
   return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date))

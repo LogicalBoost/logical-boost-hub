@@ -48,7 +48,7 @@ export default function StatsPage() {
   const [tablePlatform, setTablePlatform] = useState<'all' | AdPlatform>('all')
   const [tableCampaign, setTableCampaign] = useState<string>('all')
   const [tableAd,       setTableAd]       = useState<string>('all')
-  type SortKey = 'date' | 'spend' | 'leads' | 'qualified' | 'purchases'
+  type SortKey = 'date' | 'spend' | 'leads' | 'qualified' | 'conversions' | 'costPerConversion'
   const [sortKey, setSortKey] = useState<SortKey>('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
@@ -114,7 +114,18 @@ export default function StatsPage() {
       if (sortKey === 'date') {
         return sortDir === 'asc' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date)
       }
-      const av = a[sortKey], bv = b[sortKey]
+      // costPerConversion can be null on zero-conv days. Sort nulls to the
+      // bottom regardless of asc/desc — they're "no data", not extreme values.
+      if (sortKey === 'costPerConversion') {
+        const av = a.costPerConversion
+        const bv = b.costPerConversion
+        if (av == null && bv == null) return 0
+        if (av == null) return 1
+        if (bv == null) return -1
+        return sortDir === 'asc' ? av - bv : bv - av
+      }
+      const av = a[sortKey] as number
+      const bv = b[sortKey] as number
       return sortDir === 'asc' ? av - bv : bv - av
     })
     return rows
@@ -122,33 +133,52 @@ export default function StatsPage() {
 
   const heatmapTotals = useMemo(() => heatmapRowsRaw.reduce(
     (acc, r) => ({
-      spend:     acc.spend + r.spend,
-      leads:     acc.leads + r.leads,
-      qualified: acc.qualified + r.qualified,
-      purchases: acc.purchases + r.purchases,
+      spend:       acc.spend       + r.spend,
+      leads:       acc.leads       + r.leads,
+      qualified:   acc.qualified   + r.qualified,
+      conversions: acc.conversions + r.conversions,
     }),
-    { spend: 0, leads: 0, qualified: 0, purchases: 0 },
+    { spend: 0, leads: 0, qualified: 0, conversions: 0 },
   ), [heatmapRowsRaw])
 
   const heatmapExtremes = useMemo(() => {
     const init = {
-      spend:     { min: Infinity, max: -Infinity },
-      leads:     { min: Infinity, max: -Infinity },
-      qualified: { min: Infinity, max: -Infinity },
-      purchases: { min: Infinity, max: -Infinity },
+      spend:             { min: Infinity, max: -Infinity },
+      leads:             { min: Infinity, max: -Infinity },
+      qualified:         { min: Infinity, max: -Infinity },
+      conversions:       { min: Infinity, max: -Infinity },
+      costPerConversion: { min: Infinity, max: -Infinity },
     }
-    if (heatmapRowsRaw.length === 0) {
-      return { spend: { min: 0, max: 0 }, leads: { min: 0, max: 0 }, qualified: { min: 0, max: 0 }, purchases: { min: 0, max: 0 } }
+    const empty = {
+      spend: { min: 0, max: 0 }, leads: { min: 0, max: 0 },
+      qualified: { min: 0, max: 0 }, conversions: { min: 0, max: 0 },
+      costPerConversion: { min: 0, max: 0 },
     }
+    if (heatmapRowsRaw.length === 0) return empty
     for (const r of heatmapRowsRaw) {
-      for (const k of ['spend', 'leads', 'qualified', 'purchases'] as const) {
+      for (const k of ['spend', 'leads', 'qualified', 'conversions'] as const) {
         const v = r[k]
         if (v < init[k].min) init[k].min = v
         if (v > init[k].max) init[k].max = v
       }
+      // costPerConversion: ignore null rows when computing extremes so the
+      // gradient isn't polluted by zero-conv days.
+      if (r.costPerConversion != null) {
+        if (r.costPerConversion < init.costPerConversion.min) init.costPerConversion.min = r.costPerConversion
+        if (r.costPerConversion > init.costPerConversion.max) init.costPerConversion.max = r.costPerConversion
+      }
     }
+    // If no row had any conversions, costPerConversion bounds stay at +/-Inf.
+    // Reset to 0/0 so the cell formatter doesn't blow up.
+    if (init.costPerConversion.min === Infinity) init.costPerConversion = { min: 0, max: 0 }
     return init
   }, [heatmapRowsRaw])
+
+  // Weighted average for the footer: sum-of-cost / sum-of-conversions.
+  // Mirrors how Google Ads / Meta report "Cost / Conv." in the totals row.
+  const heatmapWeightedCPC = useMemo(() => (
+    heatmapTotals.conversions > 0 ? heatmapTotals.spend / heatmapTotals.conversions : null
+  ), [heatmapTotals])
 
   // ── Top Performing Ad Copy aggregations ────────────────────────────
   const adRowsAll = useMemo<AdPerformanceRow[]>(
@@ -396,24 +426,26 @@ export default function StatsPage() {
           }}>
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border, #333)' }}>
-                <SortableTh label="Date"                                       keyName="date"      sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left"  narrow={narrow} />
-                <SortableTh label="Cost"                                       keyName="spend"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" narrow={narrow} />
-                <SortableTh label="Leads"                                      keyName="leads"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" narrow={narrow} />
-                <SortableTh label={narrow ? 'Qualified' : 'Qualified Leads'}   keyName="qualified" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" narrow={narrow} />
-                <SortableTh label={narrow ? 'Conv.' : 'Conversions'}           keyName="purchases" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" narrow={narrow} />
+                <SortableTh label="Date"                                       keyName="date"              sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left"  narrow={narrow} />
+                <SortableTh label="Cost"                                       keyName="spend"             sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" narrow={narrow} />
+                <SortableTh label="Leads"                                      keyName="leads"             sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" narrow={narrow} />
+                <SortableTh label={narrow ? 'Qualified' : 'Qualified Leads'}   keyName="qualified"         sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" narrow={narrow} />
+                <SortableTh label={narrow ? 'Conv.' : 'Conversions'}           keyName="conversions"       sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" narrow={narrow} />
+                <SortableTh label={narrow ? '$/Conv' : 'Cost / Conv'}          keyName="costPerConversion" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" narrow={narrow} />
               </tr>
             </thead>
             <tbody>
               {heatmapRows.length === 0 && (
-                <tr><td colSpan={5} style={{ padding: 20, color: 'var(--text-muted)' }}>No data for this filter combination.</td></tr>
+                <tr><td colSpan={6} style={{ padding: 20, color: 'var(--text-muted)' }}>No data for this filter combination.</td></tr>
               )}
               {heatmapRows.map(r => (
                 <tr key={r.date} style={{ borderBottom: '1px solid var(--border, #2a2a2a)' }}>
                   <td style={{ padding: narrow ? '6px 6px' : '8px 10px', fontSize: narrow ? 11 : 12, whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>{fmtShortDate(r.date)}</td>
-                  <Cell value={r.spend}     min={heatmapExtremes.spend.min}     max={heatmapExtremes.spend.max}     hue={HEATMAP_HUE.cost}      format={(n) => fmtCostCompact(n, narrow)} narrow={narrow} />
-                  <Cell value={r.leads}     min={heatmapExtremes.leads.min}     max={heatmapExtremes.leads.max}     hue={HEATMAP_HUE.leads}     format={fmtNum} narrow={narrow} />
-                  <Cell value={r.qualified} min={heatmapExtremes.qualified.min} max={heatmapExtremes.qualified.max} hue={HEATMAP_HUE.qualified} format={fmtNum} narrow={narrow} />
-                  <Cell value={r.purchases} min={heatmapExtremes.purchases.min} max={heatmapExtremes.purchases.max} hue={HEATMAP_HUE.purchases} format={fmtNum} narrow={narrow} />
+                  <Cell value={r.spend}       min={heatmapExtremes.spend.min}       max={heatmapExtremes.spend.max}       hue={HEATMAP_HUE.cost}              format={(n) => fmtCostCompact(n, narrow)} narrow={narrow} />
+                  <Cell value={r.leads}       min={heatmapExtremes.leads.min}       max={heatmapExtremes.leads.max}       hue={HEATMAP_HUE.leads}             format={fmtNum} narrow={narrow} />
+                  <Cell value={r.qualified}   min={heatmapExtremes.qualified.min}   max={heatmapExtremes.qualified.max}   hue={HEATMAP_HUE.qualified}         format={fmtNum} narrow={narrow} />
+                  <Cell value={r.conversions} min={heatmapExtremes.conversions.min} max={heatmapExtremes.conversions.max} hue={HEATMAP_HUE.conversions}       format={fmtNum} narrow={narrow} />
+                  <CostPerConvCell value={r.costPerConversion} min={heatmapExtremes.costPerConversion.min} max={heatmapExtremes.costPerConversion.max} narrow={narrow} />
                 </tr>
               ))}
             </tbody>
@@ -424,7 +456,10 @@ export default function StatsPage() {
                   <td style={{ padding: narrow ? '6px 6px' : '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtCostCompact(heatmapTotals.spend, narrow)}</td>
                   <td style={{ padding: narrow ? '6px 6px' : '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(heatmapTotals.leads)}</td>
                   <td style={{ padding: narrow ? '6px 6px' : '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(heatmapTotals.qualified)}</td>
-                  <td style={{ padding: narrow ? '6px 6px' : '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(heatmapTotals.purchases)}</td>
+                  <td style={{ padding: narrow ? '6px 6px' : '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(heatmapTotals.conversions)}</td>
+                  <td style={{ padding: narrow ? '6px 6px' : '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }} title="Weighted average: total cost ÷ total conversions">
+                    {heatmapWeightedCPC != null ? fmtCostCompact(heatmapWeightedCPC, narrow) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                  </td>
                 </tr>
               </tfoot>
             )}
@@ -538,15 +573,19 @@ export default function StatsPage() {
 
 // Heatmap palette — single hue per column. Picked so each column reads as a
 // visually distinct band and the dark-cell text stays legible.
-//   Cost            amber-500 (#f59e0b)  — money
-//   Leads           cyan-500  (#06b6d4)  — top of funnel (matches chart)
-//   Qualified Leads emerald-400 (#34d399) — middle (matches chart)
-//   Conversions     violet-500 (#a855f7) — distinct from amber/Cost
+//   Cost              amber-500 (#f59e0b)  — money out
+//   Leads             cyan-500  (#06b6d4)  — top of funnel
+//   Qualified         emerald-400 (#34d399) — middle of funnel
+//   Conversions       violet-500 (#a855f7)  — outcomes
+//   Cost / Conv       rose-500  (#f43f5e)  — distinct from amber but in the
+//                                            same "warm = costs" family,
+//                                            since both are "more is worse"
 const HEATMAP_HUE = {
-  cost:      '#f59e0b',
-  leads:     '#06b6d4',
-  qualified: '#34d399',
-  purchases: '#a855f7',
+  cost:              '#f59e0b',
+  leads:             '#06b6d4',
+  qualified:         '#34d399',
+  conversions:       '#a855f7',
+  costPerConversion: '#f43f5e',
 } as const
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -586,6 +625,40 @@ function Cell({
   )
 }
 
+// Cost-per-conversion cell handles the null case (zero-conversion days)
+// with a muted "—" instead of $Inf or $0 — those would mislead either way.
+function CostPerConvCell({
+  value, min, max, narrow,
+}: {
+  value: number | null
+  min: number
+  max: number
+  narrow?: boolean
+}) {
+  if (value == null) {
+    return (
+      <td style={{
+        padding: narrow ? '6px 6px' : '8px 10px',
+        textAlign: 'right',
+        color: 'var(--text-muted)',
+      }}>
+        —
+      </td>
+    )
+  }
+  return (
+    <td style={{
+      padding: narrow ? '6px 6px' : '8px 10px',
+      textAlign: 'right',
+      fontVariantNumeric: 'tabular-nums',
+      background: cellBackground(value, min, max, HEATMAP_HUE.costPerConversion),
+      color: 'var(--text-primary)',
+    }}>
+      {fmtCostCompact(value, !!narrow)}
+    </td>
+  )
+}
+
 // "2026-04-15" -> "Apr 15". Year is implicit from the date-range filter.
 function fmtShortDate(iso: string): string {
   const d = new Date(iso + 'T00:00:00Z')
@@ -604,7 +677,7 @@ function fmtCostCompact(n: number, narrow: boolean): string {
   return '$' + n.toFixed(0)
 }
 
-type SortableKey = 'date' | 'spend' | 'leads' | 'qualified' | 'purchases'
+type SortableKey = 'date' | 'spend' | 'leads' | 'qualified' | 'conversions' | 'costPerConversion'
 
 function SortableTh({
   label, keyName, sortKey, sortDir, onClick, align, narrow,
