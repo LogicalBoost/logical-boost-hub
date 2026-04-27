@@ -6,6 +6,8 @@ import {
   generateMockStats,
   rollupRange,
   dailyHeatmap,
+  adsPerformance,
+  rollupByComponent,
   previousPeriod,
   fmtMoney,
   fmtNum,
@@ -13,7 +15,10 @@ import {
   CONVERSION_EVENTS,
   PLATFORM_LABEL,
 } from '@/lib/mockStats'
-import type { ConversionEvent, AdPlatform, HeatmapRow } from '@/lib/mockStats'
+import type {
+  ConversionEvent, AdPlatform, AdType, HeatmapRow,
+  AdPerformanceRow, ComponentRollupRow,
+} from '@/lib/mockStats'
 
 type Preset = '7' | '30' | '90' | 'custom'
 
@@ -47,6 +52,13 @@ export default function StatsPage() {
   const [sortKey, setSortKey] = useState<SortKey>('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
+  // Top Performing Ad Copy section — its own platform + ad_type filter and
+  // a sort metric. Scoped only to that section.
+  const [topPlatform, setTopPlatform] = useState<'all' | AdPlatform>('all')
+  const [topAdType,   setTopAdType]   = useState<'all' | AdType>('all')
+  type TopSortMetric = 'cpql' | 'conversions' | 'cpc'
+  const [topSort, setTopSort] = useState<TopSortMetric>('cpql')
+
   // Narrow-viewport detection for the heatmap table. Below 600px we tighten
   // padding, abbreviate headers, and format Cost as $1.2k. Initial state
   // matches SSR (false / desktop) and re-renders on the client.
@@ -67,8 +79,8 @@ export default function StatsPage() {
     return generateMockStats({
       clientId: client.id,
       clientName: client.name,
-      audiences: avatars.map(a => ({ id: a.id, name: a.name })),
-      offers: offers.map(o => ({ id: o.id, name: o.name })),
+      audiences: avatars.map(a => ({ id: a.id, name: a.name, display_id: a.display_id })),
+      offers: offers.map(o => ({ id: o.id, name: o.name, display_id: o.display_id })),
       days: 90,
     })
   }, [client, avatars, offers])
@@ -137,6 +149,57 @@ export default function StatsPage() {
     }
     return init
   }, [heatmapRowsRaw])
+
+  // ── Top Performing Ad Copy aggregations ────────────────────────────
+  const adRowsAll = useMemo<AdPerformanceRow[]>(
+    () => stats ? adsPerformance(stats, range, { platform: topPlatform, adType: topAdType }) : [],
+    [stats, range, topPlatform, topAdType],
+  )
+
+  const top5Ads = useMemo(() => {
+    const rows = [...adRowsAll]
+    if (topSort === 'cpql') {
+      // Lower CPQL is better. Ads with no Qualified Leads (null CPQL) and zero
+      // spend sink to the bottom.
+      rows.sort((a, b) => {
+        const an = a.costPerQualified
+        const bn = b.costPerQualified
+        if (an == null && bn == null) return b.spend - a.spend
+        if (an == null) return 1
+        if (bn == null) return -1
+        return an - bn
+      })
+    } else if (topSort === 'conversions') {
+      rows.sort((a, b) => b.conversions - a.conversions)
+    } else {
+      rows.sort((a, b) => {
+        const an = a.costPerConversion
+        const bn = b.costPerConversion
+        if (an == null && bn == null) return b.spend - a.spend
+        if (an == null) return 1
+        if (bn == null) return -1
+        return an - bn
+      })
+    }
+    return rows.slice(0, 5)
+  }, [adRowsAll, topSort])
+
+  const componentRollups = useMemo(
+    () => stats ? rollupByComponent(stats, range, { platform: topPlatform, adType: topAdType }) : null,
+    [stats, range, topPlatform, topAdType],
+  )
+
+  // Pick top-3 by ascending CPQL within each rollup. Components with no
+  // Qualified Leads (null CPQL) drop out of the top list.
+  function pickTop3(rows: ComponentRollupRow[]): ComponentRollupRow[] {
+    return rows
+      .filter(r => r.costPerQualified != null)
+      .sort((a, b) => (a.costPerQualified! - b.costPerQualified!))
+      .slice(0, 3)
+  }
+  const topBh   = useMemo(() => componentRollups ? pickTop3(componentRollups.bh)   : [], [componentRollups])
+  const topBody = useMemo(() => componentRollups ? pickTop3(componentRollups.body) : [], [componentRollups])
+  const topCta  = useMemo(() => componentRollups ? pickTop3(componentRollups.cta)  : [], [componentRollups])
 
   function pickPlatform(p: 'all' | AdPlatform) {
     setTablePlatform(p)
@@ -369,6 +432,100 @@ export default function StatsPage() {
         </div>
       </div>
 
+      {/* ── Top Performing Ad Copy ──────────────────────────────────── */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+          <div>
+            <div className="card-title" style={{ marginBottom: 0 }}>Top Performing Ad Copy</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+              Component rollups parse the ad name (AU#_OF#_BH#-{`{body}`}#-CTA#) to find which hooks, bodies, and CTAs perform best across ads. Filters scope this section only.
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', fontSize: 12 }}>
+            <label style={{ color: 'var(--text-muted)' }}>Platform:</label>
+            <select
+              className="form-input"
+              value={topPlatform}
+              onChange={e => setTopPlatform(e.target.value as 'all' | AdPlatform)}
+              style={{ padding: '4px 10px', fontSize: 12 }}
+            >
+              <option value="all">All</option>
+              <option value="google">{PLATFORM_LABEL.google}</option>
+              <option value="meta">{PLATFORM_LABEL.meta}</option>
+            </select>
+
+            <label style={{ color: 'var(--text-muted)' }}>Ad type:</label>
+            <select
+              className="form-input"
+              value={topAdType}
+              onChange={e => setTopAdType(e.target.value as 'all' | AdType)}
+              style={{ padding: '4px 10px', fontSize: 12 }}
+            >
+              <option value="all">All</option>
+              <option value="video">Video</option>
+              <option value="static">Static</option>
+              <option value="text">Text</option>
+            </select>
+
+            <label style={{ color: 'var(--text-muted)' }}>Sort by:</label>
+            <select
+              className="form-input"
+              value={topSort}
+              onChange={e => setTopSort(e.target.value as 'cpql' | 'conversions' | 'cpc')}
+              style={{ padding: '4px 10px', fontSize: 12 }}
+            >
+              <option value="cpql">Cost per Qualified Lead (asc)</option>
+              <option value="conversions">Conversions (desc)</option>
+              <option value="cpc">Cost per Conversion (asc)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Top 5 ads list */}
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>Top 5 ads</div>
+          {top5Ads.length === 0 ? (
+            <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No ads match the current filters.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {top5Ads.map((row, i) => (
+                <div key={row.ad.id} style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'auto 1fr auto',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '10px 12px',
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid var(--border, #333)',
+                  borderRadius: 6,
+                }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 16, textAlign: 'right' }}>#{i + 1}</div>
+                  <div style={{ overflow: 'hidden' }}>
+                    <div style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12, color: 'var(--accent)', wordBreak: 'break-all' }}>{row.ad.name}</div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 4, fontSize: 11, flexWrap: 'wrap' }}>
+                      <Badge label={PLATFORM_LABEL[row.ad.platform]} tone={row.ad.platform === 'google' ? 'blue' : 'pink'} />
+                      <Badge label={row.ad.ad_type} tone="muted" />
+                      {row.parsed == null && <Badge label="non-standard name" tone="warn" />}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', fontSize: 12, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                    <div><span style={{ color: 'var(--text-muted)' }}>Spend</span> {fmtMoney(row.spend)}</div>
+                    <div><span style={{ color: 'var(--text-muted)' }}>QL</span> {fmtNum(row.qualified)} <span style={{ color: 'var(--text-muted)' }}>· CPQL</span> {row.costPerQualified != null ? fmtMoney(row.costPerQualified) : '—'}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Three component cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginTop: 16 }}>
+          <ComponentCard title="Best Hook (BH)" rows={topBh} />
+          <ComponentCard title="Best Body (SH/T/PC)" rows={topBody} />
+          <ComponentCard title="Best CTA" rows={topCta} />
+        </div>
+      </div>
+
       {/* Footer note */}
       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 12, textAlign: 'center' }}>
         Mock data only. Wire up real Google Ads + Meta integrations to replace.
@@ -483,3 +640,65 @@ function SortableTh({
   )
 }
 
+
+// ─── Badge for the top-5 ads list ──────────────────────────────────────
+function Badge({ label, tone }: { label: string; tone: 'blue' | 'pink' | 'muted' | 'warn' }) {
+  const palette: Record<string, { bg: string; fg: string }> = {
+    blue:  { bg: 'rgba(66,133,244,0.15)',  fg: '#4285F4' },
+    pink:  { bg: 'rgba(228,64,95,0.15)',   fg: '#E4405F' },
+    muted: { bg: 'rgba(115,115,115,0.18)', fg: 'var(--text-muted)' },
+    warn:  { bg: 'rgba(245,158,11,0.15)',  fg: '#f59e0b' },
+  }
+  const p = palette[tone]
+  return (
+    <span style={{
+      display: 'inline-block',
+      padding: '1px 8px',
+      borderRadius: 999,
+      background: p.bg,
+      color: p.fg,
+      fontSize: 11,
+      fontWeight: 600,
+      textTransform: tone === 'muted' || tone === 'warn' ? 'uppercase' : undefined,
+      letterSpacing: 0.3,
+    }}>
+      {label}
+    </span>
+  )
+}
+
+// ─── Component rollup card (BH / Body / CTA) ───────────────────────────
+function ComponentCard({ title, rows }: { title: string; rows: ComponentRollupRow[] }) {
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.02)',
+      border: '1px solid var(--border, #333)',
+      borderRadius: 6,
+      padding: 12,
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>{title}</div>
+      {rows.length === 0 ? (
+        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No qualified-lead activity yet for this filter.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {rows.map((r, i) => (
+            <div key={r.label} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 8, alignItems: 'baseline' }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 14, textAlign: 'right' }}>#{i + 1}</span>
+              <div style={{ overflow: 'hidden' }}>
+                <span style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12, color: 'var(--accent)', marginRight: 6 }}>{r.label}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-primary)' }}>{r.text || <span style={{ color: 'var(--text-muted)' }}>(no excerpt available)</span>}</span>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  {r.adCount} ad{r.adCount === 1 ? '' : 's'} · {fmtMoney(r.spend)} spend · {fmtNum(r.qualified)} QL
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', fontSize: 12, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.3 }}>CPQL</div>
+                <div>{r.costPerQualified != null ? fmtMoney(r.costPerQualified) : '—'}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

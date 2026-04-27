@@ -9,7 +9,6 @@
 // Delete or replace this file when real integrations come online.
 // ─────────────────────────────────────────────────────────────────────────
 
-import type { Avatar, Offer } from '@/types/database'
 
 export type AdPlatform = 'google' | 'meta'
 
@@ -49,12 +48,48 @@ export interface MockCampaign {
   status: 'active' | 'paused'
 }
 
+// Coarse creative-type bucket the user can filter by. Independent of the
+// platform-specific `format` (search/display/etc.) which is a finer detail.
+export type AdType = 'video' | 'static' | 'text'
+
 export interface MockAd {
   id: string
   campaign_id: string
   platform: AdPlatform
+  // Hub naming convention: AU{aud_seq}_OF{offer_seq}_BH{n}-{body_type}{n}-CTA{n}_V{n}
+  // The convention tells you exactly which copy components went into the ad.
   name: string
+  ad_type: AdType
   format: 'search' | 'display' | 'video' | 'image' | 'carousel'
+  // Component IDs parsed back out of the name. Stored on the ad so the UI
+  // doesn't have to re-parse on every aggregation.
+  components: {
+    audience_seq: number
+    offer_seq: number
+    bh: number
+    body_type: 'SH' | 'T' | 'PC'
+    body_seq: number
+    cta: number
+    variation: number  // V1, V2…
+  }
+}
+
+// Per-client pool of copy components. Each entry has a stable seq number used
+// in ad names + a fake excerpt so the UI can show "BH4 — Tired of overpriced…".
+// In production the excerpts would come from copy_components.text; here they
+// stay in the mock since the live copy_components rarely has matching rows
+// loaded for the visible client.
+export interface ComponentEntry {
+  seq: number
+  text: string
+}
+
+export interface ComponentPool {
+  bh:  ComponentEntry[]
+  sh:  ComponentEntry[]
+  t:   ComponentEntry[]
+  pc:  ComponentEntry[]
+  cta: ComponentEntry[]
 }
 
 export interface DailyMetric {
@@ -74,6 +109,7 @@ export interface MockStats {
   campaigns: MockCampaign[]
   ads: MockAd[]
   daily: DailyMetric[]   // one row per (ad, day)
+  components: ComponentPool
 }
 
 // ─── Deterministic PRNG ──────────────────────────────────────────────────
@@ -121,8 +157,8 @@ function bell(rng: () => number, low: number, high: number): number {
 interface GenerateInput {
   clientId: string
   clientName: string
-  audiences: Pick<Avatar, 'id' | 'name'>[]
-  offers: Pick<Offer, 'id' | 'name'>[]
+  audiences: { id: string; name: string; display_id?: number | null }[]
+  offers:    { id: string; name: string; display_id?: number | null }[]
   /** how many days of history to generate (default 90) */
   days?: number
 }
@@ -132,11 +168,110 @@ const FORMATS_BY_PLATFORM: Record<AdPlatform, MockAd['format'][]> = {
   meta:   ['image', 'carousel', 'video'],
 }
 
-const AD_HEADLINE_FRAGMENTS = [
-  'Free Quote', 'Same-Day Service', 'No Obligation', 'Limited Time',
-  '5-Star Rated', 'Family Owned', 'Local Experts', 'Save 30%',
-  'Hassle-Free', 'Get Started Today', 'Custom Plan', 'Trusted Choice',
+// ad_type weights per platform (total ~1.0). Google leans text/RSA; Meta
+// leans video/static.
+const AD_TYPE_WEIGHTS: Record<AdPlatform, Array<[AdType, number]>> = {
+  google: [['text', 0.60], ['static', 0.25], ['video', 0.15]],
+  meta:   [['video', 0.60], ['static', 0.35], ['text', 0.05]],
+}
+
+function pickAdType(rng: () => number, platform: AdPlatform): AdType {
+  const r = rng()
+  let acc = 0
+  for (const [t, w] of AD_TYPE_WEIGHTS[platform]) {
+    acc += w
+    if (r < acc) return t
+  }
+  return 'text'
+}
+
+// ad_type also constrains the platform-specific format. Meta video stays
+// video; Google video stays video; static can be display/image; text is
+// always Google search.
+function pickFormatForAdType(rng: () => number, platform: AdPlatform, adType: AdType): MockAd['format'] {
+  if (adType === 'video') return 'video'
+  if (adType === 'text')  return platform === 'google' ? 'search' : 'image'
+  // static
+  return platform === 'google' ? 'display' : pick(rng, ['image', 'carousel'] as const)
+}
+
+// Fake excerpts for the per-client component pool. Tilted toward home-security
+// language because the showcase client is SmarterHome.ai; reads as plausible
+// for any home-services business too. The aggregation tab shows these next to
+// the BH4/SH7/CTA3 labels so the user has something concrete to react to.
+const BH_BANK = [
+  'Suburban parents: is your alarm really working?',
+  'Cost-conscious homeowners — security without the upsell.',
+  'Empty nesters: the simplest security move you\'ll make.',
+  'Tired of overpriced security systems?',
+  'Tech-savvy homeowners, this changes everything.',
+  'Hate pushy security salespeople?',
+  'New homeowners: lock in fair pricing now.',
+  'Frequent travelers — your home shouldn\'t be a target.',
+  'Done with overengineered home security?',
+  'Want security that actually works the first time?',
+  'Family-first homeowners: protect what matters.',
+  'Still relying on a 1990s alarm system?',
 ]
+const SH_BANK = [
+  'Custom plans designed around how you actually live.',
+  '24/7 monitoring with response in under 30 seconds.',
+  'No long-term contracts. Cancel anytime.',
+  'Pro install in under 2 hours. Often same-day.',
+  'Your existing equipment may already be compatible.',
+  'Built by ex-military and law enforcement experts.',
+  'A real local team, not a faceless call center.',
+  'Quotes in writing, no hidden fees.',
+  'Compatible with the smart home you already love.',
+  'Free professional install on every plan.',
+]
+const T_BANK = [
+  'BBB A+ rated since 2014.',
+  'Licensed, bonded, and insured in 14 states.',
+  'Family-owned and operated for over 20 years.',
+  'UL-certified central station monitoring.',
+  '4.9★ average from 3,200+ verified reviews.',
+  'Featured in CNET, The Verge, and Wirecutter.',
+]
+const PC_BANK = [
+  'Reduced false alarms by 72% across our service area last year.',
+  'Helped 18,000+ families upgrade their home security.',
+  'Average customer saves $340/year vs. their previous provider.',
+  'Detected 1,140 attempted entries in 2026 alone.',
+  '93% of customers stay on past their first year.',
+  'Won "Best Home Security" three years running in [Region].',
+  'Independent test labs rank our system #1 for response time.',
+  'Customer-rated 4.9 stars on our last 1,000 installs.',
+]
+const CTA_BANK = [
+  'Get My Free Security Plan',
+  'Book My Free Walk-Through',
+  'Claim My No-Obligation Quote',
+  'See If My Home Qualifies',
+  'Talk to a Real Expert',
+  'Lock In Today\'s Pricing',
+  'Schedule My Free Consult',
+  'Get an Instant Quote',
+  'Start My Custom Plan',
+  'Reserve My Install Slot',
+]
+
+function buildComponentPool(rng: () => number): ComponentPool {
+  // Sample size per type. Multiple ads will share these (the only way the
+  // component aggregation is interesting).
+  const take = (bank: string[], min: number, max: number): ComponentEntry[] => {
+    const n = min + Math.floor(rng() * (max - min + 1))
+    const shuffled = [...bank].sort(() => rng() - 0.5)
+    return shuffled.slice(0, Math.min(n, bank.length)).map((text, i) => ({ seq: i + 1, text }))
+  }
+  return {
+    bh:  take(BH_BANK,  8, 12),
+    sh:  take(SH_BANK,  6, 10),
+    t:   take(T_BANK,   4, 6),
+    pc:  take(PC_BANK,  5, 8),
+    cta: take(CTA_BANK, 6, 10),
+  }
+}
 
 export function generateMockStats(input: GenerateInput): MockStats {
   const days = input.days ?? 90
@@ -144,12 +279,20 @@ export function generateMockStats(input: GenerateInput): MockStats {
   const rng = mulberry32(baseSeed)
 
   // Build 5-8 campaigns by mixing audiences × offers × platforms.
-  const audiences = input.audiences.length > 0
+  // Fall back to AU1/OF1 when the caller didn't pass display_ids (only matters
+  // for clients that pre-date migration 037).
+  const audiences = (input.audiences.length > 0
     ? input.audiences
-    : [{ id: 'aud-1', name: 'Primary Audience' }]
-  const offers = input.offers.length > 0
+    : [{ id: 'aud-1', name: 'Primary Audience', display_id: 1 }])
+    .map((a, i) => ({ ...a, display_id: a.display_id ?? i + 1 }))
+  const offers = (input.offers.length > 0
     ? input.offers
-    : [{ id: 'off-1', name: 'Main Offer' }]
+    : [{ id: 'off-1', name: 'Main Offer', display_id: 1 }])
+    .map((o, i) => ({ ...o, display_id: o.display_id ?? i + 1 }))
+
+  // One per-client component pool. Component IDs (BH4, SH7, CTA3, etc.) are
+  // shared across many ads — that's what makes the aggregation tab interesting.
+  const components = buildComponentPool(rng)
 
   const targetCampaignCount = 5 + Math.floor(rng() * 4)  // 5-8
   const campaigns: MockCampaign[] = []
@@ -181,19 +324,54 @@ export function generateMockStats(input: GenerateInput): MockStats {
     })
   }
 
-  // 3-5 ads per campaign.
+  // 3-5 ads per campaign. Each ad picks BH/body/CTA from the shared pool so
+  // multiple ads end up using the same component IDs — the only way the
+  // component aggregation card has interesting peaks.
   const ads: MockAd[] = []
   for (const c of campaigns) {
     const adCount = 3 + Math.floor(rng() * 3)
+    // Map campaign back to its (audience, offer) display IDs.
+    const aud = audiences.find(a => a.name === c.audience_label) ?? audiences[0]
+    const off = offers.find(o => c.name.includes(o.name)) ?? offers[0]
+    const audSeq = aud.display_id ?? 1
+    const offSeq = off.display_id ?? 1
+
     for (let k = 0; k < adCount; k++) {
-      const fmt = pick(rng, FORMATS_BY_PLATFORM[c.platform])
-      const headline = `${pick(rng, AD_HEADLINE_FRAGMENTS)} · ${c.audience_label.split(' ')[0]} v${k + 1}`
+      const adType = pickAdType(rng, c.platform)
+      const fmt    = pickFormatForAdType(rng, c.platform, adType)
+
+      const bh   = pick(rng, components.bh)
+      // Body slot: SH/T/PC, weighted toward SH which is the most common
+      // body type in real campaigns.
+      const bodyTypeRoll = rng()
+      const bodyType: 'SH' | 'T' | 'PC' =
+        bodyTypeRoll < 0.55 ? 'SH' :
+        bodyTypeRoll < 0.80 ? 'T'  : 'PC'
+      const bodyEntry = pick(rng,
+        bodyType === 'SH' ? components.sh :
+        bodyType === 'T'  ? components.t  : components.pc,
+      )
+      const cta = pick(rng, components.cta)
+      const variation = 1 + Math.floor(rng() * 3)  // V1..V3
+
+      const name = `AU${audSeq}_OF${offSeq}_BH${bh.seq}-${bodyType}${bodyEntry.seq}-CTA${cta.seq}_V${variation}`
+
       ads.push({
         id: `${c.id}_a${k + 1}`,
         campaign_id: c.id,
         platform: c.platform,
-        name: headline,
+        name,
+        ad_type: adType,
         format: fmt,
+        components: {
+          audience_seq: audSeq,
+          offer_seq: offSeq,
+          bh: bh.seq,
+          body_type: bodyType,
+          body_seq: bodyEntry.seq,
+          cta: cta.seq,
+          variation,
+        },
       })
     }
   }
@@ -262,7 +440,7 @@ export function generateMockStats(input: GenerateInput): MockStats {
     }
   }
 
-  return { campaigns, ads, daily }
+  return { campaigns, ads, daily, components }
 }
 
 // ─── Aggregations the UI uses ────────────────────────────────────────────
@@ -500,4 +678,187 @@ export function fmtPercentDelta(curr: number, prev: number): { text: string; pos
   const positive = pct >= 0
   const sign = positive ? '+' : ''
   return { text: `${sign}${pct.toFixed(0)}%`, positive }
+}
+
+// ─── Top Performing Ad Copy aggregations ─────────────────────────────────
+
+// Parses an ad name in Hub convention: AU1_OF3_BH4-SH5-CTA8_V1
+// Returns null if the name doesn't match (custom-named ads still appear in
+// the top-5-ads list but are excluded from component rollups).
+const AD_NAME_RE = /^AU(\d+)_OF(\d+)_BH(\d+)-(SH|T|PC)(\d+)-CTA(\d+)(?:_V(\d+))?$/
+
+export interface ParsedAdName {
+  audSeq: number
+  offSeq: number
+  bh: number
+  bodyType: 'SH' | 'T' | 'PC'
+  bodySeq: number
+  cta: number
+  variation: number | null
+}
+
+export function parseAdName(name: string): ParsedAdName | null {
+  const m = AD_NAME_RE.exec(name)
+  if (!m) return null
+  return {
+    audSeq:   Number(m[1]),
+    offSeq:   Number(m[2]),
+    bh:       Number(m[3]),
+    bodyType: m[4] as 'SH' | 'T' | 'PC',
+    bodySeq:  Number(m[5]),
+    cta:      Number(m[6]),
+    variation: m[7] ? Number(m[7]) : null,
+  }
+}
+
+export interface TopFilters {
+  platform?: AdPlatform | 'all'
+  adType?:   AdType | 'all'
+}
+
+export interface AdPerformanceRow {
+  ad: MockAd
+  campaign: MockCampaign | null
+  spend: number
+  qualified: number  // Qualified Lead count
+  conversions: number  // Purchase count (matches the heatmap)
+  costPerQualified: number | null
+  costPerConversion: number | null
+  parsed: ParsedAdName | null
+}
+
+export function adsPerformance(
+  stats: MockStats,
+  range: DateRange,
+  filters: TopFilters = {},
+): AdPerformanceRow[] {
+  const platform = filters.platform ?? 'all'
+  const adType   = filters.adType   ?? 'all'
+
+  const acc = new Map<string, { spend: number; qualified: number; purchases: number }>()
+  for (const a of stats.ads) acc.set(a.id, { spend: 0, qualified: 0, purchases: 0 })
+  for (const m of stats.daily) {
+    if (!inRange(m.date, range)) continue
+    if (platform !== 'all' && m.platform !== platform) continue
+    const ad = stats.ads.find(a => a.id === m.ad_id)
+    if (!ad) continue
+    if (adType !== 'all' && ad.ad_type !== adType) continue
+    const row = acc.get(m.ad_id)
+    if (!row) continue
+    row.spend     += m.spend
+    row.qualified += m.conversions['Qualified Lead']
+    row.purchases += m.conversions['Purchase']
+  }
+  const campById = new Map(stats.campaigns.map(c => [c.id, c]))
+  return stats.ads
+    .filter(a => platform === 'all' || a.platform === platform)
+    .filter(a => adType   === 'all' || a.ad_type   === adType)
+    .map(a => {
+      const r = acc.get(a.id)!
+      return {
+        ad: a,
+        campaign: campById.get(a.campaign_id) ?? null,
+        spend: r.spend,
+        qualified: r.qualified,
+        conversions: r.purchases,
+        costPerQualified:  r.qualified  > 0 ? r.spend / r.qualified  : null,
+        costPerConversion: r.purchases > 0 ? r.spend / r.purchases : null,
+        parsed: parseAdName(a.name),
+      }
+    })
+}
+
+export interface ComponentRollupRow {
+  label: string         // e.g. "BH4", "SH7", "CTA3"
+  seq: number
+  type: 'BH' | 'SH' | 'T' | 'PC' | 'CTA'
+  text: string          // excerpt
+  spend: number
+  qualified: number
+  costPerQualified: number | null
+  adCount: number
+}
+
+export interface ComponentRollups {
+  bh:   ComponentRollupRow[]
+  body: ComponentRollupRow[]   // SH + T + PC combined; type field tells you which
+  cta:  ComponentRollupRow[]
+}
+
+export function rollupByComponent(
+  stats: MockStats,
+  range: DateRange,
+  filters: TopFilters = {},
+): ComponentRollups {
+  const platform = filters.platform ?? 'all'
+  const adType   = filters.adType   ?? 'all'
+
+  // Map: type:seq -> { spend, qualified, adIds }
+  type Bucket = { spend: number; qualified: number; ads: Set<string> }
+  const empty = (): Bucket => ({ spend: 0, qualified: 0, ads: new Set() })
+  const bh:   Map<number, Bucket> = new Map()
+  const body: Map<string, Bucket> = new Map()  // key = "SH:5" / "T:2" / "PC:3"
+  const cta:  Map<number, Bucket> = new Map()
+
+  for (const m of stats.daily) {
+    if (!inRange(m.date, range)) continue
+    if (platform !== 'all' && m.platform !== platform) continue
+    const ad = stats.ads.find(a => a.id === m.ad_id)
+    if (!ad) continue
+    if (adType !== 'all' && ad.ad_type !== adType) continue
+    const p = parseAdName(ad.name)
+    if (!p) continue   // skip non-standard names
+
+    const sp = m.spend
+    const ql = m.conversions['Qualified Lead']
+
+    let b = bh.get(p.bh); if (!b) { b = empty(); bh.set(p.bh, b) }
+    b.spend += sp; b.qualified += ql; b.ads.add(ad.id)
+
+    const bodyKey = `${p.bodyType}:${p.bodySeq}`
+    let bb = body.get(bodyKey); if (!bb) { bb = empty(); body.set(bodyKey, bb) }
+    bb.spend += sp; bb.qualified += ql; bb.ads.add(ad.id)
+
+    let cb = cta.get(p.cta); if (!cb) { cb = empty(); cta.set(p.cta, cb) }
+    cb.spend += sp; cb.qualified += ql; cb.ads.add(ad.id)
+  }
+
+  const findText = (type: 'BH' | 'SH' | 'T' | 'PC' | 'CTA', seq: number): string => {
+    const arr =
+      type === 'BH'  ? stats.components.bh  :
+      type === 'SH'  ? stats.components.sh  :
+      type === 'T'   ? stats.components.t   :
+      type === 'PC'  ? stats.components.pc  :
+                       stats.components.cta
+    return arr.find(c => c.seq === seq)?.text ?? ''
+  }
+
+  const bhRows: ComponentRollupRow[] = Array.from(bh.entries()).map(([seq, b]) => ({
+    label: `BH${seq}`, seq, type: 'BH',
+    text: findText('BH', seq),
+    spend: b.spend, qualified: b.qualified,
+    costPerQualified: b.qualified > 0 ? b.spend / b.qualified : null,
+    adCount: b.ads.size,
+  }))
+  const bodyRows: ComponentRollupRow[] = Array.from(body.entries()).map(([key, b]) => {
+    const [type, seqStr] = key.split(':') as [string, string]
+    const seq = Number(seqStr)
+    const t = type as 'SH' | 'T' | 'PC'
+    return {
+      label: `${t}${seq}`, seq, type: t,
+      text: findText(t, seq),
+      spend: b.spend, qualified: b.qualified,
+      costPerQualified: b.qualified > 0 ? b.spend / b.qualified : null,
+      adCount: b.ads.size,
+    }
+  })
+  const ctaRows: ComponentRollupRow[] = Array.from(cta.entries()).map(([seq, b]) => ({
+    label: `CTA${seq}`, seq, type: 'CTA',
+    text: findText('CTA', seq),
+    spend: b.spend, qualified: b.qualified,
+    costPerQualified: b.qualified > 0 ? b.spend / b.qualified : null,
+    adCount: b.ads.size,
+  }))
+
+  return { bh: bhRows, body: bodyRows, cta: ctaRows }
 }
