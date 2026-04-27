@@ -26,11 +26,15 @@ export const PLATFORM_COLOR: Record<AdPlatform, string> = {
 // The five conversion events surfaced in the dropdown. Real Google/Meta data
 // has a similar string-keyed structure where each campaign/ad reports counts
 // per named conversion event.
+//
+// The first three form a funnel: every Qualified Lead is also a Lead; every
+// Purchase is also a Qualified Lead. Phone Call and Add to Cart are
+// independent tracks that don't strictly nest.
 export const CONVERSION_EVENTS = [
+  'Lead',
   'Qualified Lead',
-  'Form Submit',
-  'Phone Call',
   'Purchase',
+  'Phone Call',
   'Add to Cart',
 ] as const
 export type ConversionEvent = typeof CONVERSION_EVENTS[number]
@@ -165,7 +169,7 @@ export function generateMockStats(input: GenerateInput): MockStats {
     const channel = platform === 'google'
       ? pick(rng, ['Search', 'Display', 'YouTube', 'Performance Max'])
       : pick(rng, ['Feed', 'Reels', 'Stories', 'Audience Network'])
-    const event: ConversionEvent = pick(rng, ['Qualified Lead', 'Form Submit', 'Phone Call'])
+    const event: ConversionEvent = pick(rng, ['Lead', 'Qualified Lead', 'Purchase'])
     const status: MockCampaign['status'] = rng() > 0.18 ? 'active' : 'paused'
     campaigns.push({
       id: `c_${i + 1}`,
@@ -215,7 +219,7 @@ export function generateMockStats(input: GenerateInput): MockStats {
         daily.push({
           ad_id: ad.id, campaign_id: camp.id, platform: ad.platform, date: isoDay(dt),
           spend: 0, impressions: 0, clicks: 0,
-          conversions: { 'Qualified Lead': 0, 'Form Submit': 0, 'Phone Call': 0, 'Purchase': 0, 'Add to Cart': 0 },
+          conversions: { 'Lead': 0, 'Qualified Lead': 0, 'Purchase': 0, 'Phone Call': 0, 'Add to Cart': 0 },
         })
         continue
       }
@@ -227,33 +231,23 @@ export function generateMockStats(input: GenerateInput): MockStats {
       const spend = Math.max(0, baseSpend * dowMult * trend * noise)
       const clicks = Math.max(0, Math.round(spend / cpc))
       const impressions = Math.round(clicks / Math.max(ctr, 0.001))
-      const totalConvs = Math.round(clicks * cvr)
 
-      // Distribute total conversions across event names. The campaign's
-      // primary_event gets the biggest share; others get noisy fragments.
+      // True funnel: Lead is the broad top of funnel, Qualified Lead is a
+      // subset of leads, Purchase is a subset of qualified.
+      // Phone Call and Add to Cart are independent micro-events.
+      const leads = Math.max(0, Math.round(clicks * cvr))
+      const qualified = Math.round(leads * (0.30 + dayRng() * 0.20))     // 30-50% of leads
+      const purchases = Math.round(qualified * (0.10 + dayRng() * 0.15)) // 10-25% of qualified
+      const phoneCalls = Math.round(clicks * (0.005 + dayRng() * 0.015))
+      const addToCart  = Math.round(clicks * (0.02  + dayRng() * 0.04))
+
       const conversions: Record<ConversionEvent, number> = {
-        'Qualified Lead': 0,
-        'Form Submit':    0,
-        'Phone Call':     0,
-        'Purchase':       0,
-        'Add to Cart':    0,
+        'Lead':           leads,
+        'Qualified Lead': qualified,
+        'Purchase':       purchases,
+        'Phone Call':     phoneCalls,
+        'Add to Cart':    addToCart,
       }
-      let remaining = totalConvs
-      // Primary event: ~55-75% of total
-      const primShare = Math.round(totalConvs * (0.55 + dayRng() * 0.2))
-      conversions[camp.primary_event] = primShare
-      remaining -= primShare
-      // Then form-submit gets a chunk if it isn't primary
-      const others: ConversionEvent[] = (['Form Submit', 'Phone Call', 'Add to Cart', 'Purchase'] as const)
-        .filter(e => e !== camp.primary_event)
-      for (const e of others) {
-        if (remaining <= 0) break
-        const share = Math.max(0, Math.round(remaining * (0.2 + dayRng() * 0.4)))
-        conversions[e] = share
-        remaining -= share
-      }
-      // Any leftover -> primary
-      conversions[camp.primary_event] += Math.max(0, remaining)
 
       daily.push({
         ad_id: ad.id,
@@ -301,7 +295,7 @@ export function rollupRange(stats: MockStats, range: DateRange): RangeTotals {
   const totals: RangeTotals = {
     spend: 0,
     conversionsByEvent: {
-      'Qualified Lead': 0, 'Form Submit': 0, 'Phone Call': 0, 'Purchase': 0, 'Add to Cart': 0,
+      'Lead': 0, 'Qualified Lead': 0, 'Purchase': 0, 'Phone Call': 0, 'Add to Cart': 0,
     },
     totalConversions: 0,
   }
@@ -337,6 +331,35 @@ export function dailyByPlatform(stats: MockStats, range: DateRange): DailyPlatfo
     const row = map.get(m.date)
     if (!row) continue
     row[m.platform] += m.spend
+  }
+  return Array.from(map.values()).sort((a, b) => a.date < b.date ? -1 : 1)
+}
+
+// Daily funnel counts: Lead -> Qualified Lead -> Purchase. These three nest;
+// Phone Call and Add to Cart are deliberately not included (they're separate
+// tracks, not part of the same funnel).
+export interface DailyFunnel {
+  date: string
+  lead: number
+  qualified: number
+  purchase: number
+}
+
+export function dailyFunnel(stats: MockStats, range: DateRange): DailyFunnel[] {
+  const map = new Map<string, DailyFunnel>()
+  const from = new Date(range.from + 'T00:00:00Z')
+  const to   = new Date(range.to   + 'T00:00:00Z')
+  for (let t = from.getTime(); t <= to.getTime(); t += 86400000) {
+    const d = isoDay(new Date(t))
+    map.set(d, { date: d, lead: 0, qualified: 0, purchase: 0 })
+  }
+  for (const m of stats.daily) {
+    if (!inRange(m.date, range)) continue
+    const row = map.get(m.date)
+    if (!row) continue
+    row.lead      += m.conversions['Lead']
+    row.qualified += m.conversions['Qualified Lead']
+    row.purchase  += m.conversions['Purchase']
   }
   return Array.from(map.values()).sort((a, b) => a.date < b.date ? -1 : 1)
 }
