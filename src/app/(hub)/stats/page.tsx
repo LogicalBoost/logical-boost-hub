@@ -5,10 +5,9 @@ import { useAppStore } from '@/lib/store'
 import {
   generateMockStats,
   rollupRange,
-  rollupByCampaign,
-  rollupByAd,
   dailyByPlatform,
   dailyFunnel,
+  dailyHeatmap,
   previousPeriod,
   fmtMoney,
   fmtNum,
@@ -17,7 +16,7 @@ import {
   PLATFORM_LABEL,
   PLATFORM_COLOR,
 } from '@/lib/mockStats'
-import type { ConversionEvent, AdPlatform } from '@/lib/mockStats'
+import type { ConversionEvent, AdPlatform, HeatmapRow } from '@/lib/mockStats'
 
 type Preset = '7' | '30' | '90' | 'custom'
 
@@ -41,7 +40,15 @@ export default function StatsPage() {
   const today = isoDay(new Date())
   const [custom, setCustom] = useState({ from: isoDay(new Date(Date.now() - 29 * 86400000)), to: today })
   const [event, setEvent] = useState<ConversionEvent>('Qualified Lead')
-  const [campaignFilter, setCampaignFilter] = useState<string>('')  // for ad table
+
+  // Heatmap-table-only filters. Cascading: platform → campaign → ad.
+  // These do NOT scope the cards/charts above (see the note in the report).
+  const [tablePlatform, setTablePlatform] = useState<'all' | AdPlatform>('all')
+  const [tableCampaign, setTableCampaign] = useState<string>('all')
+  const [tableAd,       setTableAd]       = useState<string>('all')
+  type SortKey = 'date' | 'spend' | 'leads' | 'qualified' | 'purchases'
+  const [sortKey, setSortKey] = useState<SortKey>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   const range = rangeFromPreset(preset, custom)
 
@@ -62,8 +69,87 @@ export default function StatsPage() {
   const prevTotals = useMemo(() => stats ? rollupRange(stats, previousPeriod(range)) : null, [stats, range])
   const dailySpend = useMemo(() => stats ? dailyByPlatform(stats, range) : [], [stats, range])
   const funnelDaily = useMemo(() => stats ? dailyFunnel(stats, range) : [], [stats, range])
-  const campaignRows = useMemo(() => stats ? rollupByCampaign(stats, range, event) : [], [stats, range, event])
-  const adRows = useMemo(() => stats ? rollupByAd(stats, range, event, campaignFilter || undefined) : [], [stats, range, event, campaignFilter])
+
+  // Cascading table-filter option lists.
+  const tableCampaigns = useMemo(() => {
+    if (!stats) return []
+    return stats.campaigns.filter(c => tablePlatform === 'all' || c.platform === tablePlatform)
+  }, [stats, tablePlatform])
+  const tableAds = useMemo(() => {
+    if (!stats) return []
+    return stats.ads.filter(a => {
+      if (tablePlatform !== 'all' && a.platform !== tablePlatform) return false
+      if (tableCampaign !== 'all' && a.campaign_id !== tableCampaign) return false
+      return true
+    })
+  }, [stats, tablePlatform, tableCampaign])
+
+  // Heatmap rows + sort.
+  const heatmapRowsRaw = useMemo<HeatmapRow[]>(() => stats ? dailyHeatmap(stats, range, {
+    platform: tablePlatform,
+    campaignId: tableCampaign,
+    adId: tableAd,
+  }) : [], [stats, range, tablePlatform, tableCampaign, tableAd])
+
+  const heatmapRows = useMemo(() => {
+    const rows = [...heatmapRowsRaw]
+    rows.sort((a, b) => {
+      if (sortKey === 'date') {
+        return sortDir === 'asc' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date)
+      }
+      const av = a[sortKey], bv = b[sortKey]
+      return sortDir === 'asc' ? av - bv : bv - av
+    })
+    return rows
+  }, [heatmapRowsRaw, sortKey, sortDir])
+
+  const heatmapTotals = useMemo(() => heatmapRowsRaw.reduce(
+    (acc, r) => ({
+      spend:     acc.spend + r.spend,
+      leads:     acc.leads + r.leads,
+      qualified: acc.qualified + r.qualified,
+      purchases: acc.purchases + r.purchases,
+    }),
+    { spend: 0, leads: 0, qualified: 0, purchases: 0 },
+  ), [heatmapRowsRaw])
+
+  const heatmapExtremes = useMemo(() => {
+    const init = {
+      spend:     { min: Infinity, max: -Infinity },
+      leads:     { min: Infinity, max: -Infinity },
+      qualified: { min: Infinity, max: -Infinity },
+      purchases: { min: Infinity, max: -Infinity },
+    }
+    if (heatmapRowsRaw.length === 0) {
+      return { spend: { min: 0, max: 0 }, leads: { min: 0, max: 0 }, qualified: { min: 0, max: 0 }, purchases: { min: 0, max: 0 } }
+    }
+    for (const r of heatmapRowsRaw) {
+      for (const k of ['spend', 'leads', 'qualified', 'purchases'] as const) {
+        const v = r[k]
+        if (v < init[k].min) init[k].min = v
+        if (v > init[k].max) init[k].max = v
+      }
+    }
+    return init
+  }, [heatmapRowsRaw])
+
+  function pickPlatform(p: 'all' | AdPlatform) {
+    setTablePlatform(p)
+    setTableCampaign('all')
+    setTableAd('all')
+  }
+  function pickCampaign(id: string) {
+    setTableCampaign(id)
+    setTableAd('all')
+  }
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDir(key === 'date' ? 'desc' : 'desc')
+    }
+  }
 
   if (!client) {
     return (
@@ -241,117 +327,90 @@ export default function StatsPage() {
         <ConversionsChart data={funnelDaily} />
       </div>
 
-      {/* ── Cost by campaign ────────────────────────────────────────── */}
+      {/* ── Daily heatmap table ─────────────────────────────────────── */}
       <div className="card" style={{ marginBottom: 20 }}>
-        <div className="card-title">Cost by campaign</div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border, #333)' }}>
-                <th style={{ padding: '8px 6px', minWidth: 80 }}>Platform</th>
-                <th style={{ padding: '8px 6px', minWidth: 280 }}>Campaign</th>
-                <th style={{ padding: '8px 6px', textAlign: 'right' }}>Spend</th>
-                <th style={{ padding: '8px 6px', textAlign: 'right' }}>{event}s</th>
-                <th style={{ padding: '8px 6px', textAlign: 'right' }}>Cost / {event}</th>
-                <th style={{ padding: '8px 6px' }}>Optimized for</th>
-                <th style={{ padding: '8px 6px' }}>Status</th>
-                <th style={{ padding: '8px 6px', width: 90 }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {campaignRows.length === 0 && (
-                <tr><td colSpan={8} style={{ padding: 20, color: 'var(--text-muted)' }}>No campaigns in this date range.</td></tr>
-              )}
-              {[...campaignRows].sort((a, b) => b.spend - a.spend).map(r => (
-                <tr key={r.campaign.id} style={{ borderBottom: '1px solid var(--border, #2a2a2a)' }}>
-                  <td style={{ padding: '8px 6px' }}><PlatformBadge platform={r.campaign.platform} /></td>
-                  <td style={{ padding: '8px 6px' }}>{r.campaign.name}</td>
-                  <td style={{ padding: '8px 6px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(r.spend)}</td>
-                  <td style={{ padding: '8px 6px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtNum(r.conversionsForEvent)}</td>
-                  <td style={{ padding: '8px 6px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                    {r.costPerConversion != null ? fmtMoney(r.costPerConversion) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                  </td>
-                  <td style={{ padding: '8px 6px', fontSize: 12, color: 'var(--text-muted)' }}>{r.campaign.primary_event}</td>
-                  <td style={{ padding: '8px 6px' }}>
-                    <span style={{
-                      fontSize: 11, padding: '2px 8px', borderRadius: 999,
-                      background: r.campaign.status === 'active' ? 'rgba(52,211,153,0.15)' : 'rgba(115,115,115,0.2)',
-                      color: r.campaign.status === 'active' ? '#34d399' : 'var(--text-muted)',
-                    }}>
-                      {r.campaign.status}
-                    </span>
-                  </td>
-                  <td style={{ padding: '8px 6px', textAlign: 'right' }}>
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => setCampaignFilter(c => c === r.campaign.id ? '' : r.campaign.id)}
-                      title="Filter ads to this campaign"
-                    >
-                      {campaignFilter === r.campaign.id ? '× clear' : 'View ads'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+          <div>
+            <div className="card-title" style={{ marginBottom: 0 }}>Daily breakdown</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+              Filters scope this table only — cards and charts above stay on the date range + selected event.
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', fontSize: 12 }}>
+            <label style={{ color: 'var(--text-muted)' }}>Platform:</label>
+            <select
+              className="form-input"
+              value={tablePlatform}
+              onChange={e => pickPlatform(e.target.value as 'all' | AdPlatform)}
+              style={{ padding: '4px 10px', fontSize: 12 }}
+            >
+              <option value="all">All</option>
+              <option value="google">{PLATFORM_LABEL.google}</option>
+              <option value="meta">{PLATFORM_LABEL.meta}</option>
+            </select>
 
-      {/* ── Cost by ad ──────────────────────────────────────────────── */}
-      <div className="card" style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-          <div className="card-title" style={{ marginBottom: 0 }}>Cost by ad</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
             <label style={{ color: 'var(--text-muted)' }}>Campaign:</label>
             <select
               className="form-input"
-              value={campaignFilter}
-              onChange={e => setCampaignFilter(e.target.value)}
-              style={{ padding: '4px 10px', fontSize: 12 }}
+              value={tableCampaign}
+              onChange={e => pickCampaign(e.target.value)}
+              style={{ padding: '4px 10px', fontSize: 12, maxWidth: 260 }}
             >
-              <option value="">All campaigns</option>
-              {stats?.campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value="all">All</option>
+              {tableCampaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+
+            <label style={{ color: 'var(--text-muted)' }}>Ad:</label>
+            <select
+              className="form-input"
+              value={tableAd}
+              onChange={e => setTableAd(e.target.value)}
+              style={{ padding: '4px 10px', fontSize: 12, maxWidth: 220 }}
+            >
+              <option value="all">All</option>
+              {tableAds.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </div>
         </div>
+
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 640 }}>
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border, #333)' }}>
-                <th style={{ padding: '8px 6px', minWidth: 80 }}>Platform</th>
-                <th style={{ padding: '8px 6px', minWidth: 240 }}>Ad</th>
-                <th style={{ padding: '8px 6px', minWidth: 200 }}>Campaign</th>
-                <th style={{ padding: '8px 6px' }}>Format</th>
-                <th style={{ padding: '8px 6px', textAlign: 'right' }}>Spend</th>
-                <th style={{ padding: '8px 6px', textAlign: 'right' }}>{event}s</th>
-                <th style={{ padding: '8px 6px', textAlign: 'right' }}>Cost / {event}</th>
+                <SortableTh label="Date"            keyName="date"      sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left" />
+                <SortableTh label="Cost"            keyName="spend"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                <SortableTh label="Leads"           keyName="leads"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                <SortableTh label="Qualified Leads" keyName="qualified" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                <SortableTh label="Conversions"     keyName="purchases" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" subLabel="(Purchases)" />
               </tr>
             </thead>
             <tbody>
-              {adRows.length === 0 && (
-                <tr><td colSpan={7} style={{ padding: 20, color: 'var(--text-muted)' }}>No ads in this date range.</td></tr>
+              {heatmapRows.length === 0 && (
+                <tr><td colSpan={5} style={{ padding: 20, color: 'var(--text-muted)' }}>No data for this filter combination.</td></tr>
               )}
-              {[...adRows].sort((a, b) => b.spend - a.spend).slice(0, 50).map(r => (
-                <tr key={r.ad.id} style={{ borderBottom: '1px solid var(--border, #2a2a2a)' }}>
-                  <td style={{ padding: '8px 6px' }}><PlatformBadge platform={r.ad.platform} /></td>
-                  <td style={{ padding: '8px 6px' }}>{r.ad.name}</td>
-                  <td style={{ padding: '8px 6px', color: 'var(--text-muted)', fontSize: 12 }}>{r.campaignName}</td>
-                  <td style={{ padding: '8px 6px', fontSize: 12 }}>{r.ad.format}</td>
-                  <td style={{ padding: '8px 6px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(r.spend)}</td>
-                  <td style={{ padding: '8px 6px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtNum(r.conversionsForEvent)}</td>
-                  <td style={{ padding: '8px 6px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                    {r.costPerConversion != null ? fmtMoney(r.costPerConversion) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                  </td>
+              {heatmapRows.map(r => (
+                <tr key={r.date} style={{ borderBottom: '1px solid var(--border, #2a2a2a)' }}>
+                  <td style={{ padding: '8px 10px', fontFamily: 'var(--font-mono, monospace)', fontSize: 12, whiteSpace: 'nowrap' }}>{r.date}</td>
+                  <Cell value={r.spend}     min={heatmapExtremes.spend.min}     max={heatmapExtremes.spend.max}     hue={HEATMAP_HUE.cost}      format={fmtMoney} />
+                  <Cell value={r.leads}     min={heatmapExtremes.leads.min}     max={heatmapExtremes.leads.max}     hue={HEATMAP_HUE.leads}     format={fmtNum} />
+                  <Cell value={r.qualified} min={heatmapExtremes.qualified.min} max={heatmapExtremes.qualified.max} hue={HEATMAP_HUE.qualified} format={fmtNum} />
+                  <Cell value={r.purchases} min={heatmapExtremes.purchases.min} max={heatmapExtremes.purchases.max} hue={HEATMAP_HUE.purchases} format={fmtNum} />
                 </tr>
               ))}
             </tbody>
+            {heatmapRows.length > 0 && (
+              <tfoot>
+                <tr style={{ borderTop: '2px solid var(--border, #333)', background: 'rgba(255,255,255,0.02)' }}>
+                  <td style={{ padding: '8px 10px', fontWeight: 600 }}>Totals · {heatmapRowsRaw.length} day{heatmapRowsRaw.length === 1 ? '' : 's'}</td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(heatmapTotals.spend)}</td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(heatmapTotals.leads)}</td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(heatmapTotals.qualified)}</td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(heatmapTotals.purchases)}</td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
-        {adRows.length > 50 && (
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8, textAlign: 'right' }}>
-            Showing top 50 of {adRows.length} ads (by spend).
-          </div>
-        )}
       </div>
 
       {/* Footer note */}
@@ -388,16 +447,88 @@ function PlatformDot({ platform }: { platform: AdPlatform }) {
   )
 }
 
-function PlatformBadge({ platform }: { platform: AdPlatform }) {
+// Heatmap palette — single hue per column. Picked so each column reads as a
+// visually distinct band and the dark-cell text stays legible.
+//   Cost            amber-500 (#f59e0b)  — money
+//   Leads           cyan-500  (#06b6d4)  — top of funnel (matches chart)
+//   Qualified Leads emerald-400 (#34d399) — middle (matches chart)
+//   Conversions     violet-500 (#a855f7) — distinct from amber/Cost
+const HEATMAP_HUE = {
+  cost:      '#f59e0b',
+  leads:     '#06b6d4',
+  qualified: '#34d399',
+  purchases: '#a855f7',
+} as const
+
+function hexToRgb(hex: string): [number, number, number] {
+  return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]
+}
+
+function cellBackground(value: number, min: number, max: number, hex: string): string {
+  if (max <= 0 || max === min) return 'transparent'
+  const t = Math.max(0, Math.min(1, (value - min) / (max - min)))
+  // Floor at 0.04 so even the smallest non-zero cell carries a tint; ceil at
+  // 0.55 so dark cells never wash out white text on the dark theme.
+  const alpha = value === 0 ? 0 : 0.04 + t * 0.55
+  const [r, g, b] = hexToRgb(hex)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+function Cell({
+  value, min, max, hue, format,
+}: {
+  value: number
+  min: number
+  max: number
+  hue: string
+  format: (n: number) => string
+}) {
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4,
-      padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 600,
-      background: `${PLATFORM_COLOR[platform]}22`, color: PLATFORM_COLOR[platform],
+    <td style={{
+      padding: '8px 10px',
+      textAlign: 'right',
+      fontVariantNumeric: 'tabular-nums',
+      background: cellBackground(value, min, max, hue),
+      color: value === 0 ? 'var(--text-muted)' : 'var(--text-primary)',
     }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: PLATFORM_COLOR[platform] }} />
-      {PLATFORM_LABEL[platform]}
-    </span>
+      {format(value)}
+    </td>
+  )
+}
+
+type SortableKey = 'date' | 'spend' | 'leads' | 'qualified' | 'purchases'
+
+function SortableTh({
+  label, keyName, sortKey, sortDir, onClick, align, subLabel,
+}: {
+  label: string
+  keyName: SortableKey
+  sortKey: SortableKey
+  sortDir: 'asc' | 'desc'
+  onClick: (k: SortableKey) => void
+  align: 'left' | 'right'
+  subLabel?: string
+}) {
+  const isActive = sortKey === keyName
+  const arrow = isActive ? (sortDir === 'asc' ? '▲' : '▼') : ''
+  return (
+    <th
+      onClick={() => onClick(keyName)}
+      style={{
+        padding: '8px 10px',
+        textAlign: align,
+        cursor: 'pointer',
+        userSelect: 'none',
+        whiteSpace: 'nowrap',
+        color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+        fontWeight: isActive ? 600 : 500,
+      }}
+      title={`Sort by ${label}`}
+    >
+      {label}
+      {subLabel && <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 11, marginLeft: 4 }}>{subLabel}</span>}
+      {arrow && <span style={{ marginLeft: 6, fontSize: 10 }}>{arrow}</span>}
+    </th>
   )
 }
 

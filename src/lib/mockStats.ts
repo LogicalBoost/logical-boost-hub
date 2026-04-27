@@ -335,6 +335,54 @@ export function dailyByPlatform(stats: MockStats, range: DateRange): DailyPlatfo
   return Array.from(map.values()).sort((a, b) => a.date < b.date ? -1 : 1)
 }
 
+// Daily heatmap row: spend + funnel counts for one day, after filtering.
+// Drives the daily breakdown table on /stats/.
+export interface HeatmapRow {
+  date: string
+  spend: number
+  leads: number
+  qualified: number
+  purchases: number
+}
+
+export interface HeatmapFilters {
+  platform?: AdPlatform | 'all'
+  campaignId?: string | 'all'
+  adId?: string | 'all'
+}
+
+export function dailyHeatmap(
+  stats: MockStats,
+  range: DateRange,
+  filters: HeatmapFilters = {},
+): HeatmapRow[] {
+  const platform   = filters.platform   ?? 'all'
+  const campaignId = filters.campaignId ?? 'all'
+  const adId       = filters.adId       ?? 'all'
+
+  const map = new Map<string, HeatmapRow>()
+  const from = new Date(range.from + 'T00:00:00Z')
+  const to   = new Date(range.to   + 'T00:00:00Z')
+  for (let t = from.getTime(); t <= to.getTime(); t += 86400000) {
+    const d = isoDay(new Date(t))
+    map.set(d, { date: d, spend: 0, leads: 0, qualified: 0, purchases: 0 })
+  }
+  for (const m of stats.daily) {
+    if (!inRange(m.date, range)) continue
+    if (platform   !== 'all' && m.platform    !== platform)   continue
+    if (campaignId !== 'all' && m.campaign_id !== campaignId) continue
+    if (adId       !== 'all' && m.ad_id       !== adId)       continue
+    const row = map.get(m.date)
+    if (!row) continue
+    row.spend     += m.spend
+    row.leads     += m.conversions['Lead']
+    row.qualified += m.conversions['Qualified Lead']
+    row.purchases += m.conversions['Purchase']
+  }
+  // Default: newest first.
+  return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date))
+}
+
 // Daily funnel counts: Lead -> Qualified Lead -> Purchase. These three nest;
 // Phone Call and Add to Cart are deliberately not included (they're separate
 // tracks, not part of the same funnel).
