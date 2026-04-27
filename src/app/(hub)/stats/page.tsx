@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAppStore } from '@/lib/store'
 import {
   generateMockStats,
@@ -49,6 +49,17 @@ export default function StatsPage() {
   type SortKey = 'date' | 'spend' | 'leads' | 'qualified' | 'purchases'
   const [sortKey, setSortKey] = useState<SortKey>('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  // Narrow-viewport detection for the heatmap table. Below 600px we tighten
+  // padding, abbreviate headers, and format Cost as $1.2k. Initial state
+  // matches SSR (false / desktop) and re-renders on the client.
+  const [narrow, setNarrow] = useState(false)
+  useEffect(() => {
+    const update = () => setNarrow(window.innerWidth < 600)
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
 
   const range = rangeFromPreset(preset, custom)
 
@@ -167,17 +178,14 @@ export default function StatsPage() {
 
   // Top-line numbers — selected event is the lever for cost-per-conversion.
   const totalSpend = totals?.spend ?? 0
-  const totalConversions = totals?.totalConversions ?? 0
   const eventConversions = totals?.conversionsByEvent[event] ?? 0
   const costPerEvent = eventConversions > 0 ? totalSpend / eventConversions : null
 
   const prevSpend = prevTotals?.spend ?? 0
-  const prevTotalConv = prevTotals?.totalConversions ?? 0
   const prevEventConv = prevTotals?.conversionsByEvent[event] ?? 0
   const prevCostPerEvent = prevEventConv > 0 ? prevSpend / prevEventConv : null
 
   const spendDelta = fmtPercentDelta(totalSpend, prevSpend)
-  const convDelta = fmtPercentDelta(totalConversions, prevTotalConv)
   const cplDelta = costPerEvent != null && prevCostPerEvent != null ? fmtPercentDelta(costPerEvent, prevCostPerEvent) : null
 
   return (
@@ -263,16 +271,6 @@ export default function StatsPage() {
         </div>
 
         <div className="stat-card">
-          <div className="stat-label">Total Conversions <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>(all events)</span></div>
-          <div className="stat-value">{fmtNum(totalConversions)}</div>
-          {convDelta && (
-            <div className="stat-change" style={{ color: convDelta.positive ? 'var(--success, #34d399)' : 'var(--warning, #f59e0b)' }}>
-              {convDelta.text} vs previous period
-            </div>
-          )}
-        </div>
-
-        <div className="stat-card">
           <div className="stat-label">Cost per {event}</div>
           <div className="stat-value">{costPerEvent != null ? fmtMoney(costPerEvent) : '—'}</div>
           <div className="stat-change" style={{ color: 'var(--text-muted)' }}>
@@ -282,17 +280,6 @@ export default function StatsPage() {
                 · {cplDelta.text} vs prev
               </span>
             )}
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-label">Active Campaigns</div>
-          <div className="stat-value">
-            {stats?.campaigns.filter(c => c.status === 'active').length ?? 0}
-            <span style={{ fontSize: 16, color: 'var(--text-muted)', marginLeft: 6 }}>/ {stats?.campaigns.length ?? 0}</span>
-          </div>
-          <div className="stat-change" style={{ color: 'var(--text-muted)' }}>
-            {stats?.ads.length ?? 0} total ads
           </div>
         </div>
       </div>
@@ -374,14 +361,19 @@ export default function StatsPage() {
         </div>
 
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 640 }}>
+          <table style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            fontSize: narrow ? 12 : 13,
+            minWidth: narrow ? 0 : 640,
+          }}>
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border, #333)' }}>
-                <SortableTh label="Date"            keyName="date"      sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left" />
-                <SortableTh label="Cost"            keyName="spend"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
-                <SortableTh label="Leads"           keyName="leads"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
-                <SortableTh label="Qualified Leads" keyName="qualified" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
-                <SortableTh label="Conversions"     keyName="purchases" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" subLabel="(Purchases)" />
+                <SortableTh label="Date"                                       keyName="date"      sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="left"  narrow={narrow} />
+                <SortableTh label="Cost"                                       keyName="spend"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" narrow={narrow} />
+                <SortableTh label="Leads"                                      keyName="leads"     sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" narrow={narrow} />
+                <SortableTh label={narrow ? 'Qualified' : 'Qualified Leads'}   keyName="qualified" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" narrow={narrow} />
+                <SortableTh label={narrow ? 'Conv.' : 'Conversions'}           keyName="purchases" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" narrow={narrow} />
               </tr>
             </thead>
             <tbody>
@@ -390,22 +382,22 @@ export default function StatsPage() {
               )}
               {heatmapRows.map(r => (
                 <tr key={r.date} style={{ borderBottom: '1px solid var(--border, #2a2a2a)' }}>
-                  <td style={{ padding: '8px 10px', fontFamily: 'var(--font-mono, monospace)', fontSize: 12, whiteSpace: 'nowrap' }}>{r.date}</td>
-                  <Cell value={r.spend}     min={heatmapExtremes.spend.min}     max={heatmapExtremes.spend.max}     hue={HEATMAP_HUE.cost}      format={fmtMoney} />
-                  <Cell value={r.leads}     min={heatmapExtremes.leads.min}     max={heatmapExtremes.leads.max}     hue={HEATMAP_HUE.leads}     format={fmtNum} />
-                  <Cell value={r.qualified} min={heatmapExtremes.qualified.min} max={heatmapExtremes.qualified.max} hue={HEATMAP_HUE.qualified} format={fmtNum} />
-                  <Cell value={r.purchases} min={heatmapExtremes.purchases.min} max={heatmapExtremes.purchases.max} hue={HEATMAP_HUE.purchases} format={fmtNum} />
+                  <td style={{ padding: narrow ? '6px 6px' : '8px 10px', fontSize: narrow ? 11 : 12, whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>{fmtShortDate(r.date)}</td>
+                  <Cell value={r.spend}     min={heatmapExtremes.spend.min}     max={heatmapExtremes.spend.max}     hue={HEATMAP_HUE.cost}      format={(n) => fmtCostCompact(n, narrow)} narrow={narrow} />
+                  <Cell value={r.leads}     min={heatmapExtremes.leads.min}     max={heatmapExtremes.leads.max}     hue={HEATMAP_HUE.leads}     format={fmtNum} narrow={narrow} />
+                  <Cell value={r.qualified} min={heatmapExtremes.qualified.min} max={heatmapExtremes.qualified.max} hue={HEATMAP_HUE.qualified} format={fmtNum} narrow={narrow} />
+                  <Cell value={r.purchases} min={heatmapExtremes.purchases.min} max={heatmapExtremes.purchases.max} hue={HEATMAP_HUE.purchases} format={fmtNum} narrow={narrow} />
                 </tr>
               ))}
             </tbody>
             {heatmapRows.length > 0 && (
               <tfoot>
                 <tr style={{ borderTop: '2px solid var(--border, #333)', background: 'rgba(255,255,255,0.02)' }}>
-                  <td style={{ padding: '8px 10px', fontWeight: 600 }}>Totals · {heatmapRowsRaw.length} day{heatmapRowsRaw.length === 1 ? '' : 's'}</td>
-                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtMoney(heatmapTotals.spend)}</td>
-                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(heatmapTotals.leads)}</td>
-                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(heatmapTotals.qualified)}</td>
-                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(heatmapTotals.purchases)}</td>
+                  <td style={{ padding: narrow ? '6px 6px' : '8px 10px', fontWeight: 600 }}>Totals{narrow ? '' : ` · ${heatmapRowsRaw.length} day${heatmapRowsRaw.length === 1 ? '' : 's'}`}</td>
+                  <td style={{ padding: narrow ? '6px 6px' : '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtCostCompact(heatmapTotals.spend, narrow)}</td>
+                  <td style={{ padding: narrow ? '6px 6px' : '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(heatmapTotals.leads)}</td>
+                  <td style={{ padding: narrow ? '6px 6px' : '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(heatmapTotals.qualified)}</td>
+                  <td style={{ padding: narrow ? '6px 6px' : '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(heatmapTotals.purchases)}</td>
                 </tr>
               </tfoot>
             )}
@@ -475,17 +467,18 @@ function cellBackground(value: number, min: number, max: number, hex: string): s
 }
 
 function Cell({
-  value, min, max, hue, format,
+  value, min, max, hue, format, narrow,
 }: {
   value: number
   min: number
   max: number
   hue: string
   format: (n: number) => string
+  narrow?: boolean
 }) {
   return (
     <td style={{
-      padding: '8px 10px',
+      padding: narrow ? '6px 6px' : '8px 10px',
       textAlign: 'right',
       fontVariantNumeric: 'tabular-nums',
       background: cellBackground(value, min, max, hue),
@@ -496,10 +489,28 @@ function Cell({
   )
 }
 
+// "2026-04-15" -> "Apr 15". Year is implicit from the date-range filter.
+function fmtShortDate(iso: string): string {
+  const d = new Date(iso + 'T00:00:00Z')
+  const month = d.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' })
+  const day = d.getUTCDate()
+  return `${month} ${day}`
+}
+
+// Compact cost format on narrow viewports: $1,234 -> $1.2k. Desktop keeps
+// the precise dollar figure via fmtMoney.
+function fmtCostCompact(n: number, narrow: boolean): string {
+  if (!narrow) return fmtMoney(n)
+  if (!isFinite(n)) return '—'
+  if (Math.abs(n) >= 10_000) return '$' + (n / 1000).toFixed(0) + 'k'
+  if (Math.abs(n) >= 1_000)  return '$' + (n / 1000).toFixed(1) + 'k'
+  return '$' + n.toFixed(0)
+}
+
 type SortableKey = 'date' | 'spend' | 'leads' | 'qualified' | 'purchases'
 
 function SortableTh({
-  label, keyName, sortKey, sortDir, onClick, align, subLabel,
+  label, keyName, sortKey, sortDir, onClick, align, narrow,
 }: {
   label: string
   keyName: SortableKey
@@ -507,7 +518,7 @@ function SortableTh({
   sortDir: 'asc' | 'desc'
   onClick: (k: SortableKey) => void
   align: 'left' | 'right'
-  subLabel?: string
+  narrow?: boolean
 }) {
   const isActive = sortKey === keyName
   const arrow = isActive ? (sortDir === 'asc' ? '▲' : '▼') : ''
@@ -515,18 +526,18 @@ function SortableTh({
     <th
       onClick={() => onClick(keyName)}
       style={{
-        padding: '8px 10px',
+        padding: narrow ? '6px 6px' : '8px 10px',
         textAlign: align,
         cursor: 'pointer',
         userSelect: 'none',
         whiteSpace: 'nowrap',
         color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
         fontWeight: isActive ? 600 : 500,
+        fontSize: narrow ? 11 : 13,
       }}
       title={`Sort by ${label}`}
     >
       {label}
-      {subLabel && <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 11, marginLeft: 4 }}>{subLabel}</span>}
       {arrow && <span style={{ marginLeft: 6, fontSize: 10 }}>{arrow}</span>}
     </th>
   )
